@@ -1,0 +1,21 @@
+version: '2'
+services:
+  python:
+    image: gfw/pipe-events
+    build: .
+    entrypoint: python
+    volumes:
+      - ".:/opt/project"
+      - "gcp:/root/.config/"
+
+  gcloud:
+    image: gfw/pipe-events
+    build: .
+    entrypoint: gcloud
+    volumes:
+      - "gcp:/root/.config/"
+
+volumes:
+  gcp:
+
+
