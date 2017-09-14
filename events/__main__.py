@@ -5,14 +5,16 @@ import apache_beam as beam
 
 source_query = """
 select
-    *
+    mmsi, lat, lon, score, timestamp
 from
-    [pipeline_tileset_p_p516_daily.516_resample_v2_2017_09_08_messages] messages
-limit 1000
+    [pipeline_tileset_p_p516_daily.516_resample_v2_2017_09_08_messages]
+where
+    year(timestamp) = 2017
 """
 
 def to_timestamped_message(x):
     import datetime as dt
+    import apache_beam as beam
 
     timestamp = dt.datetime.strptime(x['timestamp'], "%Y-%m-%d %H:%M:%S.%f %Z")
     unix_timestamp = (timestamp - dt.datetime(1970, 1, 1)).total_seconds()
@@ -50,6 +52,12 @@ def collect_messages_into_event(x):
     def longitude(x):
         return x['lon']
 
+    def safe_stdev(xs, mean):
+        if len(xs) > 1:
+            return stat.stdev(xs, mean)
+        else:
+            return 0
+
     (mmsi, messages) = x
     logging.debug("Collecting %d messages for a single mmsi %s into an event: %s", len(messages), mmsi, messages)
 
@@ -68,11 +76,11 @@ def collect_messages_into_event(x):
 
     all_scores = map(score, all_messages)
     all_mean = stat.mean(all_scores)
-    all_stddev = stat.stdev(all_scores, all_mean)
+    all_stddev = safe_stdev(all_scores, all_mean)
 
     fishing_scores = map(score, fishing_messages)
     fishing_mean = stat.mean(fishing_scores)
-    fishing_stddev = stat.stdev(fishing_scores, fishing_mean)
+    fishing_stddev = safe_stdev(fishing_scores, fishing_mean)
 
     time_bucket_start = first_message['timestamp'].replace(minute=0, second=0, microsecond=0)
     time_bucket_end = time_bucket_start + dt.timedelta(hours=1)
@@ -104,13 +112,13 @@ def run():
         (
             pipeline
             | beam.io.Read(source)
-            | beam.Map(to_timestamped_message)
             | beam.Filter(has_score)
-            | beam.WindowInto(beam.window.FixedWindows(3600 * 24))
+            | beam.Map(to_timestamped_message)
+            | beam.WindowInto(beam.window.FixedWindows(3600))
             | beam.Map(to_mmsi_tuples)
             | beam.GroupByKey()
             | beam.FlatMap(collect_messages_into_event)
-            | beam.io.WriteToText('gs://andres-scratch/pipe-events/')
+            | beam.io.WriteToText('gs://andres-scratch/pipe-events/results/output')
         )
 
 if __name__ == '__main__':
