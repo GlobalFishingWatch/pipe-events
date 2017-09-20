@@ -10,3 +10,5 @@ FROM
      ON messages.seg_id == vessels.seg_id
 WHERE
   messages.score IS NOT NULL
+LIMIT
+  1000

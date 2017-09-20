@@ -17,18 +17,20 @@ def run():
     standard_options = options.view_as(StandardOptions)
     events_options = options.view_as(EventsOptions)
 
+    if events_options.source.startswith("@"):
+        events_options.source = Source.read_query(events_options.source[1:])
+
     logging.info("Running events pipeline with the following options")
     logging.info(options)
     logging.info(google_options)
     logging.info(standard_options)
     logging.info(events_options)
 
-    query = Source.read_query(events_options.source)
     pipeline = Pipeline(options=options)
 
     (
         pipeline
-        | "ReadFromSource" >> Source(query)
+        | "ReadFromSource" >> Source(events_options.source)
         | "Cleanup" >> Cleanup()
         | "GroupHourly" >> GroupByIdAndTimeBucket(GroupByIdAndTimeBucket.HOURLY_BUCKET)
         | "CollectEvents" >> Events(fishing_threshold=events_options.fishing_threshold)
