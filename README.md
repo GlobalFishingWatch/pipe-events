@@ -16,6 +16,13 @@ pipelines.
 For now, we only have a fishing events pipeline, which can be run with
 `docker-compose run python -m events [PARAMETERS]`.
 
+You need to first authenticate with your google cloud account inside the docker
+images. To do that, you need to run this command and follow the instructions:
+
+```
+docker-compose run gcloud auth login
+```
+
 ## Running locally
 
 To run the pipeline locally, you only need to configure a source query and a
@@ -46,16 +53,9 @@ records instead.
 
 ## Running in Google Cloud Dataflow
 
-To run the pipeline in google cloud dataflow, you need to first authenticate
-with your google cloud account inside the docker images. To do that, you need
-to run the following command:
-
-```
-docker-compose run gcloud auth login
-```
-
-Then you need to setup a couple more parameters that specify how the pipeline
-runs in the cloud infrastructure. For example, you could run this:
+To run the pipline remotely on google cloud dataflow you need to setup a couple
+more parameters that specify how the pipeline runs in the cloud infrastructure.
+For example, you could run this:
 
 ```
 docker-compose run python -m events
