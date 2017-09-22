@@ -1,7 +1,7 @@
 # Events pipeline
 
-This repository contains the different dataflow pipelines we run to extract
-summarized events out of our data.
+This repository contains the fishing events pipeline, a dataflow pipeline which
+extracts summarized fishing events from a collection of scored AIS messages.
 
 # Running
 
@@ -9,15 +9,13 @@ summarized events out of our data.
 
 You just need [docker](https://www.docker.com/) and
 [docker-compose](https://docs.docker.com/compose/) in your machine to run the
-pipelines.
+pipeline. No other dependency is required.
 
-## Pipelines
+## Prerequisites
 
-For now, we only have a fishing events pipeline, which can be run with
-`docker-compose run python -m events [PARAMETERS]`.
-
-You need to first authenticate with your google cloud account inside the docker
-images. To do that, you need to run this command and follow the instructions:
+The pipeline reads it's input from BigQuery, so you need to first authenticate
+with your google cloud account inside the docker images. To do that, you need
+to run this command and follow the instructions:
 
 ```
 docker-compose run gcloud auth login
@@ -29,7 +27,7 @@ To run the pipeline locally, you only need to configure a source query and a
 sink to upload the results to. For example, you could run this:
 
 ```
-docker-compose run python -m events \
+docker-compose run pipeline \
   --project world-fishing-827 \
   --source @examples/local.sql \
   --sink world-fishing-827:scratch_andres.sample \
@@ -58,15 +56,15 @@ more parameters that specify how the pipeline runs in the cloud infrastructure.
 For example, you could run this:
 
 ```
-docker-compose run python -m events
+docker-compose run pipeline
   --runner dataflow  \
   --project world-fishing-827 \
   --source @examples/source.sql \
-  --sink scratch_andres.sample \
+  --sink world-fishing-827:dataset.table \
   --sink_write_disposition WRITE_TRUNCATE \
-  --temp_location gs://andres-scratch/pipe-events/ \
+  --temp_location gs://my-pipeline-scratch/pipe-events/ \
   --setup_file ./setup.py \
-  --job_name andres-fishing-events-all-years \
+  --job_name my-pipline \
   --max_num_workers=200
 ```
 

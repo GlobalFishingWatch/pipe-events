@@ -5,11 +5,11 @@ from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import GoogleCloudOptions
 from apache_beam.options.pipeline_options import StandardOptions
 from options import EventsOptions
-from events.transforms.source import Source
-from events.transforms.cleanup import Cleanup
-from events.transforms.group import GroupByIdAndTimeBucket
-from events.transforms.events import Events
-from events.transforms.sink import Sink
+from pipeline.transforms.source import Source
+from pipeline.transforms.cleanup import Cleanup
+from pipeline.transforms.group import GroupByIdAndTimeBucket
+from pipeline.transforms.events import Events
+from pipeline.transforms.sink import Sink
 
 def run():
     options = PipelineOptions()

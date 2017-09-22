@@ -1,10 +1,11 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="events",
+    name="fishing-events",
     version="1.0.0",
     description="Apache Beam pipeline which computes fishing events out of classified positional messages.",
     author="Global Fishing Watch",
+    author_email="info@globalfishingwatch.org",
     license="Apache 2",
     packages=find_packages(),
     install_requires=[
@@ -19,7 +20,6 @@ setup(
         "crcmod==1.7",
         "dill==0.2.6",
         "enum34==1.1.6",
-        "events==1.0.0",
         "funcsigs==1.0.2",
         "future==0.16.0",
         "futures==3.1.1",
@@ -52,6 +52,5 @@ setup(
         "rsa==3.4.2",
         "six==1.10.0",
         "urllib3==1.22",
-        "virtualenv==15.1.0",
     ]
 )

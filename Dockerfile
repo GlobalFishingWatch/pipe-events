@@ -32,3 +32,6 @@ VOLUME ["/root/.config"]
 COPY . /opt/project
 RUN pip install .
 
+# Setup the entrypoint for quickly executing the pipelines
+ENTRYPOINT ["python", "-m", "pipeline"]
+

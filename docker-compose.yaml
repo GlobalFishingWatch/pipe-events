@@ -1,15 +1,14 @@
 version: '2'
 services:
-  python:
-    image: gfw/pipe-events
+  pipeline:
+    image: gfw/pipe-events-fishing
     build: .
-    entrypoint: python
     volumes:
       - ".:/opt/project"
       - "gcp:/root/.config/"
 
   gcloud:
-    image: gfw/pipe-events
+    image: gfw/pipe-events-fishing
     build: .
     entrypoint: gcloud
     volumes:

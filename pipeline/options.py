@@ -6,6 +6,7 @@ class EventsOptions(PipelineOptions):
         parser.add_argument(
             '--source',
             help='BigQuery query that returns the records to process. Might be either a query or a file containing the query if using the `@path/to/file.sql syntax`. Requires selecting the following fields: lat:float, long:float, score:float, timestamp:timestamp, id:integer. See examples/source.sql.',
+            required=True,
         )
 
         parser.add_argument(
