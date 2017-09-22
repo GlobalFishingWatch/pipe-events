@@ -1,46 +1,17 @@
+from pipeline.definition import PipelineDefinition
+import apache_beam as beam
 import logging
-from apache_beam import Pipeline
-from apache_beam import io
-from apache_beam.options.pipeline_options import PipelineOptions
-from apache_beam.options.pipeline_options import GoogleCloudOptions
-from apache_beam.options.pipeline_options import StandardOptions
-from options import EventsOptions
-from pipeline.transforms.source import Source
-from pipeline.transforms.cleanup import Cleanup
-from pipeline.transforms.group import GroupByIdAndTimeBucket
-from pipeline.transforms.events import Events
-from pipeline.transforms.sink import Sink
+import pipeline.options.parser as parser
 
 def run():
-    options = PipelineOptions()
-    google_options = options.view_as(GoogleCloudOptions)
-    standard_options = options.view_as(StandardOptions)
-    events_options = options.view_as(EventsOptions)
+    (options, pipeline_options) = parser.parse()
 
-    if events_options.source.startswith("@"):
-        events_options.source = Source.read_query(events_options.source[1:])
+    definition = PipelineDefinition(options)
+    pipeline = definition.build(beam.Pipeline(options=pipeline_options))
+    job = pipeline.run()
 
-    logging.info("Running events pipeline with the following options")
-    logging.info(options)
-    logging.info(google_options)
-    logging.info(standard_options)
-    logging.info(events_options)
-
-    pipeline = Pipeline(options=options)
-
-    (
-        pipeline
-        | "ReadFromSource" >> Source(events_options.source)
-        | "Cleanup" >> Cleanup()
-        | "GroupHourly" >> GroupByIdAndTimeBucket(GroupByIdAndTimeBucket.HOURLY_BUCKET)
-        | "CollectEvents" >> Events(fishing_threshold=events_options.fishing_threshold)
-        | "WriteToSink" >> Sink(
-            table=events_options.sink,
-            write_disposition=events_options.sink_write_disposition
-        )
-    )
-
-    pipeline.run()
+    if options.remote and options.wait:
+        job.wait_until_finish()
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.DEBUG)
