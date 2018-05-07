@@ -106,3 +106,11 @@ venv.bak/
 # End of https://www.gitignore.io/api/python
 
 output/
+
+# Pycharm
+.idea/
+
+#OSX
+.DS_Store
+
+.pytest_cache/

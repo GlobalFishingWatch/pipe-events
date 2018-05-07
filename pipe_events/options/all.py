@@ -1,4 +1,4 @@
-from pipeline.options.actions import ReadFileAction
+from pipe_events.options.actions import ReadFileAction
 
 def setup(parser):
     """

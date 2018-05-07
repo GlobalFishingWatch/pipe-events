@@ -1,8 +1,8 @@
-from pipeline.transforms.source import Source
-from pipeline.transforms.cleanup import Cleanup
-from pipeline.transforms.group import GroupByIdAndTimeBucket
-from pipeline.transforms.events import Events
-from pipeline.transforms.sink import Sink
+from pipe_events.transforms.source import Source
+from pipe_events.transforms.cleanup import Cleanup
+from pipe_events.transforms.group import GroupByIdAndTimeBucket
+from pipe_events.transforms.events import Events
+from pipe_events.transforms.sink import Sink
 from apache_beam import io
 
 class PipelineDefinition():

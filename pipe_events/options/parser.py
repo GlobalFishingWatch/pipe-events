@@ -1,8 +1,8 @@
 from argparse import ArgumentParser
-import pipeline.options.all as all
-import pipeline.options.local as local
-import pipeline.options.remote as remote
-import pipeline.options.google as google
+import pipe_events.options.all as all
+import pipe_events.options.local as local
+import pipe_events.options.remote as remote
+import pipe_events.options.google as google
 import apache_beam.options.pipeline_options as beam
 
 # We need a custom options class to serialize and store additional options we
