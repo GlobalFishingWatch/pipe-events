@@ -11,19 +11,11 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     temp_bucket="{{ var.value.TEMP_BUCKET }}"  \
     pipeline_bucket="{{ var.value.PIPELINE_BUCKET }}" \
     pipeline_dataset="{{ var.value.PIPELINE_DATASET }}" \
-
-
+    events_dataset="{{ var.value.EVENTS_DATASET }}" \
     source_dataset="{{ var.value.PIPELINE_DATASET }}" \
-    source_table="messages_segmented_" \
-    dest_table="position_messages_" \
-    measures="spatial_measures" \
-    segments="segments_" \
-    segment_identity="segment_identity_" \
-    add_regions_source="position_messages_" \
-    add_regions_dest="regions_" \
-    regions_vector_source="gs://scratch-paul-ttl100/measures/oceans.zip" \
-    region_fields="Ocean" \
-    spatial_measures_source="world-fishing-827:pipe_staging_a.spatial_measures"
+    position_messages="position_messages_" \
+    gap_events_table="gap_events" \
+
 
 echo "Installation Complete"
 

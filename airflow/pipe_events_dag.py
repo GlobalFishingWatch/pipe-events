@@ -14,45 +14,31 @@ class TemplatedBigQueryCheckOperator(BigQueryCheckOperator):
     template_fields = ('sql',)
 
 
-class PipeEventsDagFactory(DagFactory):
+class GapEventsDagFactory(DagFactory):
     def __init__(self, pipeline=PIPELINE, **kwargs):
-        super(PipeEventsDagFactory, self).__init__(pipeline=pipeline, **kwargs)
+        super(GapEventsDagFactory, self).__init__(pipeline=pipeline, **kwargs)
 
     def build(self, dag_id):
         config = self.config
-        # config['date_range'] = ','.join(self.source_date_range())
-        #
-        # with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
-        #     source_sensors = self.source_table_sensors(dag)
-        #
-        #     segment_identity_exists = TemplatedBigQueryCheckOperator(
-        #         task_id='segment_identity_exists',
-        #         sql='SELECT count(*) FROM '
-        #             '[{project_id}:{pipeline_dataset}.{segment_identity}{first_day_of_month_nodash}] '
-        #             'WHERE last_timestamp > TIMESTAMP("{ds} 01:00")'.format(**config),
-        #         retries=24 * 7,  # retry once per hour for a week
-        #         retry_delay=timedelta(minutes=60)
-        #     )
-        #
-        #     add_measures = BashOperator(
-        #         task_id='add_measures',
-        #         pool='bigquery',
-        #         bash_command='{docker_run} {docker_image} add_measures '
-        #                      '{date_range} '
-        #                      '{project_id}.{source_dataset}.{source_table} '
-        #                      '{project_id}:{pipeline_dataset}.{dest_table} '
-        #                      '{project_id}.{pipeline_dataset}.{segments} '
-        #                      '{project_id}.{pipeline_dataset}.{segment_identity}{first_day_of_month_nodash} '
-        #                      '{project_id}.{pipeline_dataset}.{measures} '
-        #                      ''.format(**config)
-        #     )
-        #
-        #     for sensor in source_sensors:
-        #         dag >> sensor >> add_measures
-        #     dag >> segment_identity_exists >> add_measures
-        #
-        # return dag
+        config['source_table'] = config['position_messages']
+        config['date_range'] = ','.join(self.source_date_range())
+
+        with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
+            source_sensors = self.source_table_sensors(dag)
+
+            publish_events = BashOperator(
+                task_id='publish_events',
+                bash_command='{docker_run} {docker_image} gap_events '
+                             '{date_range} '
+                             '{project_id}:{source_dataset}.{position_messages} '
+                             '{project_id}:{events_dataset}.{gap_events_table}'.format(**config)
+            )
+
+            for sensor in source_sensors:
+                dag >> sensor >> publish_events
+
+            return dag
 
 
-# pipe_measures_daily_dag = PipeMeasuresDagFactory().build('pipe_measures_daily')
-# pipe_measures_monthly_dag = PipeMeasuresDagFactory(schedule_interval='@monthly').build('pipe_measures_monthly')
+gaps_events_daily_dag = GapEventsDagFactory().build('gap_events_daily')
+gaps_events_monthly_dag = GapEventsDagFactory(schedule_interval='@monthly').build('gap_events_monthly')

@@ -1,0 +1,75 @@
+#StandardSQL
+
+INSERT INTO `{{ dest }}`
+  (
+    event_id, event_type, vessel_id, timestamp,
+    lat, lon, timestamp_min, timestamp_max,
+    lat_min, lat_max, lon_min, lon_max,
+    event_info
+  )
+
+WITH message as (
+  SELECT
+    vessel_id,
+    timestamp,
+    lat,
+    lon,
+    distance_from_shore_m
+  FROM
+    `{{source}}*`
+  WHERE
+    _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}' AND '{{ end_yyyymmdd }}'
+  ),
+
+  lead_lag_message AS (
+  SELECT
+    *,
+    LEAD(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS next_timestamp,
+    LAG(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS prev_timestamp
+  FROM
+    message
+  ),
+
+  off_message as (
+  SELECT
+    *,
+    "transponder_off" as event_type
+  FROM
+    lead_lag_message
+  WHERE
+    date(timestamp) = DATE "2018-01-01"
+    AND (next_timestamp is null
+         OR TIMESTAMP_DIFF(next_timestamp, timestamp, HOUR) >= 24)
+    AND distance_from_shore_m >= 10000
+  ),
+
+  on_message as (
+  SELECT
+    *,
+    "transponder_on" as event_type
+  FROM
+    lead_lag_message
+  WHERE
+    date(timestamp) = DATE "2018-01-02"
+    AND (prev_timestamp is null
+         OR TIMESTAMP_DIFF(timestamp, prev_timestamp, HOUR) >= 24)
+    AND distance_from_shore_m >= 10000
+  )
+
+  SELECT
+    TO_HEX(MD5(FORMAT("%s|%s|%t", event_type, vessel_id, timestamp))) AS event_id,
+    event_type,
+    vessel_id,
+    timestamp,
+    lat,
+    lon,
+    timestamp as timestamp_min,
+    timestamp as timestamp_max,
+    lat as lat_min,
+    lat as lat_max,
+    lon as lon_min,
+    lon as lon_max,
+    TO_JSON_STRING(STRUCT( distance_from_shore_m )) AS event_info
+  FROM
+    (select * from off_message union all (select * from on_message))
+

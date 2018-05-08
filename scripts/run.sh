@@ -5,6 +5,7 @@ THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 display_usage() {
 	echo "Available Commands"
 	echo "  legacy_events    run dataflow job to create legacy fishing events"
+	echo "  gap_events       publish gap (on/off at sea) events"
 	}
 
 
@@ -21,6 +22,9 @@ case $1 in
     python -m pipe_events
     ;;
 
+  gap_events)
+    ${THIS_SCRIPT_DIR}/gap_events.sh "${@:2}"
+    ;;
 
   *)
     display_usage
