@@ -62,8 +62,8 @@ echo "  Inserting new records for ${START_DATE} to ${END_DATE}"
 jinja2 ${INSERT_SQL} \
    -D source=${SOURCE_TABLE//:/.} \
    -D dest=${DEST_TABLE//:/.} \
-   -D start_yyyymmdd=$(yyyymmdd ${START_DATE}) \
-   -D end_yyyymmdd=$(yyyymmdd ${END_DATE}) \
+   -D start_date=${START_DATE} \
+   -D end_date=${END_DATE} \
    | bq query --max_rows=0
 
 
