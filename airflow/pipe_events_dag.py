@@ -19,11 +19,12 @@ class GapEventsDagFactory(DagFactory):
         super(GapEventsDagFactory, self).__init__(pipeline=pipeline, **kwargs)
 
     def source_date_range(self):
+        # shift the date range one day back
         if self.schedule_interval == '@daily':
-            return '{{ yesterday_ds }}', '{{ ds }}'
+            return '{{ yesterday_ds }}', '{{ yesterday_ds }}'
         elif self.schedule_interval == '@monthly':
             start_date = '{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(days=-1)).strftime("%Y-%m-%d") }}'
-            end_date = self.config['last_day_of_month']
+            end_date = '{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(months=1, days=-2)).strftime("%Y%m%d") }}'
             return start_date, end_date
         else:
             raise ValueError('Unsupported schedule interval {}'.format(self.schedule_interval))
@@ -38,6 +39,7 @@ class GapEventsDagFactory(DagFactory):
 
             publish_events = BashOperator(
                 task_id='publish_events',
+                depends_on_past=True,
                 bash_command='{docker_run} {docker_image} gap_events '
                              '{date_range} '
                              '{project_id}:{source_dataset}.{position_messages} '

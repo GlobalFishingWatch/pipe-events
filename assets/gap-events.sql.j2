@@ -19,8 +19,8 @@ WITH message as (
     `{{source}}*`
   WHERE
     _TABLE_SUFFIX BETWEEN
-        'FORMAT_DATE("%Y%m%d", DATE_SUB( DATE "{{ start_date }}", INTERVAL 1 DAY) )' AND
-        'FORMAT_DATE("%Y%m%d", DATE "{{ end_date }}" )'
+        FORMAT_DATE("%Y%m%d", DATE_SUB( DATE "{{ start_date }}", INTERVAL 1 DAY) ) AND
+        FORMAT_DATE("%Y%m%d", DATE_ADD( DATE "{{ end_date }}", INTERVAL 1 DAY) )
   ),
 
   lead_lag_message AS (
@@ -39,7 +39,7 @@ WITH message as (
   FROM
     lead_lag_message
   WHERE
-    DATE(timestamp) BETWEEN DATE "{{ start_date }}" AND DATE_SUB( DATE("{{ end_date }}"), INTERVAL 1 DAY)
+    DATE(timestamp) BETWEEN DATE "{{ start_date }}" AND  DATE "{{ end_date }}"
     AND (next_timestamp is null
          OR TIMESTAMP_DIFF(next_timestamp, timestamp, HOUR) >= 24)
     AND distance_from_shore_m >= 10000
