@@ -18,6 +18,16 @@ class GapEventsDagFactory(DagFactory):
     def __init__(self, pipeline=PIPELINE, **kwargs):
         super(GapEventsDagFactory, self).__init__(pipeline=pipeline, **kwargs)
 
+    def source_date_range(self):
+        if self.schedule_interval == '@daily':
+            return '{{ yesterday_ds }}', '{{ ds }}'
+        elif self.schedule_interval == '@monthly':
+            start_date = '{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(days=-1)).strftime("%Y-%m-%d") }}'
+            end_date = self.config['last_day_of_month']
+            return start_date, end_date
+        else:
+            raise ValueError('Unsupported schedule interval {}'.format(self.schedule_interval))
+
     def build(self, dag_id):
         config = self.config
         config['source_table'] = config['position_messages']
