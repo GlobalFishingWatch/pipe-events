@@ -1,7 +1,7 @@
-from pipeline.definition import PipelineDefinition
+from pipe_events.definition import PipelineDefinition
 import apache_beam as beam
 import logging
-import pipeline.options.parser as parser
+import pipe_events.options.parser as parser
 
 def run():
     (options, pipeline_options) = parser.parse()
