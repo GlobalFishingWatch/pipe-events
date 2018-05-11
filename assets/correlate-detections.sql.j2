@@ -94,8 +94,9 @@ LANGUAGE js AS """
 
 """;
 
--- get the vessel positions to be correlated
 WITH
+  -- get the vessel positions to be correlated.  Include a buffer from the day before the target date range so
+  -- we can get a previous position for all vessel points in the range
   vessel_position as (
     SELECT
       vessel_id,
@@ -106,17 +107,21 @@ WITH
     FROM
       `{{vessel_positions}}*`
     WHERE
-      _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}' AND '{{ end_yyyymmdd }}'
+      _TABLE_SUFFIX BETWEEN
+        FORMAT_DATE("%Y%m%d", DATE_SUB( DATE "{{ start_date }}", INTERVAL 1 DAY) ) AND
+        FORMAT_DATE("%Y%m%d", DATE "{{ end_date }}" )
   ),
 
--- Get a set of noise segments to use to filter vessel positions
+  -- Get a set of noise segments to use to filter vessel positions
   noise_segment as (
     SELECT
       seg_id
     FROM
       `{{ segments }}*`
     WHERE
-      _TABLE_SUFFIX BETWEEN '20180101' AND '20180101'
+      _TABLE_SUFFIX BETWEEN
+        FORMAT_DATE("%Y%m%d", DATE "{{ start_date }}" ) AND
+        FORMAT_DATE("%Y%m%d", DATE "{{ end_date }}" )
       AND noise
     GROUP BY seg_id
   ),
@@ -130,7 +135,9 @@ WITH
       Lon_DNB as lon
     FROM `world-fishing-827.pipe_staging_a.raw_vbd`
     WHERE
-      _PARTITIONTIME >= "2018-01-01 00:00:00" AND _PARTITIONTIME < "2018-01-02 00:00:00"
+      DATE(_PARTITIONTIME) BETWEEN
+         DATE "{{ start_date }}" AND
+         DATE "{{ end_date }}"
       AND QF_Detect = 1
   ),
 
@@ -138,9 +145,9 @@ WITH
   vessel_point_pair as (
     SELECT
       v.*,
-      LEAD(timestamp) OVER (PARTITION BY seg_id ORDER BY timestamp) AS next_timestamp,
-      LEAD(lat) OVER (PARTITION BY seg_id ORDER BY timestamp) AS next_lat,
-      LEAD(lon) OVER (PARTITION BY seg_id ORDER BY timestamp) AS next_lon
+      LAG(timestamp) OVER (PARTITION BY seg_id ORDER BY timestamp) AS prev_timestamp,
+      LAG(lat) OVER (PARTITION BY seg_id ORDER BY timestamp) AS prev_lat,
+      LAG(lon) OVER (PARTITION BY seg_id ORDER BY timestamp) AS prev_lon
     FROM
       vessel_position v
     LEFT OUTER JOIN
@@ -151,6 +158,7 @@ WITH
   ),
 
   -- Find detections that fall within the spatial and temporal extent of a vessel point pair
+  -- and filter out vessel points from the buffer day
   candidate_match as (
     SELECT
       v.*,
@@ -163,8 +171,9 @@ WITH
     JOIN
       detection d
     ON
-      d.timestamp BETWEEN v.timestamp AND v.next_timestamp
-      AND contains_point(d.lat, d.lon, v.lat, v.lon, v.next_lat, v.next_lon)
+      d.timestamp BETWEEN v.prev_timestamp AND v.timestamp
+      AND DATE(v.timestamp) BETWEEN DATE "{{ start_date }}" AND DATE "{{ end_date }}"
+      AND contains_point(d.lat, d.lon, v.prev_lat, v.prev_lon, v.lat, v.lon)
   ),
 
   -- Compute the interpolated vessel position for the timestamp of each candidate detection
@@ -173,8 +182,8 @@ WITH
       *,
       interpolate_position (
         UNIX_MICROS(d_timestamp)/1000000.0,
-        lat, lon, UNIX_MICROS(timestamp)/1000000.0,
-        next_lat, next_lon, UNIX_MICROS(next_timestamp)/1000000.0
+        prev_lat, prev_lon, UNIX_MICROS(prev_timestamp)/1000000.0,
+        lat, lon, UNIX_MICROS(timestamp)/1000000.0
         ) as interpolated
     FROM
       candidate_match
