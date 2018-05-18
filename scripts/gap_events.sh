@@ -8,7 +8,7 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 source ${THIS_SCRIPT_DIR}/pipeline.sh
 
 display_usage() {
-	echo -e "\nUsage:\n gap_events YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE DEST_TABLE \n"
+	echo -e "\nUsage:\n gap_events YYYY-MM-DD[,YYYY-MM-DD] MESSAGES_TABLE EVENTS_TABLE \n"
 	}
 
 
@@ -19,8 +19,8 @@ then
 fi
 
 DATE_RANGE=$1
-SOURCE_TABLE=$2
-DEST_TABLE=$3
+MESSAGES_TABLE=$2
+EVENTS_TABLE=$3
 
 IFS=, read START_DATE END_DATE <<<"${DATE_RANGE}"
 if [[ -z $END_DATE ]]; then
@@ -33,7 +33,7 @@ INSERT_SQL=${ASSETS}/gap-events.sql.j2
 SCHEMA=${ASSETS}/events.schema.json
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${SOURCE_TABLE}"
+  "* Source: ${MESSAGES_TABLE}"
   "* Command:"
   "$(basename $0)"
   "$@"
@@ -41,7 +41,7 @@ TABLE_DESC=(
 TABLE_DESC=$( IFS=$'\n'; echo "${TABLE_DESC[*]}" )
 
 
-echo "Publishing gap events to ${DEST_TABLE}..."
+echo "Publishing gap events to ${EVENTS_TABLE}..."
 echo "${TABLE_DESC}"
 
 echo "  Create table"
@@ -50,23 +50,23 @@ bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
   --time_partitioning_field=timestamp \
-  ${DEST_TABLE}
+  ${EVENTS_TABLE}
 
 echo "  Deleting existing records for ${START_DATE} to ${END_DATE}"
 
-jinja2 ${DELETE_SQL} -D table=${DEST_TABLE//:/.} -D start_date=${START_DATE} -D end_date=${END_DATE} \
+jinja2 ${DELETE_SQL} -D table=${EVENTS_TABLE//:/.} -D start_date=${START_DATE} -D end_date=${END_DATE} \
      | bq query --max_rows=0
 
 echo "  Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 ${INSERT_SQL} \
-   -D source=${SOURCE_TABLE//:/.} \
-   -D dest=${DEST_TABLE//:/.} \
+   -D source=${MESSAGES_TABLE//:/.} \
+   -D dest=${EVENTS_TABLE//:/.} \
    -D start_date=${START_DATE} \
    -D end_date=${END_DATE} \
    | bq query --max_rows=0
 
 
-echo "  ${DEST_TABLE} Done."
+echo "  ${EVENTS_TABLE} Done."
 
 

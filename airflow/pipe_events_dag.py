@@ -39,6 +39,7 @@ class GapEventsDagFactory(DagFactory):
 
             publish_events = BashOperator(
                 task_id='publish_events',
+                pool='bigquery',
                 bash_command='{docker_run} {docker_image} gap_events '
                              '{date_range} '
                              '{project_id}:{source_dataset}.{position_messages} '
