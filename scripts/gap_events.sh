@@ -8,11 +8,11 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 source ${THIS_SCRIPT_DIR}/pipeline.sh
 
 display_usage() {
-	echo -e "\nUsage:\n gap_events YYYY-MM-DD[,YYYY-MM-DD] MESSAGES_TABLE EVENTS_TABLE MIN_POS_COUNT \n"
+	echo -e "\nUsage:\n gap_events YYYY-MM-DD[,YYYY-MM-DD] MESSAGES_TABLE EVENTS_TABLE MIN_POS_COUNT MIN_DIST \n"
 	}
 
 
-if [[ $# -ne 4  ]]
+if [[ $# -ne 5  ]]
 then
     display_usage
     exit 1
@@ -22,6 +22,7 @@ DATE_RANGE=$1
 MESSAGES_TABLE=$2
 EVENTS_TABLE=$3
 MIN_POS_COUNT=$4
+MIN_DIST=$5
 
 IFS=, read START_DATE END_DATE <<<"${DATE_RANGE}"
 if [[ -z $END_DATE ]]; then
@@ -66,6 +67,7 @@ jinja2 ${INSERT_SQL} \
    -D start_date=${START_DATE} \
    -D end_date=${END_DATE} \
    -D min_pos_count=${MIN_POS_COUNT} \
+   -D min_dist=${MIN_DIST} \
    | bq query --max_rows=0
 
 

@@ -64,7 +64,7 @@ WITH
     DATE(timestamp) BETWEEN DATE "{{ start_date }}" AND  DATE "{{ end_date }}"
     AND (next_timestamp is null
          OR TIMESTAMP_DIFF(next_timestamp, timestamp, HOUR) >= 24)
-    AND distance_from_shore_m >= 10000
+    AND distance_from_shore_m >= {{ min_dist }}
   ),
 
   on_message as (
@@ -77,7 +77,7 @@ WITH
     DATE(timestamp) BETWEEN DATE "{{ start_date }}"  AND DATE "{{ end_date }}"
     AND (prev_timestamp is null
          OR TIMESTAMP_DIFF(timestamp, prev_timestamp, HOUR) >= 24)
-    AND distance_from_shore_m >= 10000
+    AND distance_from_shore_m >= {{ min_dist }}
   )
 
   SELECT

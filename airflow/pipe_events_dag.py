@@ -44,7 +44,8 @@ class GapEventsDagFactory(DagFactory):
                              '{date_range} '
                              '{project_id}:{source_dataset}.{position_messages} '
                              '{project_id}:{events_dataset}.{gap_events_table} '
-                             '{gap_events_min_pos_count}'.format(**config)
+                             '{gap_events_min_pos_count} '
+                             '{gap_events_min_dist}'.format(**config)
             )
 
             for sensor in source_sensors:
