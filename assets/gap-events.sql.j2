@@ -32,7 +32,7 @@ WITH
     FROM
       message
     GROUP BY seg_id
-    HAVING pos_count >= 3
+    HAVING pos_count >= {{ min_pos_count }}
   ),
 
   filtered_message as (

@@ -15,6 +15,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     source_dataset="{{ var.value.PIPELINE_DATASET }}" \
     position_messages="position_messages_" \
     gap_events_table="gap_events" \
+    gap_events_min_pos_count="3" \
 
 
 echo "Installation Complete"

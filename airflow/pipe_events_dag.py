@@ -43,7 +43,8 @@ class GapEventsDagFactory(DagFactory):
                 bash_command='{docker_run} {docker_image} gap_events '
                              '{date_range} '
                              '{project_id}:{source_dataset}.{position_messages} '
-                             '{project_id}:{events_dataset}.{gap_events_table}'.format(**config)
+                             '{project_id}:{events_dataset}.{gap_events_table} '
+                             '{gap_events_min_pos_count}'.format(**config)
             )
 
             for sensor in source_sensors:
