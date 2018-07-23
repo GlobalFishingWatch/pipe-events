@@ -8,9 +8,11 @@ INSERT INTO `{{ dest }}`
     event_info
   )
 
-WITH message as (
+WITH
+  message as (
   SELECT
     vessel_id,
+    seg_id,
     timestamp,
     lat,
     lon,
@@ -23,13 +25,33 @@ WITH message as (
         FORMAT_DATE("%Y%m%d", DATE_ADD( DATE "{{ end_date }}", INTERVAL 1 DAY) )
   ),
 
+  segment as (
+    SELECT
+      seg_id,
+      count(*) as pos_count
+    FROM
+      message
+    GROUP BY seg_id
+    HAVING pos_count >= {{ min_pos_count }}
+  ),
+
+  filtered_message as (
+    SELECT
+      *
+    FROM
+      message m
+    JOIN
+      segment
+    USING (seg_id)
+  ),
+
   lead_lag_message AS (
   SELECT
     *,
     LEAD(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS next_timestamp,
     LAG(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS prev_timestamp
   FROM
-    message
+    filtered_message
   ),
 
   off_message as (
@@ -42,7 +64,7 @@ WITH message as (
     DATE(timestamp) BETWEEN DATE "{{ start_date }}" AND  DATE "{{ end_date }}"
     AND (next_timestamp is null
          OR TIMESTAMP_DIFF(next_timestamp, timestamp, HOUR) >= 24)
-    AND distance_from_shore_m >= 10000
+    AND distance_from_shore_m >= {{ min_dist }}
   ),
 
   on_message as (
@@ -55,7 +77,7 @@ WITH message as (
     DATE(timestamp) BETWEEN DATE "{{ start_date }}"  AND DATE "{{ end_date }}"
     AND (prev_timestamp is null
          OR TIMESTAMP_DIFF(timestamp, prev_timestamp, HOUR) >= 24)
-    AND distance_from_shore_m >= 10000
+    AND distance_from_shore_m >= {{ min_dist }}
   )
 
   SELECT
@@ -71,7 +93,7 @@ WITH message as (
     lat as lat_max,
     lon as lon_min,
     lon as lon_max,
-    TO_JSON_STRING(STRUCT( distance_from_shore_m )) AS event_info
+    TO_JSON_STRING(STRUCT( distance_from_shore_m, pos_count )) AS event_info
   FROM
     (select * from off_message union all (select * from on_message))
 
