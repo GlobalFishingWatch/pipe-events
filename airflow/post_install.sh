@@ -13,11 +13,39 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     pipeline_dataset="{{ var.value.PIPELINE_DATASET }}" \
     events_dataset="{{ var.value.EVENTS_DATASET }}" \
     source_dataset="{{ var.value.PIPELINE_DATASET }}" \
-    position_messages="position_messages_" \
-    gap_events_table="gap_events" \
-    gap_events_min_pos_count="3" \
-    gap_events_min_dist="10000" \
 
+
+for PARENT_DAG in pipe_events_daily pipe_events_monthly; do
+
+  python $AIRFLOW_HOME/utils/set_default_variables.py \
+      --force docker_image=$1 \
+      $PARENT_DAG.gaps \
+      source_table="position_messages_" \
+      events_table="published_events_gaps" \
+      gap_min_pos_count="3" \
+      gap_min_dist="10000" \
+
+
+  python $AIRFLOW_HOME/utils/set_default_variables.py \
+      --force docker_image=$1 \
+      $PARENT_DAG.encounters \
+      source_table="encounters" \
+      events_table="published_events_encounters" \
+
+
+  python $AIRFLOW_HOME/utils/set_default_variables.py \
+      --force docker_image=$1 \
+      $PARENT_DAG.anchorages \
+      source_table="port_events_" \
+      events_table="published_events_ports" \
+
+
+  python $AIRFLOW_HOME/utils/set_default_variables.py \
+      --force docker_image=$1 \
+      $PARENT_DAG.fishing \
+      source_table="messages_scored_" \
+      events_table="published_events_fishing" \
+
+done
 
 echo "Installation Complete"
-

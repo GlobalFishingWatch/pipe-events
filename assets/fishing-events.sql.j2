@@ -1,0 +1,104 @@
+#StandardSQL
+INSERT INTO `{{ dest }}`
+  (
+    event_id, event_type, vessel_id, timestamp,
+    lat_mean, lon_mean, timestamp_min, timestamp_max,
+    lat_min, lat_max, lon_min, lon_max,
+    event_info
+  )
+
+WITH
+  message AS (
+  SELECT
+    vessel_id,
+    timestamp,
+    lat,
+    lon,
+    ifnull(nnet_score,
+      logistic_score) AS score
+  FROM
+    `{{ source }}*`
+  WHERE
+    _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}' AND '{{ end_yyyymmdd }}'
+  ),
+
+  prev_score_message AS (
+  SELECT
+    vessel_id,
+    timestamp,
+    score,
+    LAG(score) OVER (PARTITION BY vessel_id, date(timestamp) ORDER BY timestamp) AS prev_score
+  FROM
+    message
+  ),
+
+  event_start as (
+  SELECT
+    vessel_id,
+    timestamp
+  FROM
+    prev_score_message
+  WHERE
+    prev_score is null or score != prev_score
+  ),
+
+  event_range as (
+  SELECT
+    vessel_id,
+    timestamp as event_start,
+    lead(timestamp) over (partition by vessel_id order by timestamp) as next_event_start
+  FROM
+    event_start
+  ),
+
+  event_message as (
+  SELECT
+    message.*,
+    event_range.event_start
+  FROM
+    message
+  JOIN
+    event_range
+  ON
+    message.vessel_id = event_range.vessel_id AND
+    message.timestamp >= event_range.event_start AND
+    (event_range.next_event_start is null or message.timestamp < event_range.next_event_start)
+  ),
+
+  event as (
+  SELECT
+    vessel_id,
+    event_start as timestamp,
+    avg(lat) as lat_mean,
+    avg(lon) as lon_mean,
+    min(timestamp) as timestamp_min,
+    max(timestamp) as timestamp_max,
+    min(lat) as lat_min,
+    max(lat) as lat_max,
+    min(lon) as lon_min,
+    max(lon) as lon_max,
+    count(*) as message_count
+  FROM
+    event_message
+  WHERE
+    score = 1.0
+  GROUP BY
+    vessel_id, event_start
+  )
+
+SELECT
+  TO_HEX(MD5(FORMAT("%s|%s|%t",'fishing', vessel_id, timestamp))) AS event_id,
+  'fishing' as event_type,
+  vessel_id,
+  timestamp,
+  lat,
+  lon,
+  timestamp_min,
+  timestamp_max,
+  lat_min,
+  lat_max,
+  lon_min,
+  lon_max,
+  TO_JSON_STRING(STRUCT( message_count )) AS event_info
+FROM
+  event
