@@ -13,8 +13,8 @@ RUN pip install -U --ignore-installed pip==9.0.3
 RUN  \
   export CLOUD_SDK_APT_DEPS="curl gcc python-dev python-setuptools apt-transport-https lsb-release openssh-client git" && \
   export CLOUD_SDK_PIP_DEPS="crcmod" && \
-  apt-get -qqy update && \
-  apt-get install -qqy $CLOUD_SDK_APT_DEPS && \
+  apt-get -y update && \
+  apt-get install -y $CLOUD_SDK_APT_DEPS && \
   pip install -U $CLOUD_SDK_PIP_DEPS && \
   export CLOUD_SDK_VERSION="198.0.0" && \
   export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
@@ -26,8 +26,8 @@ RUN  \
   gcloud config set component_manager/disable_update_check true && \
   gcloud config set metrics/environment github_docker_image
 
-RUN apt-get -qqy update && \
-  apt-get -qqy install gdal-bin libgdal-dev python-numpy-dev && \
+RUN apt-get -y update && \
+  apt-get -y install gdal-bin libgdal-dev python-numpy-dev && \
   pip install numpy
 
 # Setup a volume for configuration and auth data

@@ -3,7 +3,7 @@
 INSERT INTO `{{ dest }}`
   (
     event_id, event_type, vessel_id, timestamp,
-    lat, lon, timestamp_min, timestamp_max,
+    lat_mean, lon_mean, timestamp_min, timestamp_max,
     lat_min, lat_max, lon_min, lon_max,
     event_info
   )
@@ -85,8 +85,8 @@ WITH
     event_type,
     vessel_id,
     timestamp,
-    lat,
-    lon,
+    lat as lat_mean,
+    lon as lon_mean,
     timestamp as timestamp_min,
     timestamp as timestamp_max,
     lat as lat_min,
