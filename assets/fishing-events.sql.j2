@@ -10,16 +10,43 @@ INSERT INTO `{{ dest }}`
 WITH
   message AS (
   SELECT
-    vessel_id,
+    seg_id,
     timestamp,
     lat,
     lon,
     ifnull(nnet_score,
       logistic_score) AS score
   FROM
-    `{{ source }}*`
+    `{{ messages }}*`
   WHERE
     _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}' AND '{{ end_yyyymmdd }}'
+  ),
+
+  best_segment_vessel as (
+  SELECT DISTINCT
+    seg_id,
+    FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) as vessel_id
+  FROM
+    `{{ segment_vessel }}`
+
+  ),
+
+  good_seg as (
+  SELECT
+    seg_id
+  FROM
+    `{{ segment_info }}`
+  WHERE
+    pos_count >= 10
+  ),
+
+  vessel_message as (
+  SELECT
+    *
+  FROM
+    message
+  JOIN good_seg USING (seg_id)
+  JOIN best_segment_vessel USING (seg_id)
   ),
 
   prev_score_message AS (
@@ -29,7 +56,7 @@ WITH
     score,
     LAG(score) OVER (PARTITION BY vessel_id, date(timestamp) ORDER BY timestamp) AS prev_score
   FROM
-    message
+    vessel_message
   ),
 
   event_start as (
@@ -53,16 +80,16 @@ WITH
 
   event_message as (
   SELECT
-    message.*,
+    vessel_message.*,
     event_range.event_start
   FROM
-    message
+    vessel_message
   JOIN
     event_range
   ON
-    message.vessel_id = event_range.vessel_id AND
-    message.timestamp >= event_range.event_start AND
-    (event_range.next_event_start is null or message.timestamp < event_range.next_event_start)
+    vessel_message.vessel_id = event_range.vessel_id AND
+    vessel_message.timestamp >= event_range.event_start AND
+    (event_range.next_event_start is null OR vessel_message.timestamp < event_range.next_event_start)
   ),
 
   event as (
@@ -91,8 +118,8 @@ SELECT
   'fishing' as event_type,
   vessel_id,
   timestamp,
-  lat,
-  lon,
+  lat_mean,
+  lon_mean,
   timestamp_min,
   timestamp_max,
   lat_min,
