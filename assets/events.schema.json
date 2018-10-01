@@ -18,10 +18,16 @@
     "description": "Id of the main vessel involved in the event. When an event has multiple vessels associated with it (for example, encounters) you will find multiple records, one for each vessel involved."
   },
   {
-    "mode": "REQUIRED",
-    "name": "timestamp",
+    "mode": "NULLABLE",
+    "name": "event_start",
     "type": "TIMESTAMP",
-    "description": "Main timestamp when the event ocurred. When an event occurs during an interval (for example, encounters in which a single record may represent 2 or more hours) the timestamp is the start time of that event"
+    "description": "Start time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "event_end",
+    "type": "TIMESTAMP",
+    "description": "End time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
   },
   {
     "mode": "REQUIRED",
@@ -34,18 +40,6 @@
     "name": "lon_mean",
     "type": "FLOAT",
     "description": "Mean longitude where the event ocurred. When an event occurs over a region (for example, encounters) this is the mean longitude over all the individual points involved."
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "timestamp_min",
-    "type": "TIMESTAMP",
-    "description": "Start time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "timestamp_max",
-    "type": "TIMESTAMP",
-    "description": "End time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
   },
   {
     "mode": "NULLABLE",
@@ -76,5 +70,11 @@
     "name": "event_info",
     "type": "STRING",
     "description": "Custom, schemaless metadata for the event in json format. This field depends entirely on the event type, different event types will contain entirely different schemas for this field. The schema is stable for each type."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "event_geography",
+    "type": "GEOGRAPHY",
+    "description": "Detailed line geometry which describes the geographic area where the event happened. In the case of fishing events, for example, it's a line which includes all the individual positional messages where the vessel was fishing."
   }
 ]

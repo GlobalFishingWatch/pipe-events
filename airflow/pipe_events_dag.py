@@ -22,9 +22,10 @@ class PipelineDagFactory(DagFactory):
     def build(self, dag_id):
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
             for subdag_name, dag_factory in subpipelines.iteritems():
+                subdag_pipeline = '{}.{}'.format(self.pipeline, subdag_name)
                 subdag_id = '{}.{}'.format(dag_id, subdag_name)
                 subdag_factory = dag_factory.PipelineDagFactory(
-                    pipeline=subdag_id, schedule_interval=self.schedule_interval, base_config=self.config)
+                    pipeline=subdag_pipeline, schedule_interval=self.schedule_interval, base_config=self.config)
 
                 subdag = SubDagOperator(
                     subdag=subdag_factory.build(dag_id=subdag_id),
