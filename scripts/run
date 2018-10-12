@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
+
+display_usage() {
+	echo "Available Commands"
+	echo "  generate_gap_events                publish gap (on/off at sea) events"
+	echo "  generate_encounter_events          publish encounter (vessel rendevouz at sea) events"
+	echo "  generate_anchorage_events          publish port (port in and out) events"
+	echo "  generate_fishing_events            publish continuous fishing message events"
+	}
+
+
+if [[ $# -le 0 ]]
+then
+    display_usage
+    exit 1
+fi
+
+
+case $1 in
+
+  generate_gap_events)
+    ${THIS_SCRIPT_DIR}/gap_events.sh "${@:2}"
+    ;;
+
+  generate_encounter_events)
+    ${THIS_SCRIPT_DIR}/generate_encounter_events "${@:2}"
+    ;;
+
+  generate_anchorage_events)
+    ${THIS_SCRIPT_DIR}/generate_anchorage_events "${@:2}"
+    ;;
+
+  generate_fishing_events)
+    ${THIS_SCRIPT_DIR}/generate_fishing_events "${@:2}"
+    ;;
+
+  upload_postgis)
+    $(THIS_SCRIPT_DIR)/upload_postgis "${@:2}"
+    ;;
+
+  *)
+    display_usage
+    exit 1
+    ;;
+esac

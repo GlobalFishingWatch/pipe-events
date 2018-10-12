@@ -40,5 +40,5 @@ COPY . /opt/project
 RUN pip install --process-dependency-links -e .
 
 # Setup the entrypoint for quickly executing the pipelines
-ENTRYPOINT ["scripts/run.sh"]
+ENTRYPOINT ["scripts/run"]
 
