@@ -10,31 +10,57 @@ INSERT INTO `{{ dest }}`
 WITH
   message AS (
   SELECT
-    vessel_id,
+    seg_id,
     timestamp,
     lat,
     lon,
     ifnull(nnet_score,
       logistic_score) AS score
   FROM
-    `{{ source }}*`
+    `{{ messages }}*`
   WHERE
     _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}' AND '{{ end_yyyymmdd }}'
   ),
 
-  prev_score_message AS (
+  best_segment_vessel as (
+  SELECT DISTINCT
+    seg_id,
+    FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) as vessel_id
+  FROM
+    `{{ segment_vessel }}`
+
+  ),
+
+  good_seg as (
   SELECT
-    vessel_id,
-    timestamp,
-    score,
-    LAG(score) OVER (PARTITION BY vessel_id, date(timestamp) ORDER BY timestamp) AS prev_score
+    seg_id
+  FROM
+    `{{ segment_info }}`
+  WHERE
+    pos_count >= 10
+  ),
+
+  segment_message as (
+  SELECT
+    *
   FROM
     message
+  JOIN good_seg USING (seg_id)
+  ),
+
+  prev_score_message AS (
+  SELECT
+    seg_id,
+    timestamp,
+    score,
+    LAG(score) OVER (PARTITION BY seg_id, date(timestamp) ORDER BY timestamp) AS prev_score
+  FROM
+    segment_message
   ),
 
   event_start as (
   SELECT
-    vessel_id,
+    seg_id,
     timestamp
   FROM
     prev_score_message
@@ -44,25 +70,25 @@ WITH
 
   event_range as (
   SELECT
-    vessel_id,
+    seg_id,
     timestamp as event_start,
-    lead(timestamp) over (partition by vessel_id order by timestamp) as next_event_start
+    lead(timestamp) over (partition by seg_id order by timestamp) as next_event_start
   FROM
     event_start
   ),
 
   event_message as (
   SELECT
-    message.*,
+    segment_message.*,
     event_range.event_start
   FROM
-    message
+    segment_message
   JOIN
     event_range
   ON
-    message.vessel_id = event_range.vessel_id AND
-    message.timestamp >= event_range.event_start AND
-    (event_range.next_event_start is null or message.timestamp < event_range.next_event_start)
+    segment_message.seg_id = event_range.seg_id AND
+    segment_message.timestamp >= event_range.event_start AND
+    (event_range.next_event_start is null OR segment_message.timestamp < event_range.next_event_start)
   ),
 
   event as (
@@ -80,10 +106,12 @@ WITH
     count(*) as message_count
   FROM
     event_message
+  JOIN
+    best_segment_vessel USING (seg_id)
   WHERE
     score = 1.0
   GROUP BY
-    vessel_id, event_start
+    vessel_id, seg_id, event_start
   )
 
 SELECT
@@ -91,8 +119,8 @@ SELECT
   'fishing' as event_type,
   vessel_id,
   timestamp,
-  lat,
-  lon,
+  lat_mean,
+  lon_mean,
   timestamp_min,
   timestamp_max,
   lat_min,

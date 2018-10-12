@@ -44,6 +44,8 @@ for PARENT_DAG in pipe_events_daily pipe_events_monthly; do
       --force docker_image=$1 \
       $PARENT_DAG.fishing \
       source_table="messages_scored_" \
+      segment_vessel="segment_vessel" \
+      segment_info="segment_info" \
       events_table="published_events_fishing" \
 
 done

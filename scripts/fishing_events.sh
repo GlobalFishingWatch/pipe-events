@@ -6,11 +6,11 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 source ${THIS_SCRIPT_DIR}/pipeline.sh
 
 display_usage() {
-	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE DEST_TABLE \n"
+	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE SEGMENT_VESSEL SEGMENT_INFO DEST_TABLE \n"
 	}
 
 
-if [[ $# -ne 3  ]]
+if [[ $# -ne 5  ]]
 then
     display_usage
     exit 1
@@ -18,7 +18,9 @@ fi
 
 DATE_RANGE=$1
 SOURCE_TABLE=$2
-DEST_TABLE=$3
+SEGMENT_VESSEL=$3
+SEGMENT_INFO=$4
+DEST_TABLE=$5
 
 IFS=, read START_DATE END_DATE <<<"${DATE_RANGE}"
 if [[ -z $END_DATE ]]; then
@@ -68,7 +70,9 @@ fi
 echo "  Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 ${INSERT_SQL} \
-   -D source=${SOURCE_TABLE//:/.} \
+   -D messages=${SOURCE_TABLE//:/.} \
+   -D segment_vessel=${SEGMENT_VESSEL//:/.} \
+   -D segment_info=${SEGMENT_INFO//:/.} \
    -D dest=${DEST_TABLE//:/.} \
    -D start_yyyymmdd=$(yyyymmdd ${START_DATE}) \
    -D end_yyyymmdd=$(yyyymmdd ${END_DATE}) \
