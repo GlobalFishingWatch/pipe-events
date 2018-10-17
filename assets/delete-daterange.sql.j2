@@ -3,4 +3,4 @@ DELETE
 FROM
   `{{ table }}`
 WHERE
-  DATE(timestamp) BETWEEN "{{ start_date }}" AND "{{ end_date }}"
+  DATE(event_start) BETWEEN "{{ start_date }}" AND "{{ end_date }}"

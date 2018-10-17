@@ -47,7 +47,7 @@ echo "  Create table"
 bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
-  --time_partitioning_field=timestamp \
+  --time_partitioning_field=event_start \
   ${DEST_TABLE}
 
 if [ "$?" -ne 0 ]; then
