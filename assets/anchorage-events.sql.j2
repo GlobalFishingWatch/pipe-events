@@ -27,8 +27,7 @@ SELECT
   lon AS lon_max,
   TO_JSON_STRING(STRUCT( ROUND(lat,6) AS anchorage_lat,
       ROUND(lon,6) AS anchorage_lon,
-      anchorage_id,
-      port_label )) AS event_info,
+      anchorage_id )) AS event_info,
   ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(vessel_lon AS string), ' ', CAST(vessel_lat AS string), ')')) AS event_geography
 FROM
   `{{ source }}*`
