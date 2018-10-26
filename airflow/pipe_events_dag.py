@@ -1,58 +1,41 @@
-from datetime import datetime, timedelta
+import posixpath as pp
+import imp
 
 from airflow import DAG
-from airflow.operators.bash_operator import BashOperator
-from airflow.contrib.operators.bigquery_check_operator import BigQueryCheckOperator
-
+from airflow.operators.subdag_operator import SubDagOperator
 from pipe_tools.airflow.models import DagFactory
-
 
 PIPELINE = "pipe_events"
 
+subpipelines = {
+    'gaps': imp.load_source('pipe_events_gaps', pp.join(pp.dirname(__file__), 'pipe_events_gaps_dag.py')),
+    'encounters': imp.load_source('pipe_events_encounters', pp.join(pp.dirname(__file__), 'pipe_events_encounters_dag.py')),
+    'anchorages': imp.load_source('pipe_events_anchorages', pp.join(pp.dirname(__file__), 'pipe_events_anchorages_dag.py')),
+    'fishing': imp.load_source('pipe_events_fishing', pp.join(pp.dirname(__file__), 'pipe_events_fishing_dag.py')),
+}
 
-class TemplatedBigQueryCheckOperator(BigQueryCheckOperator):
-    template_fields = ('sql',)
 
-
-class GapEventsDagFactory(DagFactory):
+class PipelineDagFactory(DagFactory):
     def __init__(self, pipeline=PIPELINE, **kwargs):
-        super(GapEventsDagFactory, self).__init__(pipeline=pipeline, **kwargs)
-
-    def source_date_range(self):
-        # shift the date range one day back
-        if self.schedule_interval == '@daily':
-            return '{{ yesterday_ds }}', '{{ yesterday_ds }}'
-        elif self.schedule_interval == '@monthly':
-            start_date = '{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(days=-1)).strftime("%Y-%m-%d") }}'
-            end_date = '{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(months=1, days=-2)).strftime("%Y-%m-%d") }}'
-            return start_date, end_date
-        else:
-            raise ValueError('Unsupported schedule interval {}'.format(self.schedule_interval))
+        super(PipelineDagFactory, self).__init__(pipeline=pipeline, **kwargs)
 
     def build(self, dag_id):
-        config = self.config
-        config['source_table'] = config['position_messages']
-        config['date_range'] = ','.join(self.source_date_range())
-
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
-            source_sensors = self.source_table_sensors(dag)
+            for subdag_name, dag_factory in subpipelines.iteritems():
+                subdag_pipeline = '{}.{}'.format(self.pipeline, subdag_name)
+                subdag_id = '{}.{}'.format(dag_id, subdag_name)
+                subdag_factory = dag_factory.PipelineDagFactory(
+                    pipeline=subdag_pipeline, schedule_interval=self.schedule_interval, base_config=self.config)
 
-            publish_events = BashOperator(
-                task_id='publish_events',
-                pool='bigquery',
-                bash_command='{docker_run} {docker_image} gap_events '
-                             '{date_range} '
-                             '{project_id}:{source_dataset}.{position_messages} '
-                             '{project_id}:{events_dataset}.{gap_events_table} '
-                             '{gap_events_min_pos_count} '
-                             '{gap_events_min_dist}'.format(**config)
-            )
-
-            for sensor in source_sensors:
-                dag >> sensor >> publish_events
-
+                subdag = SubDagOperator(
+                    subdag=subdag_factory.build(dag_id=subdag_id),
+                    task_id=subdag_name,
+                    depends_on_past=True,
+                    dag=dag
+                )
             return dag
 
 
-gaps_events_daily_dag = GapEventsDagFactory().build('gap_events_daily')
-gaps_events_monthly_dag = GapEventsDagFactory(schedule_interval='@monthly').build('gap_events_monthly')
+events_daily_dag = PipelineDagFactory().build('pipe_events_daily')
+events_monthly_dag = PipelineDagFactory(
+    schedule_interval='@monthly').build('pipe_events_monthly')

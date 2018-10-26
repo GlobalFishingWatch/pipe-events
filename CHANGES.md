@@ -1,7 +1,14 @@
 Changes
 =======
 
-Higher level changes affecting the API or data.
+0.3.0 - 2018-09-07
+------------------
+
+* [#7](https://github.com/GlobalFishingWatch/encounters_pipeline/pull/7)
+  * Adds the publication of the rest of the event types into this pipeline.
+  * Bump version of pipe-tools to 0.2.0
+  * Requires a new global airflow variable, `INFERENCE_BUFFER_DAYS`, which contains the number of days the fishing events might have to be updated in the past due to inference buffering.
+  * Changes the schema of the events table, removing some field duplication (both `timestamp` and `event_start` meant the same) and adding a new `event_geography` column, which is a GIS column allowing geospatial queries.
 
 v0.2.0 - 2018-07-23
 -------------------

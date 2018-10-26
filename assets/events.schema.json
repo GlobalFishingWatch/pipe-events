@@ -1,67 +1,80 @@
 [
-    {
-      "mode": "REQUIRED",
-      "name": "event_id",
-      "type": "STRING"
-    },
-    {
-      "mode": "REQUIRED",
-      "name": "event_type",
-      "type": "STRING"
-    },
-    {
-      "mode": "REQUIRED",
-      "name": "vessel_id",
-      "type": "STRING"
-    },
-    {
-      "mode": "REQUIRED",
-      "name": "timestamp",
-      "type": "TIMESTAMP"
-    },
-    {
-      "mode": "REQUIRED",
-      "name": "lat",
-      "type": "FLOAT"
-    },
-    {
-      "mode": "REQUIRED",
-      "name": "lon",
-      "type": "FLOAT"
-    },
-    {
-      "mode": "NULLABLE",
-      "name": "timestamp_min",
-      "type": "TIMESTAMP"
-    },
-    {
-      "mode": "NULLABLE",
-      "name": "timestamp_max",
-      "type": "TIMESTAMP"
-    },
-    {
-      "mode": "NULLABLE",
-      "name": "lat_min",
-      "type": "FLOAT"
-    },
-    {
-      "mode": "NULLABLE",
-      "name": "lat_max",
-      "type": "FLOAT"
-    },
-    {
-      "mode": "NULLABLE",
-      "name": "lon_min",
-      "type": "FLOAT"
-    },
-    {
-      "mode": "NULLABLE",
-      "name": "lon_max",
-      "type": "FLOAT"
-    },
-    {
-      "mode": "NULLABLE",
-      "name": "event_info",
-      "type": "STRING"
-    }
-  ]
+  {
+    "mode": "REQUIRED",
+    "name": "event_id",
+    "type": "STRING",
+    "description": "Unique identifier."
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "event_type",
+    "type": "STRING",
+    "description": "Type discriminator, such as fishing, encounter, etc. Different event types have completely different structures in the event_info field."
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "vessel_id",
+    "type": "STRING",
+    "description": "Id of the main vessel involved in the event. When an event has multiple vessels associated with it (for example, encounters) you will find multiple records, one for each vessel involved."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "event_start",
+    "type": "TIMESTAMP",
+    "description": "Start time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "event_end",
+    "type": "TIMESTAMP",
+    "description": "End time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "lat_mean",
+    "type": "FLOAT",
+    "description": "Mean latitude where the event ocurred. When an event occurs over a region (for example, encounters) this is the mean latitude over all the individual points involved."
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "lon_mean",
+    "type": "FLOAT",
+    "description": "Mean longitude where the event ocurred. When an event occurs over a region (for example, encounters) this is the mean longitude over all the individual points involved."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "lat_min",
+    "type": "FLOAT",
+    "description": "Minimum latitude of a bounded event. When an event occurs in a single position (such as port in and out), both lat_min and lat_max are equal to the main latitude field. Otherwise, lat_min, lat_max, lon_min and lon_max  define the spatial boundaries of the event."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "lat_max",
+    "type": "FLOAT",
+    "description": "Maximum latitude of a bounded event. When an event occurs in a single position (such as port in and out), both lat_min and lat_max are equal to the main latitude field. Otherwise, lat_min, lat_max, lon_min and lon_max  define the spatial boundaries of the event."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "lon_min",
+    "type": "FLOAT",
+    "description": "Minimum longitude of a bounded event. When an event occurs in a single position (such as port in and out), both lon_min and lon_max are equal to the main longitude field. Otherwise, lat_min, lat_max, lon_min and lon_max  define the spatial boundaries of the event."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "lon_max",
+    "type": "FLOAT",
+    "description": "Maximum longitude of a bounded event. When an event occurs in a single position (such as port in and out), both lon_min and lon_max are equal to the main longitude field. Otherwise, lat_min, lat_max, lon_min and lon_max  define the spatial boundaries of the event."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "event_info",
+    "type": "STRING",
+    "description": "Custom, schemaless metadata for the event in json format. This field depends entirely on the event type, different event types will contain entirely different schemas for this field. The schema is stable for each type."
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "event_geography",
+    "type": "GEOGRAPHY",
+    "description": "Detailed line geometry which describes the geographic area where the event happened. In the case of fishing events, for example, it's a line which includes all the individual positional messages where the vessel was fishing."
+  }
+]

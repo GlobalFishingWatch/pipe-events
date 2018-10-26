@@ -6,7 +6,7 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 source ${THIS_SCRIPT_DIR}/pipeline.sh
 
 display_usage() {
-	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] MESSAGES_TABLE EVENTS_TABLE MIN_POS_COUNT MIN_DIST \n"
+	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE SEGMENT_VESSEL SEGMENT_INFO DEST_TABLE \n"
 	}
 
 
@@ -17,10 +17,10 @@ then
 fi
 
 DATE_RANGE=$1
-MESSAGES_TABLE=$2
-EVENTS_TABLE=$3
-MIN_POS_COUNT=$4
-MIN_DIST=$5
+SOURCE_TABLE=$2
+SEGMENT_VESSEL=$3
+SEGMENT_INFO=$4
+DEST_TABLE=$5
 
 IFS=, read START_DATE END_DATE <<<"${DATE_RANGE}"
 if [[ -z $END_DATE ]]; then
@@ -29,11 +29,11 @@ fi
 
 
 DELETE_SQL=${ASSETS}/delete-daterange.sql.j2
-INSERT_SQL=${ASSETS}/gap-events.sql.j2
+INSERT_SQL=${ASSETS}/fishing-events.sql.j2
 SCHEMA=${ASSETS}/events.schema.json
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${MESSAGES_TABLE}"
+  "* Source: ${SOURCE_TABLE}"
   "* Command:"
   "$(basename $0)"
   "$@"
@@ -41,7 +41,7 @@ TABLE_DESC=(
 TABLE_DESC=$( IFS=$'\n'; echo "${TABLE_DESC[*]}" )
 
 
-echo "Publishing gap events to ${EVENTS_TABLE}..."
+echo "Publishing fishing events to ${DEST_TABLE}..."
 echo "${TABLE_DESC}"
 
 echo "  Create table"
@@ -50,7 +50,7 @@ bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
   --time_partitioning_field=event_start \
-  ${EVENTS_TABLE}
+  ${DEST_TABLE}
 
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create table ${DEST_TABLE}"
@@ -59,7 +59,7 @@ fi
 
 echo "  Deleting existing records for ${START_DATE} to ${END_DATE}"
 
-jinja2 ${DELETE_SQL} -D table=${EVENTS_TABLE//:/.} -D start_date=${START_DATE} -D end_date=${END_DATE} \
+jinja2 ${DELETE_SQL} -D table=${DEST_TABLE//:/.} -D start_date=${START_DATE} -D end_date=${END_DATE} \
      | bq query --max_rows=0
 
 if [ "$?" -ne 0 ]; then
@@ -70,12 +70,12 @@ fi
 echo "  Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 ${INSERT_SQL} \
-   -D source=${MESSAGES_TABLE//:/.} \
-   -D dest=${EVENTS_TABLE//:/.} \
-   -D start_date=${START_DATE} \
-   -D end_date=${END_DATE} \
-   -D min_pos_count=${MIN_POS_COUNT} \
-   -D min_dist=${MIN_DIST} \
+   -D messages=${SOURCE_TABLE//:/.} \
+   -D segment_vessel=${SEGMENT_VESSEL//:/.} \
+   -D segment_info=${SEGMENT_INFO//:/.} \
+   -D dest=${DEST_TABLE//:/.} \
+   -D start_yyyymmdd=$(yyyymmdd ${START_DATE}) \
+   -D end_yyyymmdd=$(yyyymmdd ${END_DATE}) \
    | bq query --max_rows=0
 
 if [ "$?" -ne 0 ]; then
@@ -83,6 +83,4 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 
-echo "  ${EVENTS_TABLE} Done."
-
-
+echo "  ${DEST_TABLE} Done."
