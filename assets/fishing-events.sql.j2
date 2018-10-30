@@ -52,7 +52,9 @@ WITH
   JOIN
     good_seg
   USING
-    (seg_id) ),
+    (seg_id)
+  WHERE
+    score is not NULL ),
   prev_score_message AS (
   SELECT
     seg_id,
