@@ -49,8 +49,8 @@ class PipelineDagFactory(DagFactory):
                 '{project_id}:{source_dataset}.{source_table} '
                 '{project_id}:{source_dataset}.{segment_vessel} '
                 '{project_id}:{source_dataset}.{segment_info} '
-                '{project_id}:{events_dataset}.{events_table}'.format(
-                    **config)
+                '{project_id}:{events_dataset}.{events_table} '
+                '{min_event_duration}'.format(**config)
             )
 
             for sensor in source_sensors:

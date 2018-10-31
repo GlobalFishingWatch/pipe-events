@@ -147,7 +147,7 @@ WITH
       prev_fishing_event_range
     WHERE
       prev_event_end is NULL
-      OR TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > 300  # 5 minutes. TODO: parameterize this
+      OR TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > {{ min_duration }}
   ),
 
 
@@ -201,7 +201,7 @@ WITH
     seg_id,
     event_start
   HAVING
-    TIMESTAMP_DIFF(event_end, event_start, SECOND) > 300  # 5 minutes. TODO: parameterize this
+    TIMESTAMP_DIFF(event_end, event_start, SECOND) > {{ min_duration }}
   )
 
 
