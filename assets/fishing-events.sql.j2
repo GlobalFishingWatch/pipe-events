@@ -102,29 +102,20 @@ WITH
   ),
 
   #
-  # Now get the timestamps of the messages that mark the start of a new group of same-score messages
+  # Now get the time range from the start of this group to the start of the next group
+  # Do this by filtering to only the first message in each grouping and making a time range from
+  # the first message in one group to the first message in the next group
   #
-  event_start AS (
+  event_range AS (
     SELECT
       seg_id,
-      timestamp
+      timestamp as event_start,
+      LEAD(timestamp) OVER (PARTITION BY seg_id ORDER BY timestamp) AS next_event_start
     FROM
       prev_score_message
     WHERE
       prev_score IS NULL
       OR score != prev_score
-  ),
-
-  #
-  # Now get the time range from the start of this group to the start of the next group
-  #
-  event_range AS (
-    SELECT
-      seg_id,
-      timestamp AS event_start,
-      LEAD(timestamp) OVER (PARTITION BY seg_id ORDER BY timestamp) AS next_event_start
-    FROM
-      event_start
   ),
 
   #
