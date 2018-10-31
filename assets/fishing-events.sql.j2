@@ -133,7 +133,7 @@ WITH
   event_message AS (
     SELECT
       segment_message.*,
-      event_range.event_start
+      event_range.event_start as event_start
     FROM
       segment_message
     JOIN
@@ -152,11 +152,10 @@ WITH
   event AS (
   SELECT
     vessel_id,
-    event_start AS timestamp,
     AVG(lat) AS lat_mean,
     AVG(lon) AS lon_mean,
-    MIN(timestamp) AS timestamp_min,
-    MAX(timestamp) AS timestamp_max,
+    event_start,
+    MAX(timestamp) AS event_end,
     MIN(lat) AS lat_min,
     MAX(lat) AS lat_max,
     MIN(lon) AS lon_min,
@@ -182,11 +181,11 @@ WITH
 # Finally, generate a unique event id and write out in the normalized event schema
 #
 SELECT
-  TO_HEX(MD5(FORMAT("%s|%s|%t",'fishing', vessel_id, timestamp))) AS event_id,
+  TO_HEX(MD5(FORMAT("%s|%s|%t",'fishing', vessel_id, event_start))) AS event_id,
   'fishing' AS event_type,
   vessel_id,
-  timestamp_min AS event_start,
-  timestamp_max AS event_end,
+  event_start,
+  event_end,
   lat_mean,
   lon_mean,
   lat_min,
