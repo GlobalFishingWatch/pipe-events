@@ -23,7 +23,6 @@ WITH
   #
   message AS (
   SELECT
-    vessel_id,
     seg_id,
     timestamp,
     lat,
@@ -34,6 +33,18 @@ WITH
   WHERE
     _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB( DATE "{{ start_date }}", INTERVAL 1 DAY) )
     AND FORMAT_DATE("%Y%m%d", DATE_ADD( DATE "{{ end_date }}", INTERVAL 1 DAY) )
+  ),
+
+  #
+  # get vessel_ids for each seg_id.
+  # NB the vessel_id that is in the mssages have some problems, so ignore this and get the vessel_id from the segment_vessel table
+  #
+  best_segment_vessel AS (
+    SELECT
+      DISTINCT seg_id,
+      FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
+    FROM
+      `{{ segment_vessel }}`
   ),
 
   #
@@ -53,16 +64,17 @@ WITH
 
   #
   # filter messages to only ones in the filtered segments
+  # and add in vessel_id
   #
   filtered_message AS (
   SELECT
     *
   FROM
     message m
-  JOIN
-    segment
-  USING
-    (seg_id)
+  JOIN segment
+    USING (seg_id)
+  JOIN best_segment_vessel
+    USING (seg_id)
   ),
 
 
