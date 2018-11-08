@@ -1,4 +1,6 @@
 #standardSQL
+
+
 INSERT INTO
   `{{ dest }}` ( event_id,
     event_type,
@@ -13,7 +15,12 @@ INSERT INTO
     lon_max,
     event_info,
     event_geography )
+
 WITH
+
+  #
+  # get position messages
+  #
   message AS (
   SELECT
     vessel_id,
@@ -26,7 +33,12 @@ WITH
     `{{source}}*`
   WHERE
     _TABLE_SUFFIX BETWEEN FORMAT_DATE("%Y%m%d", DATE_SUB( DATE "{{ start_date }}", INTERVAL 1 DAY) )
-    AND FORMAT_DATE("%Y%m%d", DATE_ADD( DATE "{{ end_date }}", INTERVAL 1 DAY) ) ),
+    AND FORMAT_DATE("%Y%m%d", DATE_ADD( DATE "{{ end_date }}", INTERVAL 1 DAY) )
+  ),
+
+  #
+  # extract seg_ids from the messages and filter to only segments that have the minimum number of positions
+  #
   segment AS (
   SELECT
     seg_id,
@@ -36,7 +48,12 @@ WITH
   GROUP BY
     seg_id
   HAVING
-    pos_count >= {{ min_pos_count }} ),
+    pos_count >= {{ min_pos_count }}
+  ),
+
+  #
+  # filter messages to only ones in the filtered segments
+  #
   filtered_message AS (
   SELECT
     *
@@ -45,14 +62,25 @@ WITH
   JOIN
     segment
   USING
-    (seg_id) ),
+    (seg_id)
+  ),
+
+
+   #
+   # get prev and next timestamps within a vessel_id
+   #
   lead_lag_message AS (
   SELECT
     *,
     LEAD(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS next_timestamp,
     LAG(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS prev_timestamp
   FROM
-    filtered_message ),
+    filtered_message
+  ),
+
+  #
+  # detect transponder off events
+  #
   off_message AS (
   SELECT
     *,
@@ -64,7 +92,12 @@ WITH
     AND DATE "{{ end_date }}"
     AND (next_timestamp IS NULL
       OR TIMESTAMP_DIFF(next_timestamp, timestamp, HOUR) >= 24)
-    AND distance_from_shore_m >= {{ min_dist }} ),
+    AND distance_from_shore_m >= {{ min_dist }}
+  ),
+
+  #
+  # detect transponder on events
+  #
   on_message AS (
   SELECT
     *,
@@ -76,7 +109,12 @@ WITH
     AND DATE "{{ end_date }}"
     AND (prev_timestamp IS NULL
       OR TIMESTAMP_DIFF(timestamp, prev_timestamp, HOUR) >= 24)
-    AND distance_from_shore_m >= {{ min_dist }} )
+    AND distance_from_shore_m >= {{ min_dist }}
+  )
+
+#
+# assemble the event output
+#
 SELECT
   TO_HEX(MD5(FORMAT("%s|%s|%t", event_type, vessel_id, timestamp))) AS event_id,
   event_type,
