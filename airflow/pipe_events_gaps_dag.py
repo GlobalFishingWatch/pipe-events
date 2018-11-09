@@ -34,7 +34,8 @@ class PipelineDagFactory(DagFactory):
                              '{project_id}:{source_dataset}.{source_table} '
                              '{project_id}:{events_dataset}.{events_table} '
                              '{gap_min_pos_count} '
-                             '{gap_min_dist}'.format(**config)
+                             '{gap_min_dist} '
+                             '{segment_vessel}'.format(**config)
             )
 
             for sensor in source_sensors:
