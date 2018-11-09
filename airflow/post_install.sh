@@ -41,6 +41,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     source_table="messages_scored_" \
     segment_vessel="segment_vessel" \
     segment_info="segment_info" \
+    min_event_duration="300" \
     events_table="published_events_fishing" \
 
 echo "Installation Complete"
