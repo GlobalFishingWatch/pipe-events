@@ -3,26 +3,45 @@ source pipe-tools-utils
 
 THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 ASSETS=${THIS_SCRIPT_DIR}/../assets
-source ${THIS_SCRIPT_DIR}/pipeline.sh
+ARGS=( \
+  START_DATE \
+  SOURCE \
+  TEMP_BUCKET \
+  DEST_INSTANCE \
+  DEST_CONNECTION_STRING \
+  DEST_TABLE \
+)
 
 ################################################################################
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 SOURCE TEMP_BUCKET  DEST_INSTANCE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_INSTANCE DEST_CONNECTION_STRING DEST_TABLE\n"
 }
 
-if [[ $# -ne 4  ]]; then
-  display_usage
-  exit 1
+if [[ $# -ne ${#ARGS[@]} ]]
+then
+    display_usage
+    exit 1
 fi
 
-ARGS=( \
-  SOURCE \
-  TEMP_BUCKET \
-  DEST_INSTANCE \
-)
+ARG_VALUES=("$@")
+PARAMS=()
+for index in ${!ARGS[*]}; do
+  echo "${ARGS[$index]}=${ARG_VALUES[$index]}"
+  declare "${ARGS[$index]}"="${ARG_VALUES[$index]}"
+done
+
+
 TEMP_PATH=gs://${TEMP_BUCKET}/pipe-events/$( date -u "+%FT%T.%N" )
+
+echo "Running $0"
+echo "  START_DATE: $START_DATE"
+echo "  SOURCE: $SOURCE"
+echo "  TEMP_BUCKET: $TEMP_BUCKET"
+echo "  DEST_INSTANCE: $DEST_INSTANCE"
+echo "  DEST_CONNECTION_STRING: $DEST_CONNECTION_STRING"
+echo "  DEST_TABLE: $DEST_TABLE"
 ################################################################################
 # Export events to json files
 ################################################################################
@@ -54,10 +73,17 @@ LOCAL_JSON_PATH=./data/json/
 ################################################################################
 # Convert format from json to exported sql format
 ################################################################################
-echo "Converting downloaded files to csv format"
-LOCAL_CSV_PATH=./data/csv/
+# echo "Converting downloaded files to csv format"
+LOCAL_CSV_PATH=./data/csv
 LOCAL_CSV_FILE=${LOCAL_CSV_PATH}/data.csv
-cat LOCAL_JSON_PATH/*.json | python -m pipe_events.postgis.formatter ${LOCAL_CSV_FILE}
+echo "Creating local csv directory"
+mkdir -p ${LOCAL_CSV_PATH}
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to create local CSV directory"
+  exit 1
+fi
+echo "Converting json events to csv format"
+cat ${LOCAL_JSON_PATH}/*.json | python -m pipe_events.postgis.formatter ${LOCAL_CSV_FILE}
 if [ "$?" -ne 0 ]; then
   echo "  Unable to convert events from JSON to CSV format"
   exit 1
@@ -65,10 +91,38 @@ fi
 echo "  Coverted events from JSON to CSV"
 
 ################################################################################
-# Load the data
+# Start the cloudsql proxy
 ################################################################################
+echo "Starting the cloudsql proxy"
+cloud_sql_proxy -instances=${DEST_INSTANCE}=tcp:5432 &
+sleep 3
 
+################################################################################
+# Load data into postgres
+################################################################################
+echo "Setting up database for data import"
+SETUP_SQL=${ASSETS}/postgres/setup.j2.sql
+jinja2 ${SETUP_SQL} \
+  -D table_name=${DEST_TABLE} \
+  | psql "${DEST_CONNECTION_STRING}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to set database up for data import"
+  exit 1
+fi
 
-# TODO: Run a copy command to bulk-load data
-# TODO: Enable indices
-# TODO: Rename tables
+echo "Importing data"
+cat ${LOCAL_CSV_FILE} | head -n 1 | psql "${DEST_CONNECTION_STRING}" -c "\copy ${DEST_TABLE} from stdin with (format 'csv')"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to import data into postgres"
+  exit 1
+fi
+
+echo "Indexing data"
+INDEX_SQL=${ASSETS}/postgres/index.j2.sql
+jinja2 ${INDEX_SQL} \
+  -D table_name=${DEST_TABLE} \
+  | psql "${DEST_CONNECTION_STRING}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to set up indices for imported data"
+  exit 1
+fi

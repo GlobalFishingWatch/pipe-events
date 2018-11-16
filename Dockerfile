@@ -26,6 +26,13 @@ RUN  \
   gcloud config set component_manager/disable_update_check true && \
   gcloud config set metrics/environment github_docker_image
 
+# Download and install the cloudssql proxy and the client libraries
+RUN \
+  wget -q https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O /usr/local/bin/cloud_sql_proxy && \
+  chmod +x /usr/local/bin/cloud_sql_proxy && \
+  apt-get -y install postgresql-client
+
+# Download and install numpy and gdal
 RUN apt-get -y update && \
   apt-get -y install gdal-bin libgdal-dev python-numpy-dev && \
   pip install numpy

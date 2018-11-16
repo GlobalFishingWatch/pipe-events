@@ -29,13 +29,14 @@ class PipelineDagFactory(DagFactory):
             publish_events = BashOperator(
                 task_id='publish_events',
                 pool='bigquery',
-                bash_command='{docker_run} {docker_image} gap_events '
+                bash_command='{docker_run} {docker_image} generate_gap_events '
                              '{date_range} '
                              '{project_id}:{source_dataset}.{source_table} '
                              '{project_id}:{events_dataset}.{events_table} '
                              '{gap_min_pos_count} '
                              '{gap_min_dist} '
-                             '{project_id}:{source_dataset}.{segment_vessel}'.format(**config)
+                             '{project_id}:{source_dataset}.{segment_vessel}'.format(
+                                 **config)
             )
 
             for sensor in source_sensors:

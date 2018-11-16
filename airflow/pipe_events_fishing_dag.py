@@ -44,7 +44,7 @@ class PipelineDagFactory(DagFactory):
             publish_events = BashOperator(
                 task_id='publish_events',
                 pool='bigquery',
-                bash_command='{docker_run} {docker_image} fishing_events '
+                bash_command='{docker_run} {docker_image} generate_fishing_events '
                 '{date_range} '
                 '{project_id}:{source_dataset}.{source_table} '
                 '{project_id}:{source_dataset}.{segment_vessel} '

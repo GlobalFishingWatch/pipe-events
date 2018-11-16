@@ -37,7 +37,7 @@ case $1 in
     ;;
 
   upload_postgis)
-    $(THIS_SCRIPT_DIR)/upload_postgis "${@:2}"
+    ${THIS_SCRIPT_DIR}/upload_postgis "${@:2}"
     ;;
 
   *)
