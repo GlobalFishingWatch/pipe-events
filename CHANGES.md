@@ -4,6 +4,8 @@ Changes
 0.3.0 - 2018-09-07
 ------------------
 
+* [#7](https://github.com/GlobalFishingWatch/encounters_pipeline/pull/7) TODO: Complete the actual PR link
+  * Implements postgres event publication. Requires new airflow variables: `pipe_events.postgres_instance`, `pipe_events.postgres_connection_string` and one `postgres_table` variable for each event type subpipeline. See the README for more information.
 * [#7](https://github.com/GlobalFishingWatch/encounters_pipeline/pull/7)
   * Adds the publication of the rest of the event types into this pipeline.
   * Bump version of pipe-tools to 0.2.0
