@@ -45,35 +45,35 @@ echo "  DEST_TABLE: $DEST_TABLE"
 ################################################################################
 # Export events to json files
 ################################################################################
-# echo "Exporting events from $SOURCE"
-# EXTRACT_PATH=$TEMP_PATH/bq/*.json
-# bq extract \
-#   --destination_format=NEWLINE_DELIMITED_JSON \
-#   $SOURCE \
-#   $EXTRACT_PATH
-# if [ "$?" -ne 0 ]; then
-#   echo "  Unable to extract ${SOURCE} to ${EXTRACT_PATH}"
-#   exit 1
-# fi
-# echo "  Exported events from ${SOURCE} to ${EXTRACT_PATH}"
+echo "Exporting events from $SOURCE"
+EXTRACT_PATH=$TEMP_PATH/bq/*.json
+bq extract \
+  --destination_format=NEWLINE_DELIMITED_JSON \
+  $SOURCE \
+  $EXTRACT_PATH
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to extract ${SOURCE} to ${EXTRACT_PATH}"
+  exit 1
+fi
+echo "  Exported events from ${SOURCE} to ${EXTRACT_PATH}"
 
 ################################################################################
 # Download files locally
 ################################################################################
-# echo "Downloading events from ${SOURCE} to local disk"
+echo "Downloading events from ${SOURCE} to local disk"
 LOCAL_JSON_PATH=./data/json/
-# mkdir -p ${LOCAL_JSON_PATH}
-# gsutil -m cp ${EXTRACT_PATH} ${LOCAL_JSON_PATH}
-# if [ "$?" -ne 0 ]; then
-#   echo "  Unable to download events data locally from ${TEMP_BUCKET}"
-#   exit 1
-# fi
-# echo "  Downloaded  events from ${TEMP_BUCKET}"
+mkdir -p ${LOCAL_JSON_PATH}
+gsutil -m cp ${EXTRACT_PATH} ${LOCAL_JSON_PATH}
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to download events data locally from ${TEMP_BUCKET}"
+  exit 1
+fi
+echo "  Downloaded  events from ${TEMP_BUCKET}"
 
 ################################################################################
 # Convert format from json to exported sql format
 ################################################################################
-# echo "Converting downloaded files to csv format"
+echo "Converting downloaded files to csv format"
 LOCAL_CSV_PATH=./data/csv
 LOCAL_CSV_FILE=${LOCAL_CSV_PATH}/data.csv
 echo "Creating local csv directory"
