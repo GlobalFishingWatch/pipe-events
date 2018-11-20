@@ -21,7 +21,7 @@ fi
 case $1 in
 
   generate_gap_events)
-    ${THIS_SCRIPT_DIR}/gap_events.sh "${@:2}"
+    ${THIS_SCRIPT_DIR}/generate_gap_events "${@:2}"
     ;;
 
   generate_encounter_events)
