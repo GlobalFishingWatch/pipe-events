@@ -55,7 +55,7 @@ class PipelineDagFactory(DagFactory):
 
             publish_events_postgres = BashOperator(
                 task_id='publish_events_postgres',
-                bash_command='{docker_run} {docker_image} upload_postgis '
+                bash_command='{docker_run} {docker_image} publish_postgres '
                 '{date_range} '
                 '{project_id}:{events_dataset}.{events_table} '
                 '{temp_bucket} '

@@ -5,6 +5,7 @@ CREATE EXTENSION IF NOT EXISTS postgis_tiger_geocoder CASCADE;
 
 -- Create base events table
 CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
+    id bigserial NOT NULL,
     event_id character varying NOT NULL,
     event_type character varying NOT NULL,
     vessel_id character varying NOT NULL,
@@ -18,9 +19,7 @@ CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
 TRUNCATE TABLE public.{{ table_name }};
 
 -- Drop all constraints and indices if they exist
-ALTER TABLE ONLY public.{{ table_name }}
-  DROP CONSTRAINT IF EXISTS {{ table_name }}_pkey;
-
+DROP INDEX IF EXISTS {{ table_name }}_event_id;
 DROP INDEX IF EXISTS {{ table_name }}_gis;
 
 

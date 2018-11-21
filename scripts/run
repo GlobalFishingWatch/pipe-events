@@ -8,6 +8,7 @@ display_usage() {
 	echo "  generate_encounter_events          publish encounter (vessel rendevouz at sea) events"
 	echo "  generate_anchorage_events          publish port (port in and out) events"
 	echo "  generate_fishing_events            publish continuous fishing message events"
+  echo "  publish_postgres                   publish events of a given bigquery table to a postgres database"
 	}
 
 
@@ -36,8 +37,8 @@ case $1 in
     ${THIS_SCRIPT_DIR}/generate_fishing_events "${@:2}"
     ;;
 
-  upload_postgis)
-    ${THIS_SCRIPT_DIR}/upload_postgis "${@:2}"
+  publish_postgres)
+    ${THIS_SCRIPT_DIR}/publish_postgres "${@:2}"
     ;;
 
   *)
