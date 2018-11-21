@@ -32,11 +32,6 @@ RUN \
   chmod +x /usr/local/bin/cloud_sql_proxy && \
   apt-get -y install postgresql-client
 
-# Download and install numpy and gdal
-RUN apt-get -y update && \
-  apt-get -y install gdal-bin libgdal-dev python-numpy-dev && \
-  pip install numpy
-
 # Setup a volume for configuration and auth data
 VOLUME ["/root/.config"]
 
