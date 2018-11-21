@@ -80,5 +80,3 @@ if [ "$?" -ne 0 ]; then
 fi
 
 echo "  ${DEST_TABLE} Done."
-
-
