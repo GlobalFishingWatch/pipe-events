@@ -111,7 +111,7 @@ if [ "$?" -ne 0 ]; then
 fi
 
 echo "Importing data"
-cat ${LOCAL_CSV_FILE} | head -n 1 | psql "${DEST_CONNECTION_STRING}" -c "\copy ${DEST_TABLE} from stdin with (format 'csv')"
+cat ${LOCAL_CSV_FILE} | psql "${DEST_CONNECTION_STRING}" -c "\copy ${DEST_TABLE} from stdin with (format 'csv')"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to import data into postgres"
   exit 1
