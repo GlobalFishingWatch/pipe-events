@@ -95,7 +95,7 @@ echo "  Coverted events from JSON to CSV"
 ################################################################################
 echo "Starting the cloudsql proxy"
 cloud_sql_proxy -instances=${DEST_INSTANCE}=tcp:5432 &
-sleep 3
+sleep 5
 
 ################################################################################
 # Load data into postgres
