@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS postgis_tiger_geocoder CASCADE;
 
 -- Create base events table
 CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
-    id bigserial NOT NULL,
+    id bigserial PRIMARY KEY NOT NULL,
     event_id character varying NOT NULL,
     event_type character varying NOT NULL,
     vessel_id character varying NOT NULL,
