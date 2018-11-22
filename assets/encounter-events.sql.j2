@@ -11,6 +11,7 @@ WITH
   flattened_encounters AS (
   SELECT
     vessel_1_id AS vessel_id,
+    vessel_2_id AS encountered_vessel_id,
     CONCAT( TO_HEX(MD5(FORMAT("encouter|%s|%t",vessel_1_id,start_time))), ".1" ) AS event_id,
     * EXCEPT(vessel_1_id,
       vessel_2_id)
@@ -19,6 +20,7 @@ WITH
   UNION ALL
   SELECT
     vessel_2_id AS vessel_id,
+    vessel_1_id AS encountered_vessel_id,
     CONCAT( TO_HEX(MD5(FORMAT("encouter|%s|%t",vessel_1_id,start_time))), ".2" ) AS event_id,
     * EXCEPT(vessel_1_id,
       vessel_2_id)
@@ -36,8 +38,13 @@ SELECT
   mean_latitude AS lat_max,
   mean_longitude AS lon_min,
   mean_longitude AS lon_max,
-  TO_JSON_STRING(STRUCT( ROUND(median_distance_km,3) AS median_distance_km,
-      ROUND(median_speed_knots,3) AS median_speed_knots )) AS event_info,
+  TO_JSON_STRING(
+    STRUCT(
+      ROUND(median_distance_km,3) AS median_distance_km,
+      ROUND(median_speed_knots,3) AS median_speed_knots,
+      encountered_vessel_id
+    ),
+  ) AS event_info,
   ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(mean_longitude AS string), ' ', CAST(mean_latitude AS string), ')')) AS event_geography
 FROM
   flattened_encounters
