@@ -166,7 +166,7 @@ WITH
     USING (seg_id)
     WHERE
       timestamp >= event_start
-      AND (event_end IS NULL OR timestamp <= event_end)
+      AND ((event_end IS NULL AND DATE(timestamp) = DATE(event_start)) OR timestamp <= event_end)
       AND score = 1.0
   ),
 
