@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
     event_end timestamp without time zone NOT NULL,
     event_info jsonb NOT NULL,
     event_geography public.geography(MultiPoint,4326) NOT NULL,
-    event_mean_position public.geography(Point, 4326) NOT NULL,
+    event_mean_position public.geography(Point, 4326) NOT NULL
 );
 
 -- Ensure the table is empty
