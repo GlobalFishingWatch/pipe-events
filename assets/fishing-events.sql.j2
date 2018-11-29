@@ -1,4 +1,12 @@
 #standardSQL
+
+#
+# Fishing Events
+#
+# Aggregate position messages that have been annotated with a fishing score into fishing events
+# A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
+# messages with score=null are ignored
+
 INSERT INTO
   `{{ dest }}` ( event_id,
     event_type,
@@ -14,118 +22,198 @@ INSERT INTO
     event_info,
     event_geography )
 WITH
+
+  #
+  # Collect scored position messages
+  #
   message AS (
-  SELECT
-    seg_id,
-    timestamp,
-    lat,
-    lon,
-    ifnull(nnet_score,
-      logistic_score) AS score
-  FROM
-    `{{ messages }}*`
-  WHERE
-    _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}'
-    AND '{{ end_yyyymmdd }}'
-    AND lat > -90
-    AND lat < 90
-    AND lon > -180
-    AND lon < 180),
+    SELECT
+      seg_id,
+      timestamp,
+      lat,
+      lon,
+      ifnull(nnet_score,
+        logistic_score) AS score
+    FROM
+      `{{ messages }}*`
+    WHERE
+      _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}'
+      AND '{{ end_yyyymmdd }}'
+      AND lat > -90
+      AND lat < 90
+      AND lon > -180
+      AND lon < 180
+  ),
+
+  #
+  # Get a vessel_id for each segment
+  #
   best_segment_vessel AS (
-  SELECT
-    DISTINCT seg_id,
-    FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
-  FROM
-    `{{ segment_vessel }}` ),
+    SELECT
+      DISTINCT seg_id,
+      FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
+    FROM
+      `{{ segment_vessel }}`
+  ),
+
+  #
+  # Get a list of non-noise seg_ids
+  #
   good_seg AS (
-  SELECT
-    seg_id
-  FROM
-    `{{ segment_info }}`
-  WHERE
-    pos_count >= 10 ),
+    SELECT
+      seg_id
+    FROM
+      `{{ segment_info }}`
+    WHERE
+      pos_count >= 10
+  ),
+
+  #
+  # Filter mesasages to only good segments, and ignore messages with score=NULL
+  #
   segment_message AS (
-  SELECT
-    *
-  FROM
-    message
-  JOIN
-    good_seg
-  USING
-    (seg_id) ),
+    SELECT
+      *
+    FROM
+      message
+    JOIN
+      good_seg
+    USING
+      (seg_id)
+    WHERE
+      score is not NULL
+  ),
+
+  # Group messages into events which are consecutive sequences of messages with the same score
+
+  #
+  # First for each message, get the score from the previous message in the segement
+  #
   prev_score_message AS (
-  SELECT
-    seg_id,
-    timestamp,
-    score,
-    LAG(score) OVER (PARTITION BY seg_id, DATE(timestamp)
-    ORDER BY
-      timestamp) AS prev_score
-  FROM
-    segment_message ),
-  event_start AS (
-  SELECT
-    seg_id,
-    timestamp
-  FROM
-    prev_score_message
-  WHERE
-    prev_score IS NULL
-    OR score != prev_score),
+    SELECT
+      seg_id,
+      timestamp,
+      score,
+      LAG(score) OVER (PARTITION BY seg_id, DATE(timestamp) ORDER BY timestamp) AS prev_score,
+      LAG(timestamp) OVER (PARTITION BY seg_id, DATE(timestamp) ORDER BY timestamp) AS prev_timestamp
+    FROM
+      segment_message
+  ),
+
+  #
+  # Now get the time range from the start of a group to the end of the group
+  # Do this by filtering to only the first message in each grouping and making a time range from
+  # the first message in one group to the prev_timestamp of first message in the next group
+  #
   event_range AS (
-  SELECT
-    seg_id,
-    timestamp AS event_start,
-    LEAD(timestamp) OVER (PARTITION BY seg_id ORDER BY timestamp) AS next_event_start
-  FROM
-    event_start ),
-  event_message AS (
-  SELECT
-    segment_message.*,
-    event_range.event_start
-  FROM
-    segment_message
-  JOIN
-    event_range
-  ON
-    segment_message.seg_id = event_range.seg_id
-    AND segment_message.timestamp >= event_range.event_start
-    AND (event_range.next_event_start IS NULL
-      OR segment_message.timestamp < event_range.next_event_start) ),
-  event AS (
+    SELECT
+      seg_id,
+      score,
+      prev_timestamp,
+      timestamp as event_start,
+      LEAD(prev_timestamp) OVER (PARTITION BY seg_id, DATE(timestamp) ORDER BY timestamp) AS event_end
+    FROM
+      prev_score_message
+    WHERE
+      prev_score IS NULL
+      OR score != prev_score
+  ),
+
+  #
+  # Filter event ranges to only those with score = 1.0 (fishing)
+  # and for each fishing event get the end of the time range of the previous fishing event
+  #
+  prev_fishing_event_range as (
+    SELECT
+      seg_id,
+      event_start,
+      event_end,
+      LAG(event_end) OVER (PARTITION BY seg_id, DATE(event_start) ORDER BY event_start) as prev_event_end
+    FROM
+      event_range
+    WHERE
+      score = 1.0
+  ),
+
+  #
+  # Create ranges spanning consecutive events that are separated by a small time interval
+  #
+  fishing_event_range as (
+    SELECT
+      seg_id,
+      event_start,
+      LEAD(prev_event_end) OVER (PARTITION BY seg_id, DATE(event_start) ORDER BY event_start) AS event_end
+    FROM
+      prev_fishing_event_range
+    WHERE
+      prev_event_end is NULL
+      OR TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > {{ min_duration }}
+  ),
+
+
+  #
+  # Tag all the messages with the start time of the event range that contains the message
+  # limit this to just messages with score = 1.0
+  #
+  fishing_event_message AS (
+    SELECT
+      segment_message.*,
+      fishing_event_range.event_start
+    FROM
+      segment_message
+    JOIN
+      fishing_event_range
+    USING (seg_id)
+    WHERE
+      timestamp >= event_start
+      AND (event_end IS NULL OR timestamp <= event_end)
+      AND score = 1.0
+  ),
+
+
+  #
+  # Now aggregate all the messages that are in the same range into a single event record
+  # Filter out short duration events
+  #
+  fishing_event AS (
   SELECT
     vessel_id,
-    event_start AS timestamp,
+    seg_id,
     AVG(lat) AS lat_mean,
     AVG(lon) AS lon_mean,
-    MIN(timestamp) AS timestamp_min,
-    MAX(timestamp) AS timestamp_max,
+    event_start,
+    MAX(timestamp) as event_end,
     MIN(lat) AS lat_min,
     MAX(lat) AS lat_max,
     MIN(lon) AS lon_min,
     MAX(lon) AS lon_max,
     COUNT(*) AS message_count,
     STRING_AGG(CONCAT(CAST(lon AS string), ' ', CAST(lat AS string)), ', '
-    ORDER BY
-      timestamp) AS points_wkt
+      ORDER BY timestamp) AS points_wkt
   FROM
-    event_message
+    fishing_event_message
   JOIN
     best_segment_vessel
   USING
     (seg_id)
-  WHERE
-    score = 1.0
   GROUP BY
     vessel_id,
     seg_id,
-    event_start )
+    event_start
+  HAVING
+    TIMESTAMP_DIFF(event_end, event_start, SECOND) > {{ min_duration }}
+  )
+
+
+#
+# Finally, generate a unique event id and write out in the normalized event schema
+#
 SELECT
-  TO_HEX(MD5(FORMAT("%s|%s|%t",'fishing', vessel_id, timestamp))) AS event_id,
+  TO_HEX(MD5(FORMAT("%s|%s|%t",'fishing', vessel_id, event_start))) AS event_id,
   'fishing' AS event_type,
   vessel_id,
-  timestamp_min AS event_start,
-  timestamp_max AS event_end,
+  event_start,
+  event_end,
   lat_mean,
   lon_mean,
   lat_min,
@@ -135,4 +223,4 @@ SELECT
   TO_JSON_STRING(STRUCT( message_count )) AS event_info,
   ST_GEOGFROMTEXT(CONCAT( 'MULTIPOINT', " (", points_wkt, ')')) AS event_geography
 FROM
-  event
+  fishing_event

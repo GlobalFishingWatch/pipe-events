@@ -6,11 +6,11 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 source ${THIS_SCRIPT_DIR}/pipeline.sh
 
 display_usage() {
-	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] MESSAGES_TABLE EVENTS_TABLE MIN_POS_COUNT MIN_DIST \n"
+	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] MESSAGES_TABLE EVENTS_TABLE MIN_POS_COUNT MIN_DIST SEGMENT_VESSEL\n"
 	}
 
 
-if [[ $# -ne 5  ]]
+if [[ $# -ne 6  ]]
 then
     display_usage
     exit 1
@@ -21,6 +21,7 @@ MESSAGES_TABLE=$2
 EVENTS_TABLE=$3
 MIN_POS_COUNT=$4
 MIN_DIST=$5
+SEGMENT_VESSEL=$6
 
 IFS=, read START_DATE END_DATE <<<"${DATE_RANGE}"
 if [[ -z $END_DATE ]]; then
@@ -76,6 +77,7 @@ jinja2 ${INSERT_SQL} \
    -D end_date=${END_DATE} \
    -D min_pos_count=${MIN_POS_COUNT} \
    -D min_dist=${MIN_DIST} \
+   -D segment_vessel=${SEGMENT_VESSEL//:/.} \
    | bq query --max_rows=0
 
 if [ "$?" -ne 0 ]; then
