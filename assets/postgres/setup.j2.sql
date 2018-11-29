@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
     event_start timestamp without time zone NOT NULL,
     event_end timestamp without time zone NOT NULL,
     event_info jsonb NOT NULL,
-    event_geography public.geography(MultiPoint,4326) NOT NULL
+    event_geography public.geography(MultiPoint,4326) NOT NULL,
+    event_mean_position public.geography(Point, 4326) NOT NULL,
 );
 
 -- Ensure the table is empty
@@ -20,6 +21,7 @@ TRUNCATE TABLE public.{{ table_name }};
 
 -- Drop all constraints and indices if they exist
 DROP INDEX IF EXISTS {{ table_name }}_event_id;
-DROP INDEX IF EXISTS {{ table_name }}_gis;
+DROP INDEX IF EXISTS {{ table_name }}_event_geography_gis;
+DROP INDEX IF EXISTS {{ table_name }}_event_mean_position_gis;
 
 

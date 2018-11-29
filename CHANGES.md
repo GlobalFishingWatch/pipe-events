@@ -2,7 +2,7 @@ Changes
 =======
 
 0.3.1
-------------------
+=======
 
 * [#17](https://github.com/GlobalFishingWatch/pipe-events/pull/17)
   * Implements postgres event publication. Requires new airflow variables: `pipe_events.postgres_instance`, `pipe_events.postgres_connection_string` and one `postgres_table` variable for each event type subpipeline. See the README for more information.
