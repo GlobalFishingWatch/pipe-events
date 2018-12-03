@@ -13,10 +13,14 @@ with open(csv_file, "wb+") as f:
     for line in sys.stdin:
         record = json.loads(line)
 
-        # We need to normalize points and multipoints into multipoints
+        # Normalize points and multipoints into multipoints
         match = geography_regex.match(record['event_geography'])
         points = match.group(1)
         normalized_geography = "MULTIPOINT({})".format(points)
+
+        # Normalize mean_lat and mean_lon into an actual point
+        normalized_mean_position = "POINT({} {})".format(
+            record['lon_mean'], record['lat_mean'])
 
         writer.writerow([
             record['event_id'],
@@ -25,5 +29,6 @@ with open(csv_file, "wb+") as f:
             record['event_start'],
             record['event_end'],
             record['event_info'],
-            normalized_geography
+            normalized_geography,
+            normalized_mean_position
         ])
