@@ -1,5 +1,8 @@
 #standardSQL
 
+# Include some utility functions
+{% include 'util.sql.j2' %}
+
 #
 # Fishing Events
 #
@@ -30,6 +33,7 @@ WITH
     SELECT
       seg_id,
       timestamp,
+      ST_GEOGPOINT(lon, lat) as point,
       lat,
       lon,
       ifnull(nnet_score,
@@ -41,8 +45,6 @@ WITH
       AND '{{ end_yyyymmdd }}'
       AND lat > -90
       AND lat < 90
-      AND lon > -180
-      AND lon < 180
   ),
 
   #
@@ -179,14 +181,15 @@ WITH
   SELECT
     vessel_id,
     seg_id,
-    AVG(lat) AS lat_mean,
-    AVG(lon) AS lon_mean,
+    ST_CENTROID(ST_UNION_AGG(point)) as centroid,  # compute centoid of all the lat/lon pairs in the event
     event_start,
     MAX(timestamp) as event_end,
     MIN(lat) AS lat_min,
     MAX(lat) AS lat_max,
     MIN(lon) AS lon_min,
     MAX(lon) AS lon_max,
+    MIN(anti_lon(lon)) as anti_lon_min,   # Also get min/max for the anti_longitude (180 degrees opposite) to deal wiht dateline crossing
+    MAX(anti_lon(lon)) as anti_lon_max,
     COUNT(*) AS message_count,
     STRING_AGG(CONCAT(CAST(lon AS string), ' ', CAST(lat AS string)), ', '
       ORDER BY timestamp) AS points_wkt
@@ -202,6 +205,28 @@ WITH
     event_start
   HAVING
     TIMESTAMP_DIFF(event_end, event_start, SECOND) > {{ min_duration }}
+  ),
+
+  # Correct lon_min and lon_max for crossing the dateline (anti-meridian)
+  # And extract lat and lon from the centriod
+  #
+  fishing_event_dateline as (
+    SELECT
+      * except (centroid, lon_min, lon_max, anti_lon_min, anti_lon_max),
+
+      # Get the lat and lon from the computed centroid
+      geopoint_to_struct(centroid).lat as lat_mean,
+      geopoint_to_struct(centroid).lon as lon_mean,
+
+      # determine which direction around the globe is shorter - across the equator (eg -1.0 to 1.0), across the
+      # dateline (eg -179.0 to 179.0) or neither (eg 10.0 to 12.0).  Use this to select which values to use for
+      # min and max longitude
+
+      IF ( (lon_max - lon_min) <= (anti_lon_max - anti_lon_min), lon_min, anti_lon(anti_lon_max) ) as lon_min,
+      IF ( (lon_max - lon_min) <= (anti_lon_max - anti_lon_min), lon_max, anti_lon(anti_lon_min) ) as lon_max
+
+    FROM
+      fishing_event
   )
 
 
@@ -223,4 +248,4 @@ SELECT
   TO_JSON_STRING(STRUCT( message_count )) AS event_info,
   ST_GEOGFROMTEXT(CONCAT( 'MULTIPOINT', " (", points_wkt, ')')) AS event_geography
 FROM
-  fishing_event
+  fishing_event_dateline
