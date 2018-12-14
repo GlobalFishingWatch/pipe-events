@@ -18,6 +18,10 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 * [#18](https://github.com/GlobalFishingWatch/pipe-events/issues/18): Include
   the `encountered_vessel_id` in the `event_info` for encounters. 
 
+* [#22](https://github.com/GlobalFishingWatch/pipe-events/issues/22): Fix a bug in 
+  fishing events where events crossing the dateline had the wrong min/max/avg 
+  for longitude
+  
 ## v0.3.1 2018-11-29
 
 ### Changed
