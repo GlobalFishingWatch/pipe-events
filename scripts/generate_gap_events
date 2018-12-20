@@ -3,7 +3,7 @@ source pipe-tools-utils
 
 THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 ASSETS=${THIS_SCRIPT_DIR}/../assets
-# source ${THIS_SCRIPT_DIR}/pipeline.sh
+source ${THIS_SCRIPT_DIR}/pipeline.sh
 
 display_usage() {
 	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] MESSAGES_TABLE EVENTS_TABLE MIN_POS_COUNT MIN_DIST SEGMENT_VESSEL\n"
