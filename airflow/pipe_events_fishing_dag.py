@@ -61,7 +61,8 @@ class PipelineDagFactory(DagFactory):
                 '{temp_bucket} '
                 '{postgres_instance} '
                 '{postgres_connection_string} '
-                '{postgres_table}'.format(**config)
+                '{postgres_table} '
+                'fishing'.format(**config)
             )
 
             for sensor in source_sensors:

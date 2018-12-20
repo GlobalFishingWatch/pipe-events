@@ -9,6 +9,13 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 ## [Unreleased]
 
 ### Added
+* [#895](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/895): Gaps and
+  port events now come as a single event for each on-off / in-out raw
+  combination.
+
+* [#921](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/921): All event
+  types are now imported to postgis.
+
 * [#862](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/862):
   Implements postgres event publication. Requires new airflow variables:
   `pipe_events.postgres_instance`, `pipe_events.postgres_connection_string` and

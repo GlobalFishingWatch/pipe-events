@@ -43,7 +43,7 @@ SELECT
       ROUND(median_distance_km,3) AS median_distance_km,
       ROUND(median_speed_knots,3) AS median_speed_knots,
       encountered_vessel_id
-    ),
+    )
   ) AS event_info,
   ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(mean_longitude AS string), ' ', CAST(mean_latitude AS string), ')')) AS event_geography
 FROM

@@ -10,13 +10,14 @@ ARGS=( \
   DEST_INSTANCE \
   DEST_CONNECTION_STRING \
   DEST_TABLE \
+  DEST_EVENT_TYPE \
 )
 
 ################################################################################
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_INSTANCE DEST_CONNECTION_STRING DEST_TABLE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_INSTANCE DEST_CONNECTION_STRING DEST_TABLE DEST_EVENT_TYPE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -42,6 +43,7 @@ echo "  TEMP_BUCKET: $TEMP_BUCKET"
 echo "  DEST_INSTANCE: $DEST_INSTANCE"
 echo "  DEST_CONNECTION_STRING: $DEST_CONNECTION_STRING"
 echo "  DEST_TABLE: $DEST_TABLE"
+echo "  DEST_EVENT_TYPE: $DEST_EVENT_TYPE"
 ################################################################################
 # Export events to json files
 ################################################################################
@@ -104,6 +106,7 @@ echo "Setting up database for data import"
 SETUP_SQL=${ASSETS}/postgres/setup.j2.sql
 jinja2 ${SETUP_SQL} \
   -D table_name=${DEST_TABLE} \
+  -D event_type=${DEST_EVENT_TYPE} \
   | psql "${DEST_CONNECTION_STRING}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to set database up for data import"
