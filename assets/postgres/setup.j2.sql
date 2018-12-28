@@ -17,12 +17,10 @@ CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
 );
 
 -- Ensure the table is empty
-DELETE FROM TABLE public.{{ table_name }} WHERE event_type = '{{ event_type }}';
+DELETE FROM public.{{ table_name }} WHERE event_type = '{{ event_type }}';
 
 -- Drop all constraints and indices if they exist
 DROP INDEX IF EXISTS {{ table_name }}_event_id;
 DROP INDEX IF EXISTS {{ table_name }}_event_type;
 DROP INDEX IF EXISTS {{ table_name }}_event_geography_gis;
 DROP INDEX IF EXISTS {{ table_name }}_event_mean_position_gis;
-
-
