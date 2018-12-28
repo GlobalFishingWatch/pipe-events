@@ -107,7 +107,7 @@ SETUP_SQL=${ASSETS}/postgres/setup.j2.sql
 jinja2 ${SETUP_SQL} \
   -D table_name=${DEST_TABLE} \
   -D event_type=${DEST_EVENT_TYPE} \
-  | psql "${DEST_CONNECTION_STRING}"
+  | psql -v ON_ERROR_STOP=ON "${DEST_CONNECTION_STRING}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to set database up for data import"
   exit 1
@@ -115,7 +115,7 @@ fi
 
 echo "Importing data"
 COPY_COMMAND="\copy ${DEST_TABLE} (event_id, event_type, vessel_id, event_start, event_end, event_info, event_geography, event_mean_position) from stdin with (format 'csv')"
-cat ${LOCAL_CSV_FILE} | psql "${DEST_CONNECTION_STRING}" -c "$COPY_COMMAND"
+cat ${LOCAL_CSV_FILE} | psql -v ON_ERROR_STOP=ON "${DEST_CONNECTION_STRING}" -c "$COPY_COMMAND"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to import data into postgres"
   exit 1
@@ -125,7 +125,7 @@ echo "Indexing data"
 INDEX_SQL=${ASSETS}/postgres/index.j2.sql
 jinja2 ${INDEX_SQL} \
   -D table_name=${DEST_TABLE} \
-  | psql "${DEST_CONNECTION_STRING}"
+  | psql -v ON_ERROR_STOP=ON "${DEST_CONNECTION_STRING}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to set up indices for imported data"
   exit 1
