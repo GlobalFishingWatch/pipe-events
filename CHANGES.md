@@ -9,6 +9,9 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 ## [Unreleased]
 
 ### Added
+* [#944](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/944): Adds
+  various indices to the postgis tables.
+
 * [#895](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/895): Gaps and
   port events now come as a single event for each on-off / in-out raw
   combination.
