@@ -1,7 +1,7 @@
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 
-from pipe_tools.airflow.models import DagFactory
+from airflow_ext.gfw.models import DagFactory
 
 
 class PipelineDagFactory(DagFactory):

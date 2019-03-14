@@ -11,6 +11,10 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 ## v0.4.0 2019-03-14
 
 ### Added
+
+* [GlobalFishingWatch/GFW-Tasks#991](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/991)
+  * Migrates to use the new [airflow-gfw](https://github.com/GlobalFishingWatch/airflow-gfw) library and use the pipe-tools [v2.0.0](https://github.com/GlobalFishingWatch/pipe-tools/releases/tag/v2.0.0)
+
 * [#944](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/944): Adds
   various indices to the postgis tables.
 
