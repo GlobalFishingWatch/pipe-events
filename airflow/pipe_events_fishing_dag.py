@@ -41,10 +41,10 @@ class PipelineDagFactory(DagFactory):
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
             source_sensors = self.source_table_sensors(dag)
 
-            publish_events = BashOperator(
-                task_id='publish_events',
+            publish_events_bigquery = BashOperator(
+                task_id='publish_events_bigquery',
                 pool='bigquery',
-                bash_command='{docker_run} {docker_image} fishing_events '
+                bash_command='{docker_run} {docker_image} generate_fishing_events '
                 '{date_range} '
                 '{project_id}:{source_dataset}.{source_table} '
                 '{project_id}:{source_dataset}.{segment_vessel} '
@@ -53,7 +53,19 @@ class PipelineDagFactory(DagFactory):
                 '{min_event_duration}'.format(**config)
             )
 
+            publish_events_postgres = BashOperator(
+                task_id='publish_events_postgres',
+                bash_command='{docker_run} {docker_image} publish_postgres '
+                '{date_range} '
+                '{project_id}:{events_dataset}.{events_table} '
+                '{temp_bucket} '
+                '{postgres_instance} '
+                '{postgres_connection_string} '
+                '{postgres_table} '
+                'fishing'.format(**config)
+            )
+
             for sensor in source_sensors:
-                dag >> sensor >> publish_events
+                dag >> sensor >> publish_events_bigquery >> publish_events_postgres
 
             return dag

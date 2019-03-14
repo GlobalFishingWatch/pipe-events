@@ -13,26 +13,43 @@ INSERT INTO
     lon_max,
     event_info,
     event_geography )
+WITH
+  visits_with_leads AS (
+  SELECT
+    *,
+    LEAD(event_type) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS next_event_type,
+    LEAD(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS next_timestamp
+  FROM
+    `{{ source }}*`
+  WHERE
+    _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}'
+    AND '{{ end_yyyymmdd }}'
+    AND event_type IN ('PORT_ENTRY',
+      'PORT_EXIT') ),
+  clean_visits AS (
+  SELECT
+    *
+  FROM
+    visits_with_leads
+  WHERE
+    event_type = 'PORT_ENTRY'
+    AND (next_event_type = 'PORT_EXIT'
+      OR next_event_type IS NULL) )
 SELECT
   TO_HEX(MD5(FORMAT("%s|%s|%t",event_type, vessel_id, timestamp))) AS event_id,
-  event_type,
+  'port' AS event_type,
   vessel_id,
-  timestamp AS even_start,
-  timestamp AS even_end,
+  timestamp AS event_start,
+  next_timestamp AS event_end,
   vessel_lat AS lat_mean,
   vessel_lon AS lon_mean,
   lat AS lat_min,
   lat AS lat_max,
   lon AS lon_min,
   lon AS lon_max,
-  TO_JSON_STRING(STRUCT( ROUND(lat,6) AS anchorage_lat,
+  TO_JSON_STRING( STRUCT( ROUND(lat,6) AS anchorage_lat,
       ROUND(lon,6) AS anchorage_lon,
-      anchorage_id )) AS event_info,
+      anchorage_id ) ) AS event_info,
   ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(vessel_lon AS string), ' ', CAST(vessel_lat AS string), ')')) AS event_geography
 FROM
-  `{{ source }}*`
-WHERE
-  _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}'
-  AND '{{ end_yyyymmdd }}'
-  AND event_type IN ('PORT_ENTRY',
-    'PORT_EXIT')
+  clean_visits

@@ -1,6 +1,6 @@
 version: '2'
 services:
-  pipe_events:
+  pipeline:
     image: gfw/pipe-events
     build: .
     volumes:
@@ -10,22 +10,17 @@ services:
   gcloud:
     image: gfw/pipe-events
     build: .
-    entrypoint: gcloud
+    entrypoint:
+      - gcloud
     volumes:
+      - ".:/opt/project"
       - "gcp:/root/.config/"
 
   py.test:
     image: gfw/pipe-events
     build: .
-    entrypoint: py.test
-    volumes:
-      - ".:/opt/project"
-      - "gcp:/root/.config/"
-
-  bash:
-    image: gfw/pipe-events
-    build: .
-    entrypoint: /bin/bash
+    entrypoint:
+      - py.test
     volumes:
       - ".:/opt/project"
       - "gcp:/root/.config/"
