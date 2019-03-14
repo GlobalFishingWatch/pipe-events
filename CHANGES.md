@@ -8,6 +8,8 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v0.4.0 2019-03-14
+
 ### Added
 * [#944](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/944): Adds
   various indices to the postgis tables.
