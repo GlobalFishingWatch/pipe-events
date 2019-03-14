@@ -3,7 +3,7 @@ import imp
 
 from airflow import DAG
 from airflow.operators.subdag_operator import SubDagOperator
-from pipe_tools.airflow.models import DagFactory
+from airflow_ext.gfw.models import DagFactory
 
 PIPELINE = "pipe_events"
 
