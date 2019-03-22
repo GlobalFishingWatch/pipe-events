@@ -11,6 +11,9 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 ## v0.4.0 2019-03-14
 
 ### Added
+* [TODO](TODO): Removes configuration options for cloudsql, since we are now
+  using a custom postgres database.
+
 * [#944](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/944): Adds
   various indices to the postgis tables.
 
@@ -61,8 +64,3 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 * Initial release
 
-[Unreleased]: https://github.com/GlobalFishingWatch/api-events/compare/v0.3.0...develop
-[v0.3.1]: https://github.com/GlobalFishingWatch/api-events/compare/v0.3.1...v0.3.0
-[v0.3.0]: https://github.com/GlobalFishingWatch/api-events/compare/v0.3.0...v0.2.0
-[v0.2.0]: https://github.com/GlobalFishingWatch/api-events/compare/v0.2.0...v0.1.0
-[v0.1.0]: https://github.com/GlobalFishingWatch/api-events/compare/v0.2.0...v0.1.0

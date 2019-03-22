@@ -49,7 +49,6 @@ pipeline, and come with default values:
 
 Finally, the following custom entries do not provide a default value and must be manually configured before using this pipeline:
 
-* `pipe_events.postgres_instance`: CloudSQL postgres instance where the events are published to.
 * `pipe_events.postgres_connection_string`: Connection string for the postgres database to publish the events to.
 * `pipe_events.postgres_table`: Table in postgres to publish the events to.
 

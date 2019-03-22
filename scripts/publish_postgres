@@ -60,19 +60,6 @@ fi
 echo "  Exported events from ${SOURCE} to ${EXTRACT_PATH}"
 
 ################################################################################
-# Download files locally
-################################################################################
-echo "Downloading events from ${SOURCE} to local disk"
-LOCAL_JSON_PATH=./data/json/
-mkdir -p ${LOCAL_JSON_PATH}
-gsutil -m cp ${EXTRACT_PATH} ${LOCAL_JSON_PATH}
-if [ "$?" -ne 0 ]; then
-  echo "  Unable to download events data locally from ${TEMP_BUCKET}"
-  exit 1
-fi
-echo "  Downloaded  events from ${TEMP_BUCKET}"
-
-################################################################################
 # Convert format from json to exported sql format
 ################################################################################
 echo "Converting downloaded files to csv format"
@@ -85,19 +72,12 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 echo "Converting json events to csv format"
-cat ${LOCAL_JSON_PATH}/*.json | python -m pipe_events.postgis.formatter ${LOCAL_CSV_FILE}
+gsutil cat ${EXTRACT_PATH}/*.json | python -m pipe_events.postgis.formatter ${LOCAL_CSV_FILE}
 if [ "$?" -ne 0 ]; then
   echo "  Unable to convert events from JSON to CSV format"
   exit 1
 fi
 echo "  Coverted events from JSON to CSV"
-
-################################################################################
-# Start the cloudsql proxy
-################################################################################
-echo "Starting the cloudsql proxy"
-cloud_sql_proxy -instances=${DEST_INSTANCE}=tcp:5432 &
-sleep 5
 
 ################################################################################
 # Load data into postgres
