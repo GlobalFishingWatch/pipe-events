@@ -227,8 +227,17 @@ WITH
 
     FROM
       fishing_event
-  )
+  ),
 
+  # Include basic vessel information in the event info
+  complete_fishing_event as (
+    SELECT
+      event.*,
+      shipname as vessel_shipname
+    FROM
+      fishing_event_dateline
+      LEFT JOIN `{{ vessel_info }}` USING (vessel_id)
+  )
 
 #
 # Finally, generate a unique event id and write out in the normalized event schema
@@ -245,7 +254,7 @@ SELECT
   lat_max,
   lon_min,
   lon_max,
-  TO_JSON_STRING(STRUCT( message_count )) AS event_info,
+  TO_JSON_STRING(STRUCT( message_count, vessel_shipname )) AS event_info,
   ST_GEOGFROMTEXT(CONCAT( 'MULTIPOINT', " (", points_wkt, ')')) AS event_geography
 FROM
   fishing_event_dateline

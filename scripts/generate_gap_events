@@ -29,9 +29,9 @@ if [[ -z $END_DATE ]]; then
 fi
 
 
-DELETE_SQL=${ASSETS}/delete-daterange.sql.j2
-INSERT_SQL=${ASSETS}/gap-events.sql.j2
-SCHEMA=${ASSETS}/events.schema.json
+DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
+INSERT_SQL=${ASSETS}/bigquery/gap-events.sql.j2
+SCHEMA=${ASSETS}/bigquery/events.schema.json
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
   "* Source: ${MESSAGES_TABLE}"

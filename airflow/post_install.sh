@@ -13,6 +13,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     pipeline_dataset="{{ var.value.PIPELINE_DATASET }}" \
     events_dataset="{{ var.value.EVENTS_DATASET }}" \
     source_dataset="{{ var.value.PIPELINE_DATASET }}" \
+    vessel_info="vessel_info" \
 
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \

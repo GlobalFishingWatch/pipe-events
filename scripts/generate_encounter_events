@@ -19,9 +19,9 @@ fi
 SOURCE_TABLE=$1
 DEST_TABLE=$2
 
-SQL=${ASSETS}/encounter-events.sql.j2
+SQL=${ASSETS}/bigquery/encounter-events.sql.j2
 SOURCE_TABLE=${SOURCE_TABLE//:/.}
-SCHEMA=${ASSETS}/events.schema.json
+SCHEMA=${ASSETS}/bigquery/events.schema.json
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
   "* Source: ${SOURCE_TABLE}"
