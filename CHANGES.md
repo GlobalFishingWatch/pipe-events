@@ -8,12 +8,14 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+### Added
+* [926](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/926): Removes
+  configuration options for cloudsql, since we are now using a custom postgres
+  database.
+
 ## v0.4.0 2019-03-14
 
 ### Added
-* [TODO](TODO): Removes configuration options for cloudsql, since we are now
-  using a custom postgres database.
-
 * [#944](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/944): Adds
   various indices to the postgis tables.
 
