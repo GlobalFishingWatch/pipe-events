@@ -2,12 +2,13 @@
 source pipe-tools-utils
 
 THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
-# source ${THIS_SCRIPT_DIR}/pipeline.sh
+source ${THIS_SCRIPT_DIR}/pipeline.sh
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
   SOURCE_TABLE \
   VESSEL_INFO \
+  NAMED_ANCHORAGES \
   DEST_TABLE \
 )
 
@@ -15,7 +16,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE VESSEL_INFO DEST_TABLE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE VESSEL_INFO NAMED_ANCHORAGES DEST_TABLE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -40,6 +41,7 @@ echo "Running $0"
 echo "  DATE_RANGE: $DATE_RANGE"
 echo "  SOURCE_TABLE: $SOURCE_TABLE"
 echo "  VESSEL_INFO: $VESSEL_INFO"
+echo "  NAMED_ANCHORAGES: $NAMED_ANCHORAGES"
 echo "  DEST_TABLE: $DEST_TABLE"
 ################################################################################
 # Force that the destination table exists
@@ -88,6 +90,7 @@ echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 jinja2 ${INSERT_SQL} \
    -D source=${SOURCE_TABLE//:/.} \
    -D vessel_info=${VESSEL_INFO//:/.} \
+   -D named_anchorages=${NAMED_ANCHORAGES//:/.} \
    -D dest=${DEST_TABLE//:/.} \
    -D start_yyyymmdd=$(yyyymmdd ${START_DATE}) \
    -D end_yyyymmdd=$(yyyymmdd ${END_DATE}) \

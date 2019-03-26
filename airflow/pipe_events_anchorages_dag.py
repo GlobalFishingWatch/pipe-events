@@ -19,6 +19,7 @@ class PipelineDagFactory(DagFactory):
                              '{date_range} '
                              '{project_id}:{source_dataset}.{source_table} '
                              '{project_id}:{source_dataset}.{vessel_info} '
+                             '{project_id}:{anchorages_dataset}.{named_anchorages} '
                              '{project_id}:{events_dataset}.{events_table}'.format(
                                  **config)
             )

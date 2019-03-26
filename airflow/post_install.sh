@@ -45,6 +45,8 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     segment_vessel="segment_vessel" \
     segment_info="segment_info" \
     vessel_info="vessel_info" \
+    anchorages_dataset="gfw_research" \
+    named_anchorages="named_anchorages_v20190307" \
     min_event_duration="300" \
     events_table="published_events_fishing" \
 

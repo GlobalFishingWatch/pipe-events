@@ -47,13 +47,21 @@ WITH
   complete_port_event AS (
     SELECT
       event.*,
-      vessel.shipname.value AS main_vessel_shipname
+      vessel.shipname.value AS main_vessel_shipname,
+      IF(anchorage.label_source = 'top_destination', NULL, anchorage.label) AS anchorage_label,
+      anchorage.top_destination AS anchorage_top_destination,
+      anchorage.iso3 AS anchorage_flag
     FROM
       clean_visits AS event
     LEFT JOIN
       `{{ vessel_info }}` AS vessel
     USING
-      (vessel_id) )
+      (vessel_id) 
+    LEFT JOIN
+      `{{ named_anchorages }}` AS anchorage
+    ON
+      event.anchorage_id = anchorage.s2id
+)
 #
 # Finally, generate a unique event id and write out in the normalized event schema
 #
@@ -73,7 +81,10 @@ SELECT
     ROUND(lat,6) AS anchorage_lat,
     ROUND(lon,6) AS anchorage_lon,
     STRUCT(
-      anchorage_id as `id`
+      anchorage_id as `id`,
+      anchorage_label as `name`,
+      anchorage_top_destination AS `top_destination`,
+      anchorage_flag as `flag`
     ) As anchorage
   )) AS event_info,
   TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
