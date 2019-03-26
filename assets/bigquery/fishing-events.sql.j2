@@ -220,11 +220,12 @@ WITH
   #
   complete_fishing_event AS (
   SELECT
-    *
+    event.*,
+    vessel.shipname.value AS main_vessel_shipname
   FROM
-    fishing_event_dateline
+    fishing_event_dateline AS event
   LEFT JOIN 
-    `{{ vessel_info }}`
+    `{{ vessel_info }}` AS vessel
   USING
     (vessel_id) )
 #
@@ -245,7 +246,7 @@ SELECT
   TO_JSON_STRING(STRUCT(
     STRUCT(message_count) AS stats
   )) AS event_info,
-  TO_JSON_STRING([STRUCT(vessel_id AS `id`, shipname.value AS `name`)]) as event_vessels,
+  TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
   ST_GEOGFROMTEXT(CONCAT( 'MULTIPOINT', " (", points_wkt, ')')) AS event_geography
 FROM
   complete_fishing_event

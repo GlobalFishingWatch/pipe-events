@@ -15,6 +15,7 @@ class PipelineDagFactory(DagFactory):
                 pool='bigquery',
                 bash_command='{docker_run} {docker_image} generate_encounter_events '
                              '{project_id}:{source_dataset}.{source_table} '
+                             '{project_id}:{source_dataset}.{vessel_info} '
                              '{project_id}:{events_dataset}.{events_table}'.format(
                                  **config)
             )

@@ -12,8 +12,12 @@ INSERT INTO
     lon_min,
     lon_max,
     event_info,
+    event_vessels,
     event_geography )
 WITH
+  #
+  # Group each port visit with it's lead
+  #
   visits_with_leads AS (
   SELECT
     *,
@@ -26,6 +30,9 @@ WITH
     AND '{{ end_yyyymmdd }}'
     AND event_type IN ('PORT_ENTRY',
       'PORT_EXIT') ),
+  #
+  # Only group clean port events, port entries and then an optional exit
+  #
   clean_visits AS (
   SELECT
     *
@@ -34,7 +41,22 @@ WITH
   WHERE
     event_type = 'PORT_ENTRY'
     AND (next_event_type = 'PORT_EXIT'
-      OR next_event_type IS NULL) )
+      OR next_event_type IS NULL) ),
+
+  # Include basic vessel and port information on the event
+  complete_port_event AS (
+    SELECT
+      event.*,
+      vessel.shipname.value AS main_vessel_shipname
+    FROM
+      clean_visits AS event
+    LEFT JOIN
+      `{{ vessel_info }}` AS vessel
+    USING
+      (vessel_id) )
+#
+# Finally, generate a unique event id and write out in the normalized event schema
+#
 SELECT
   TO_HEX(MD5(FORMAT("%s|%s|%t",event_type, vessel_id, timestamp))) AS event_id,
   'port' AS event_type,
@@ -47,9 +69,14 @@ SELECT
   lat AS lat_max,
   lon AS lon_min,
   lon AS lon_max,
-  TO_JSON_STRING( STRUCT( ROUND(lat,6) AS anchorage_lat,
-      ROUND(lon,6) AS anchorage_lon,
-      anchorage_id ) ) AS event_info,
+  TO_JSON_STRING(STRUCT(
+    ROUND(lat,6) AS anchorage_lat,
+    ROUND(lon,6) AS anchorage_lon,
+    STRUCT(
+      anchorage_id as `id`
+    ) As anchorage
+  )) AS event_info,
+  TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
   ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(vessel_lon AS string), ' ', CAST(vessel_lat AS string), ')')) AS event_geography
 FROM
-  clean_visits
+  complete_port_event

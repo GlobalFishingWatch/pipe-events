@@ -156,16 +156,17 @@ WITH
   #
   complete_gap_event AS (
     SELECT
-      *
+      event.*,
+      vessel.shipname.value AS main_vessel_shipname
     FROM
-      clean_events
+      clean_events AS event
     LEFT JOIN
-      `{{ vessel_info }}`
+      `{{ vessel_info }}` as vessel
     USING
       (vessel_id) )
-  #
-  # assemble the event output
-  #
+#
+# assemble the event output
+#
 SELECT
   TO_HEX(MD5(FORMAT('%s|%s|%t', event_type, vessel_id, timestamp))) AS event_id,
   'gap' AS event_type,
@@ -182,7 +183,7 @@ SELECT
       STRUCT(message_count) AS stats,
       distance_from_shore_m
   )) AS event_info,
-  TO_JSON_STRING([STRUCT(vessel_id AS `id`, shipname.value AS `name`)]) as event_vessels,
+  TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
   IF( next_lat IS NULL OR next_lon IS NULL,
     ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(lon AS string), ' ', CAST(lat AS string), ')')),
     ST_GEOGFROMTEXT(CONCAT(
