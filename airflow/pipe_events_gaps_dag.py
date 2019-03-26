@@ -33,10 +33,10 @@ class PipelineDagFactory(DagFactory):
                              '{date_range} '
                              '{project_id}:{source_dataset}.{source_table} '
                              '{project_id}:{events_dataset}.{events_table} '
+                             '{project_id}:{source_dataset}.{segment_vessel} '
+                             '{project_id}:{source_dataset}.{vessel_info} '
                              '{gap_min_pos_count} '
-                             '{gap_min_dist} '
-                             '{project_id}:{source_dataset}.{segment_vessel}'.format(
-                                 **config)
+                             '{gap_min_dist} '.format(**config)
             )
 
             publish_events_postgres = BashOperator(

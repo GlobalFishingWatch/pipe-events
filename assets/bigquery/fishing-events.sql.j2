@@ -215,7 +215,9 @@ WITH
       anti_lon(anti_lon_min) ) AS lon_max
   FROM
     fishing_event ),
-  # Include basic vessel information in the event info
+  #
+  # Include basic vessel information on the event
+  #
   complete_fishing_event AS (
   SELECT
     *

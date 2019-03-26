@@ -13,7 +13,6 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     pipeline_dataset="{{ var.value.PIPELINE_DATASET }}" \
     events_dataset="{{ var.value.EVENTS_DATASET }}" \
     source_dataset="{{ var.value.PIPELINE_DATASET }}" \
-    vessel_info="vessel_info" \
 
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
@@ -21,6 +20,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     source_table="position_messages_" \
     events_table="published_events_gaps" \
     segment_vessel="segment_vessel" \
+    vessel_info="vessel_info" \
     gap_min_pos_count="3" \
     gap_min_dist="10000" \
 
@@ -28,12 +28,14 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
     pipe_events.encounters \
     source_table="encounters" \
+    vessel_info="vessel_info" \
     events_table="published_events_encounters" \
 
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
     pipe_events.anchorages \
     source_table="port_events_" \
+    vessel_info="vessel_info" \
     events_table="published_events_ports" \
 
 python $AIRFLOW_HOME/utils/set_default_variables.py \
@@ -42,6 +44,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     source_table="messages_scored_" \
     segment_vessel="segment_vessel" \
     segment_info="segment_info" \
+    vessel_info="vessel_info" \
     min_event_duration="300" \
     events_table="published_events_fishing" \
 
