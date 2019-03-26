@@ -13,7 +13,8 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
   information about related entities on events. For example, fishing events now
   include vessel name, ports contain the port label, and so on. Removes
   configuration options for cloudsql, since we are now using a custom postgres
-  database.
+  database. This requires new configuration options, see the
+  [README.md](README.md) for more information.
 
 ## v0.4.0 2019-03-14
 

@@ -35,16 +35,22 @@ pipeline, and come with default values:
 * `pipe_events.gaps.source_table`: BigQuery table to read gaps from. Defaults to `position_messages_`.
 * `pipe_events.gaps.events_table`: BigQuery table to publish gap events to. Defaults to `published_events_gaps`.
 * `pipe_events.gaps.segment_vessel`: BigQuery table containing segment information, used to calculate gaps. Defaults to `segment_vessel`.
+* `pipe_events.gaps.vessel_info`: BigQuery table to read vessel information from. Defaults to `vessel_info`.
 * `pipe_events.gaps.gap_min_pos_count`: Only consider segments with a given minimum amount of positions. Defaults to `3`.
 * `pipe_events.gaps.gap_min_dist`: Minimum distance to shore to consider the transponder off events. Defaults to `10000`.
 * `pipe_events.encounters.source_table`: BigQuery table containing the raw encounters to read from. Defaults to `encounters`.
+* `pipe_events.encounters.vessel_info`: BigQuery table to read vessel information from. Defaults to `vessel_info`.
 * `pipe_events.encounters.events_table`: BigQuery table to publish the encounters to. Defaults to `published_events_encounters`.
 * `pipe_events.anchorages.source_table`: BigQuery table containing the raw port events to read from. Defaults to `port_events_`.
+* `pipe_events.anchorages.vessel_info`: BigQuery table to read vessel information from. Defaults to `vessel_info`.
 * `pipe_events.anchorages.events_table`: BigQuery table to publish the anchorages to. Defaults to `published_events_ports`.
+* `pipe_events.anchorages.anchorages_dataset`: BigQuery dataset which contains the named anchorages table. Defaults to `gfw_research`.
+* `pipe_events.anchorages.named_anchorages`: BigQuery table containing anchorage information. Defaults to `named_anchorages_v20190307`.
 * `pipe_events.fishing.source_table`: BigQuery table containing the scored messages to read from. Defaults to `messages_scored_`.
 * `pipe_events.fishing.events_table`: BigQuery table to publish the fishing events to. Defaults to `published_events_fishing`.
 * `pipe_events.fishing.segment_vessel`: BigQuery table containing segent information. Defaults to `segment_vessel`.
 * `pipe_events.fishing.segment_info`: BigQuery table containing segment information. Defaults to `segment_info`.
+* `pipe_events.fishing.vessel_info`: BigQuery table to read vessel information from. Defaults to `vessel_info`.
 * `pipe_events.fishing.min_event_duration`: BigQuery table containing the minimum amount of seconds to consider a fishing event actually a fishing event. Defaults to `300`.
 
 Finally, the following custom entries do not provide a default value and must be manually configured before using this pipeline:
