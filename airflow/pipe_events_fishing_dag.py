@@ -49,6 +49,7 @@ class PipelineDagFactory(DagFactory):
                 '{project_id}:{source_dataset}.{source_table} '
                 '{project_id}:{source_dataset}.{segment_vessel} '
                 '{project_id}:{source_dataset}.{segment_info} '
+                '{project_id}:{source_dataset}.{vessel_info} '
                 '{project_id}:{events_dataset}.{events_table} '
                 '{min_event_duration}'.format(**config)
             )
@@ -59,7 +60,6 @@ class PipelineDagFactory(DagFactory):
                 '{date_range} '
                 '{project_id}:{events_dataset}.{events_table} '
                 '{temp_bucket} '
-                '{postgres_instance} '
                 '{postgres_connection_string} '
                 '{postgres_table} '
                 'fishing'.format(**config)

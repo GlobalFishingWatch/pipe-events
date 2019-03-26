@@ -7,7 +7,6 @@ ARGS=( \
   START_DATE \
   SOURCE \
   TEMP_BUCKET \
-  DEST_INSTANCE \
   DEST_CONNECTION_STRING \
   DEST_TABLE \
   DEST_EVENT_TYPE \
@@ -17,7 +16,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_INSTANCE DEST_CONNECTION_STRING DEST_TABLE DEST_EVENT_TYPE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_CONNECTION_STRING DEST_TABLE DEST_EVENT_TYPE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -40,7 +39,6 @@ echo "Running $0"
 echo "  START_DATE: $START_DATE"
 echo "  SOURCE: $SOURCE"
 echo "  TEMP_BUCKET: $TEMP_BUCKET"
-echo "  DEST_INSTANCE: $DEST_INSTANCE"
 echo "  DEST_CONNECTION_STRING: $DEST_CONNECTION_STRING"
 echo "  DEST_TABLE: $DEST_TABLE"
 echo "  DEST_EVENT_TYPE: $DEST_EVENT_TYPE"
@@ -72,7 +70,7 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 echo "Converting json events to csv format"
-gsutil cat ${EXTRACT_PATH}/*.json | python -m pipe_events.postgis.formatter ${LOCAL_CSV_FILE}
+gsutil cat ${EXTRACT_PATH} | python -m pipe_events.postgis.formatter ${LOCAL_CSV_FILE}
 if [ "$?" -ne 0 ]; then
   echo "  Unable to convert events from JSON to CSV format"
   exit 1
@@ -94,7 +92,7 @@ if [ "$?" -ne 0 ]; then
 fi
 
 echo "Importing data"
-COPY_COMMAND="\copy ${DEST_TABLE} (event_id, event_type, vessel_id, event_start, event_end, event_info, event_geography, event_mean_position) from stdin with (format 'csv')"
+COPY_COMMAND="\copy ${DEST_TABLE} (event_id, event_type, vessel_id, event_start, event_end, event_info, event_vessels, event_geography, event_mean_position) from stdin with (format 'csv')"
 cat ${LOCAL_CSV_FILE} | psql -v ON_ERROR_STOP=ON "${DEST_CONNECTION_STRING}" -c "$COPY_COMMAND"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to import data into postgres"
