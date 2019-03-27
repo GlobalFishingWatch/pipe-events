@@ -8,9 +8,19 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+## v1.0.0 - 2019-03-27
+
+### Added
+
+* [GlobalFishingWatch/GFW-Tasks#991](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/991)
+  * Migrates to use the new [airflow-gfw](https://github.com/GlobalFishingWatch/airflow-gfw) library and use the pipe-tools [v2.0.0](https://github.com/GlobalFishingWatch/pipe-tools/releases/tag/v2.0.0)
+
 ## v0.4.0 2019-03-14
 
 ### Added
+
 * [#944](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/944): Adds
   various indices to the postgis tables.
 
@@ -33,7 +43,7 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 * [#22](https://github.com/GlobalFishingWatch/pipe-events/issues/22): Fix a bug in 
   fishing events where events crossing the dateline had the wrong min/max/avg 
   for longitude
-  
+
 ## v0.3.1 2018-11-29
 
 ### Changed
