@@ -39,5 +39,3 @@ class PipelineDagFactory(DagFactory):
 events_daily_dag = PipelineDagFactory().build('pipe_events_daily')
 events_monthly_dag = PipelineDagFactory(
     schedule_interval='@monthly').build('pipe_events_monthly')
-events_yearly_dag = PipelineDagFactory(
-    schedule_interval='@yearly').build('pipe_events_yearly')
