@@ -30,6 +30,12 @@ class PipelineDagFactory(DagFactory):
             end_date_template = '{{{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(months=1)).strftime("%Y-%m-%d") }}}}'
             end_date = end_date_template.format(**expressions)
             return start_date, end_date
+        elif self.schedule_interval == '@yearly':
+            start_date_template = '{{{{ (execution_date.replace(day=1) + {buffer_delta_expression}).strftime("%Y-%m-%d") }}}}'
+            start_date = start_date_template.format(**expressions)
+            end_date_template = '{{{{ (execution_date.replace(day=1, month=1) + macros.dateutil.relativedelta.relativedelta(years=1)).strftime("%Y-%m-%d") }}}}'
+            end_date = end_date_template.format(**expressions)
+            return start_date, end_date
         else:
             raise ValueError('Unsupported schedule interval {}'.format(
                 self.schedule_interval))
