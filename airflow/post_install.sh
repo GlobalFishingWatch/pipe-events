@@ -2,6 +2,11 @@
 
 THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 
+# XXX: This is a hack which causes all postgres operations to be executed
+# serially while we develop a strategy to not overload the database via the
+# import processes.
+airflow pool -s postgres 1 "Ensure serial access to the postgres database"
+
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
     pipe_events \
