@@ -7,7 +7,6 @@ ARGS=( \
   START_DATE \
   SOURCE \
   TEMP_BUCKET \
-  DEST_INSTANCE \
   DEST_CONNECTION_STRING \
   DEST_TABLE \
   DEST_EVENT_TYPE \
@@ -17,7 +16,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_INSTANCE DEST_CONNECTION_STRING DEST_TABLE DEST_EVENT_TYPE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_CONNECTION_STRING DEST_TABLE DEST_EVENT_TYPE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -40,7 +39,6 @@ echo "Running $0"
 echo "  START_DATE: $START_DATE"
 echo "  SOURCE: $SOURCE"
 echo "  TEMP_BUCKET: $TEMP_BUCKET"
-echo "  DEST_INSTANCE: $DEST_INSTANCE"
 echo "  DEST_CONNECTION_STRING: $DEST_CONNECTION_STRING"
 echo "  DEST_TABLE: $DEST_TABLE"
 echo "  DEST_EVENT_TYPE: $DEST_EVENT_TYPE"
@@ -60,17 +58,23 @@ fi
 echo "  Exported events from ${SOURCE} to ${EXTRACT_PATH}"
 
 ################################################################################
-# Download files locally
+# Download the json files locally as it's much faster
 ################################################################################
-echo "Downloading events from ${SOURCE} to local disk"
-LOCAL_JSON_PATH=./data/json/
+echo "Downloading json files"
+LOCAL_JSON_PATH=./data/json
+echo "  Creating local json directory"
 mkdir -p ${LOCAL_JSON_PATH}
-gsutil -m cp ${EXTRACT_PATH} ${LOCAL_JSON_PATH}
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to download events data locally from ${TEMP_BUCKET}"
+  echo "  Unable to create local JSON directory"
   exit 1
 fi
-echo "  Downloaded  events from ${TEMP_BUCKET}"
+echo "  Downloading json files"
+gsutil -m cp ${EXTRACT_PATH} ${LOCAL_JSON_PATH}
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to download JSON files locally"
+  exit 1
+fi
+echo "  Downloaded JSON files"
 
 ################################################################################
 # Convert format from json to exported sql format
@@ -78,26 +82,19 @@ echo "  Downloaded  events from ${TEMP_BUCKET}"
 echo "Converting downloaded files to csv format"
 LOCAL_CSV_PATH=./data/csv
 LOCAL_CSV_FILE=${LOCAL_CSV_PATH}/data.csv
-echo "Creating local csv directory"
+echo "  Creating local csv directory"
 mkdir -p ${LOCAL_CSV_PATH}
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create local CSV directory"
   exit 1
 fi
-echo "Converting json events to csv format"
+echo "  Converting json events to csv format"
 cat ${LOCAL_JSON_PATH}/*.json | python -m pipe_events.postgis.formatter ${LOCAL_CSV_FILE}
 if [ "$?" -ne 0 ]; then
   echo "  Unable to convert events from JSON to CSV format"
   exit 1
 fi
 echo "  Coverted events from JSON to CSV"
-
-################################################################################
-# Start the cloudsql proxy
-################################################################################
-echo "Starting the cloudsql proxy"
-cloud_sql_proxy -instances=${DEST_INSTANCE}=tcp:5432 &
-sleep 5
 
 ################################################################################
 # Load data into postgres
@@ -113,15 +110,15 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 
-echo "Importing data"
-COPY_COMMAND="\copy ${DEST_TABLE} (event_id, event_type, vessel_id, event_start, event_end, event_info, event_geography, event_mean_position) from stdin with (format 'csv')"
+echo "  Importing data"
+COPY_COMMAND="\copy ${DEST_TABLE} (event_id, event_type, vessel_id, event_start, event_end, event_info, event_vessels, event_geography, event_mean_position) from stdin with (format 'csv')"
 cat ${LOCAL_CSV_FILE} | psql -v ON_ERROR_STOP=ON "${DEST_CONNECTION_STRING}" -c "$COPY_COMMAND"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to import data into postgres"
   exit 1
 fi
 
-echo "Indexing data"
+echo "  Indexing data"
 INDEX_SQL=${ASSETS}/postgres/index.j2.sql
 jinja2 ${INDEX_SQL} \
   -D table_name=${DEST_TABLE} \
@@ -130,3 +127,5 @@ if [ "$?" -ne 0 ]; then
   echo "  Unable to set up indices for imported data"
   exit 1
 fi
+
+echo "  Done importing data"

@@ -2,33 +2,51 @@
 source pipe-tools-utils
 
 THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
-ASSETS=${THIS_SCRIPT_DIR}/../assets
 source ${THIS_SCRIPT_DIR}/pipeline.sh
+ASSETS=${THIS_SCRIPT_DIR}/../assets
+ARGS=( \
+  DATE_RANGE \
+  SOURCE_TABLE \
+  VESSEL_INFO \
+  NAMED_ANCHORAGES \
+  DEST_TABLE \
+)
 
+################################################################################
+# Validate and extract arguments
+################################################################################
 display_usage() {
-	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE DEST_TABLE \n"
-	}
+  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE VESSEL_INFO NAMED_ANCHORAGES DEST_TABLE\n"
+}
 
-
-if [[ $# -ne 3  ]]
+if [[ $# -ne ${#ARGS[@]} ]]
 then
     display_usage
     exit 1
 fi
 
-DATE_RANGE=$1
-SOURCE_TABLE=$2
-DEST_TABLE=$3
+ARG_VALUES=("$@")
+PARAMS=()
+for index in ${!ARGS[*]}; do
+  echo "${ARGS[$index]}=${ARG_VALUES[$index]}"
+  declare "${ARGS[$index]}"="${ARG_VALUES[$index]}"
+done
 
 IFS=, read START_DATE END_DATE <<<"${DATE_RANGE}"
 if [[ -z $END_DATE ]]; then
   END_DATE=${START_DATE}
 fi
 
-
-DELETE_SQL=${ASSETS}/delete-daterange.sql.j2
-INSERT_SQL=${ASSETS}/anchorage-events.sql.j2
-SCHEMA=${ASSETS}/events.schema.json
+echo "Running $0"
+echo "  DATE_RANGE: $DATE_RANGE"
+echo "  SOURCE_TABLE: $SOURCE_TABLE"
+echo "  VESSEL_INFO: $VESSEL_INFO"
+echo "  NAMED_ANCHORAGES: $NAMED_ANCHORAGES"
+echo "  DEST_TABLE: $DEST_TABLE"
+################################################################################
+# Force that the destination table exists
+################################################################################
+echo "Ensuring events table ${DEST_TABLE} exists"
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
   "* Source: ${SOURCE_TABLE}"
@@ -37,42 +55,47 @@ TABLE_DESC=(
   "$@"
 )
 TABLE_DESC=$( IFS=$'\n'; echo "${TABLE_DESC[*]}" )
-
-
-echo "Publishing port in/out events to ${DEST_TABLE}..."
-echo "${TABLE_DESC}"
-
-echo "  Create table"
-
+SCHEMA=${ASSETS}/bigquery/events.schema.json
 bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
   --time_partitioning_field=event_start \
   ${DEST_TABLE}
-
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create table ${DEST_TABLE}"
   exit 1
 fi
+echo "  Events table exists"
 
-echo "  Deleting existing records for ${START_DATE} to ${END_DATE}"
-
-jinja2 ${DELETE_SQL} -D table=${DEST_TABLE//:/.} -D start_date=${START_DATE} -D end_date=${END_DATE} \
-     | bq query --max_rows=0
-
+################################################################################
+# Delete existing records
+################################################################################
+DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
+echo "Deleting existing records for ${START_DATE} to ${END_DATE}"
+jinja2 ${DELETE_SQL} \
+  -D table=${DEST_TABLE//:/.} \
+  -D start_date=${START_DATE} \
+  -D end_date=${END_DATE} \
+  | bq query --max_rows=0
 if [ "$?" -ne 0 ]; then
   echo "  Unable to delete records for table ${DEST_TABLE} from ${START_DATE} to ${END_DATE}"
   exit 1
 fi
 
-echo "  Inserting new records for ${START_DATE} to ${END_DATE}"
-
+################################################################################
+# Inserting new records
+################################################################################
+INSERT_SQL=${ASSETS}/bigquery/anchorage-events.sql.j2
+echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 jinja2 ${INSERT_SQL} \
    -D source=${SOURCE_TABLE//:/.} \
+   -D vessel_info=${VESSEL_INFO//:/.} \
+   -D named_anchorages=${NAMED_ANCHORAGES//:/.} \
    -D dest=${DEST_TABLE//:/.} \
    -D start_yyyymmdd=$(yyyymmdd ${START_DATE}) \
    -D end_yyyymmdd=$(yyyymmdd ${END_DATE}) \
    | bq query --max_rows=0
+
 
 if [ "$?" -ne 0 ]; then
   echo "  Unable to insert records for table ${DEST_TABLE} from ${START_DATE} to ${END_DATE}"
