@@ -8,6 +8,8 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v0.4.1 2019-04-06
+
 ### Added
 * [926](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/926): Adds basic
   information about related entities on events. For example, fishing events now
