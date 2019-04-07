@@ -1,5 +1,8 @@
 #standardSQL
 WITH
+  #
+  # Good encounter events
+  #
   encounters AS (
   SELECT
     *
@@ -8,6 +11,10 @@ WITH
   WHERE
     TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
     AND median_speed_knots < 2 ),
+
+  #
+  # Duplicate encounters so that we have an event for each vessel
+  #
   flattened_encounters AS (
   SELECT
     vessel_1_id AS vessel_id,
@@ -25,7 +32,27 @@ WITH
     * EXCEPT(vessel_1_id,
       vessel_2_id)
   FROM
-    encounters )
+    encounters ),
+
+  #
+  # Include basic vessel information on the event
+  #
+  complete_encounter_event AS (
+    SELECT
+      encounter.*,
+      main_vessel.shipname.value AS main_vessel_shipname,
+      encountered_vessel.shipname.value AS encountered_vessel_shipname
+    FROM
+      flattened_encounters AS encounter
+    LEFT JOIN
+      `{{ vessel_info }}` AS main_vessel
+    USING
+      (vessel_id)
+    LEFT JOIN
+      `{{ vessel_info }}` AS encountered_vessel
+    ON
+      encountered_vessel_id = encountered_vessel.vessel_id )
+
 SELECT
   event_id,
   'encounter' AS event_type,
@@ -45,6 +72,10 @@ SELECT
       encountered_vessel_id
     )
   ) AS event_info,
+  TO_JSON_STRING([
+    STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`),
+    STRUCT(encountered_vessel_id AS `id`, encountered_vessel_shipname AS `name`)
+  ]) as event_vessels,
   ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(mean_longitude AS string), ' ', CAST(mean_latitude AS string), ')')) AS event_geography
 FROM
-  flattened_encounters
+  complete_encounter_event

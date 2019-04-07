@@ -15,17 +15,18 @@ class PipelineDagFactory(DagFactory):
                 pool='bigquery',
                 bash_command='{docker_run} {docker_image} generate_encounter_events '
                              '{project_id}:{source_dataset}.{source_table} '
+                             '{project_id}:{source_dataset}.{vessel_info} '
                              '{project_id}:{events_dataset}.{events_table}'.format(
                                  **config)
             )
 
             publish_events_postgres = BashOperator(
                 task_id='publish_events_postgres',
+                pool='postgres',
                 bash_command='{docker_run} {docker_image} publish_postgres '
                 '{date_range} '
                 '{project_id}:{events_dataset}.{events_table} '
                 '{temp_bucket} '
-                '{postgres_instance} '
                 '{postgres_connection_string} '
                 '{postgres_table} '
                 'encounter'.format(**config)

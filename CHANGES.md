@@ -8,7 +8,17 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v0.4.1 (LEGACY SUPPORT) and v1.1.0 2019-04-06
+
 ### Added
+* [926](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/926): Adds basic
+  information about related entities on events. For example, fishing events now
+  include vessel name, ports contain the port label, and so on. Removes
+  configuration options for cloudsql, since we are now using a custom postgres
+  database. This requires new configuration options, see the
+  [README.md](README.md) for more information.
+* [926](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/926): Introduces
+  yearly mode to the events pipe.
 
 ## v1.0.0 - 2019-03-27
 
@@ -71,8 +81,3 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 * Initial release
 
-[Unreleased]: https://github.com/GlobalFishingWatch/api-events/compare/v0.3.0...develop
-[v0.3.1]: https://github.com/GlobalFishingWatch/api-events/compare/v0.3.1...v0.3.0
-[v0.3.0]: https://github.com/GlobalFishingWatch/api-events/compare/v0.3.0...v0.2.0
-[v0.2.0]: https://github.com/GlobalFishingWatch/api-events/compare/v0.2.0...v0.1.0
-[v0.1.0]: https://github.com/GlobalFishingWatch/api-events/compare/v0.2.0...v0.1.0

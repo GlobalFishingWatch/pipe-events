@@ -30,6 +30,12 @@ class PipelineDagFactory(DagFactory):
             end_date_template = '{{{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(months=1)).strftime("%Y-%m-%d") }}}}'
             end_date = end_date_template.format(**expressions)
             return start_date, end_date
+        elif self.schedule_interval == '@yearly':
+            start_date_template = '{{{{ (execution_date.replace(day=1) + {buffer_delta_expression}).strftime("%Y-%m-%d") }}}}'
+            start_date = start_date_template.format(**expressions)
+            end_date_template = '{{{{ (execution_date.replace(day=1, month=1) + macros.dateutil.relativedelta.relativedelta(years=1)).strftime("%Y-%m-%d") }}}}'
+            end_date = end_date_template.format(**expressions)
+            return start_date, end_date
         else:
             raise ValueError('Unsupported schedule interval {}'.format(
                 self.schedule_interval))
@@ -49,17 +55,18 @@ class PipelineDagFactory(DagFactory):
                 '{project_id}:{source_dataset}.{source_table} '
                 '{project_id}:{source_dataset}.{segment_vessel} '
                 '{project_id}:{source_dataset}.{segment_info} '
+                '{project_id}:{source_dataset}.{vessel_info} '
                 '{project_id}:{events_dataset}.{events_table} '
                 '{min_event_duration}'.format(**config)
             )
 
             publish_events_postgres = BashOperator(
                 task_id='publish_events_postgres',
+                pool='postgres',
                 bash_command='{docker_run} {docker_image} publish_postgres '
                 '{date_range} '
                 '{project_id}:{events_dataset}.{events_table} '
                 '{temp_bucket} '
-                '{postgres_instance} '
                 '{postgres_connection_string} '
                 '{postgres_table} '
                 'fishing'.format(**config)

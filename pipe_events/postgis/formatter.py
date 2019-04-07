@@ -29,6 +29,7 @@ with open(csv_file, "wb+") as f:
                 record['event_start'],
                 record.get('event_end'),
                 record['event_info'],
+                record['event_vessels'],
                 normalized_geography,
                 normalized_mean_position
             ])
