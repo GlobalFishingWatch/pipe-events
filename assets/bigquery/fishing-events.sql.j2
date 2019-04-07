@@ -1,0 +1,252 @@
+#standardSQL
+
+# Include some utility functions
+{% include 'util.sql.j2' %}
+
+#
+# Fishing Events
+#
+# Aggregate position messages that have been annotated with a fishing score into fishing events
+# A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
+# messages with score=null are ignored
+
+INSERT INTO
+  `{{ dest }}` ( event_id,
+    event_type,
+    vessel_id,
+    event_start,
+    event_end,
+    lat_mean,
+    lon_mean,
+    lat_min,
+    lat_max,
+    lon_min,
+    lon_max,
+    event_info,
+    event_vessels,
+    event_geography )
+#
+# Fishing Events
+#
+# Aggregate position messages that have been annotated with a fishing score into fishing events
+# A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
+# messages with score=null are ignored
+WITH
+  #
+  # Collect scored position messages
+  #
+  message AS (
+  SELECT
+    seg_id,
+    timestamp,
+    ST_GEOGPOINT(lon, lat) AS point,
+    lat,
+    lon,
+    ifnull(nnet_score, logistic_score) AS score
+  FROM
+    `{{ messages }}*`
+  WHERE
+    _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}'
+    AND '{{ end_yyyymmdd }}'
+    AND lat > -90
+    AND lat < 90 ),
+  #
+  # Get a vessel_id for each segment
+  #
+  best_segment_vessel AS (
+  SELECT
+    DISTINCT seg_id,
+    FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
+  FROM
+    `{{ segment_vessel }}` ),
+  #
+  # Get a list of non-noise seg_ids
+  #
+  good_seg AS (
+  SELECT
+    seg_id
+  FROM
+    `{{ segment_info }}`
+  WHERE
+    pos_count >= 10 ),
+  #
+  # Filter mesasages to only good segments, and ignore messages with score=NULL
+  #
+  segment_message AS (
+  SELECT
+    *
+  FROM
+    message
+  JOIN
+    good_seg
+  USING
+    (seg_id)
+  WHERE
+    score IS NOT NULL ),
+  # Group messages into events which are consecutive sequences of messages with the same score
+  #
+  # First for each message, get the score from the previous message in the segement
+  #
+  prev_score_message AS (
+  SELECT
+    seg_id,
+    timestamp,
+    score,
+    LAG(score) OVER (PARTITION BY seg_id, DATE(timestamp) ORDER BY timestamp) AS prev_score,
+    LAG(timestamp) OVER (PARTITION BY seg_id, DATE(timestamp) ORDER BY timestamp) AS prev_timestamp
+  FROM
+    segment_message ),
+  #
+  # Now get the time range from the start of a group to the end of the group
+  # Do this by filtering to only the first message in each grouping and making a time range from
+  # the first message in one group to the prev_timestamp of first message in the next group
+  #
+  event_range AS (
+  SELECT
+    seg_id,
+    score,
+    prev_timestamp,
+    timestamp AS event_start,
+    LEAD(prev_timestamp) OVER (PARTITION BY seg_id, DATE(timestamp) ORDER BY timestamp) AS event_end
+  FROM
+    prev_score_message
+  WHERE
+    prev_score IS NULL
+    OR score != prev_score ),
+  #
+  # Filter event ranges to only those with score = 1.0 (fishing)
+  # and for each fishing event get the end of the time range of the previous fishing event
+  #
+  prev_fishing_event_range AS (
+  SELECT
+    seg_id,
+    event_start,
+    event_end,
+    LAG(event_end) OVER (PARTITION BY seg_id, DATE(event_start) ORDER BY event_start) AS prev_event_end
+  FROM
+    event_range
+  WHERE
+    score = 1.0 ),
+  #
+  # Create ranges spanning consecutive events that are separated by a small time interval
+  #
+  fishing_event_range AS (
+  SELECT
+    seg_id,
+    event_start,
+    LEAD(prev_event_end) OVER (PARTITION BY seg_id, DATE(event_start) ORDER BY event_start) AS event_end
+  FROM
+    prev_fishing_event_range
+  WHERE
+    prev_event_end IS NULL
+    OR TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > {{ min_duration }} ),
+  #
+  # Tag all the messages with the start time of the event range that contains the message
+  # limit this to just messages with score = 1.0
+  #
+  fishing_event_message AS (
+  SELECT
+    segment_message.*,
+    fishing_event_range.event_start
+  FROM
+    segment_message
+  JOIN
+    fishing_event_range
+  USING
+    (seg_id)
+  WHERE
+    timestamp >= event_start
+    AND ((event_end IS NULL AND DATE(timestamp) = DATE(event_start)) OR timestamp <= event_end)
+    AND score = 1.0 ),
+  #
+  # Now aggregate all the messages that are in the same range into a single event record
+  # Filter out short duration events
+  #
+  fishing_event AS (
+  SELECT
+    vessel_id,
+    seg_id,
+    ST_CENTROID(ST_UNION_AGG(point)) AS centroid,
+    # compute centoid of all the lat/lon pairs in the event
+    event_start,
+    MAX(timestamp) AS event_end,
+    MIN(lat) AS lat_min,
+    MAX(lat) AS lat_max,
+    MIN(lon) AS lon_min,
+    MAX(lon) AS lon_max,
+    MIN(anti_lon(lon)) AS anti_lon_min,
+    # Also get min/max for the anti_longitude (180 degrees opposite) to deal wiht dateline crossing
+    MAX(anti_lon(lon)) AS anti_lon_max,
+    COUNT(*) AS message_count,
+    STRING_AGG(CONCAT(CAST(lon AS string), ' ', CAST(lat AS string)), ', ' ORDER BY timestamp) AS points_wkt
+  FROM
+    fishing_event_message
+  JOIN
+    best_segment_vessel
+  USING
+    (seg_id)
+  GROUP BY
+    vessel_id,
+    seg_id,
+    event_start
+  HAVING
+    TIMESTAMP_DIFF(event_end, event_start, SECOND) > {{ min_duration }} ),
+  # Correct lon_min and lon_max for crossing the dateline (anti-meridian)
+  # And extract lat and lon from the centriod
+  #
+  fishing_event_dateline AS (
+  SELECT
+    * EXCEPT (centroid,
+      lon_min,
+      lon_max,
+      anti_lon_min,
+      anti_lon_max),
+    # Get the lat and lon from the computed centroid
+    geopoint_to_struct(centroid).lat AS lat_mean,
+    geopoint_to_struct(centroid).lon AS lon_mean,
+    # determine which direction around the globe is shorter - across the equator (eg -1.0 to 1.0), across the
+    # dateline (eg -179.0 to 179.0) or neither (eg 10.0 to 12.0).  Use this to select which values to use for
+    # min and max longitude
+    IF ( (lon_max - lon_min) <= (anti_lon_max - anti_lon_min),
+      lon_min,
+      anti_lon(anti_lon_max) ) AS lon_min,
+    IF ( (lon_max - lon_min) <= (anti_lon_max - anti_lon_min),
+      lon_max,
+      anti_lon(anti_lon_min) ) AS lon_max
+  FROM
+    fishing_event ),
+  #
+  # Include basic vessel information on the event
+  #
+  complete_fishing_event AS (
+  SELECT
+    event.*,
+    vessel.shipname.value AS main_vessel_shipname
+  FROM
+    fishing_event_dateline AS event
+  LEFT JOIN 
+    `{{ vessel_info }}` AS vessel
+  USING
+    (vessel_id) )
+#
+# Finally, generate a unique event id and write out in the normalized event schema
+#
+SELECT
+  TO_HEX(MD5(FORMAT("%s|%s|%t",'fishing', vessel_id, event_start))) AS event_id,
+  'fishing' AS event_type,
+  vessel_id,
+  event_start,
+  event_end,
+  lat_mean,
+  lon_mean,
+  lat_min,
+  lat_max,
+  lon_min,
+  lon_max,
+  TO_JSON_STRING(STRUCT(
+    STRUCT(message_count) AS stats
+  )) AS event_info,
+  TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
+  ST_GEOGFROMTEXT(CONCAT( 'MULTIPOINT', " (", points_wkt, ')')) AS event_geography
+FROM
+  complete_fishing_event

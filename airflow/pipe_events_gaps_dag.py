@@ -15,6 +15,10 @@ class PipelineDagFactory(DagFactory):
             start_date = '{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(days=-1)).strftime("%Y-%m-%d") }}'
             end_date = '{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(months=1, days=-2)).strftime("%Y-%m-%d") }}'
             return start_date, end_date
+        elif self.schedule_interval == '@yearly':
+            start_date = '{{ (execution_date.replace(day=1) + macros.dateutil.relativedelta.relativedelta(days=-1)).strftime("%Y-%m-%d") }}'
+            end_date = '{{ (execution_date.replace(day=1, month=1) + macros.dateutil.relativedelta.relativedelta(years=1, days=-2)).strftime("%Y-%m-%d") }}'
+            return start_date, end_date
         else:
             raise ValueError('Unsupported schedule interval {}'.format(
                 self.schedule_interval))
@@ -33,19 +37,19 @@ class PipelineDagFactory(DagFactory):
                              '{date_range} '
                              '{project_id}:{source_dataset}.{source_table} '
                              '{project_id}:{events_dataset}.{events_table} '
+                             '{project_id}:{source_dataset}.{segment_vessel} '
+                             '{project_id}:{source_dataset}.{vessel_info} '
                              '{gap_min_pos_count} '
-                             '{gap_min_dist} '
-                             '{project_id}:{source_dataset}.{segment_vessel}'.format(
-                                 **config)
+                             '{gap_min_dist} '.format(**config)
             )
 
             publish_events_postgres = BashOperator(
                 task_id='publish_events_postgres',
+                pool='postgres',
                 bash_command='{docker_run} {docker_image} publish_postgres '
                 '{date_range} '
                 '{project_id}:{events_dataset}.{events_table} '
                 '{temp_bucket} '
-                '{postgres_instance} '
                 '{postgres_connection_string} '
                 '{postgres_table} '
                 'gap'.format(**config)

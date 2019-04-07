@@ -1,0 +1,93 @@
+#standardSQL
+INSERT INTO
+  `{{ dest }}` ( event_id,
+    event_type,
+    vessel_id,
+    event_start,
+    event_end,
+    lat_mean,
+    lon_mean,
+    lat_min,
+    lat_max,
+    lon_min,
+    lon_max,
+    event_info,
+    event_vessels,
+    event_geography )
+WITH
+  #
+  # Group each port visit with it's lead
+  #
+  visits_with_leads AS (
+  SELECT
+    *,
+    LEAD(event_type) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS next_event_type,
+    LEAD(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS next_timestamp
+  FROM
+    `{{ source }}*`
+  WHERE
+    _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}'
+    AND '{{ end_yyyymmdd }}'
+    AND event_type IN ('PORT_ENTRY',
+      'PORT_EXIT') ),
+  #
+  # Only group clean port events, port entries and then an optional exit
+  #
+  clean_visits AS (
+  SELECT
+    *
+  FROM
+    visits_with_leads
+  WHERE
+    event_type = 'PORT_ENTRY'
+    AND (next_event_type = 'PORT_EXIT'
+      OR next_event_type IS NULL) ),
+
+  # Include basic vessel and port information on the event
+  complete_port_event AS (
+    SELECT
+      event.*,
+      vessel.shipname.value AS main_vessel_shipname,
+      IF(anchorage.label_source = 'top_destination', NULL, anchorage.label) AS anchorage_label,
+      anchorage.top_destination AS anchorage_top_destination,
+      anchorage.iso3 AS anchorage_flag
+    FROM
+      clean_visits AS event
+    LEFT JOIN
+      `{{ vessel_info }}` AS vessel
+    USING
+      (vessel_id) 
+    LEFT JOIN
+      `{{ named_anchorages }}` AS anchorage
+    ON
+      event.anchorage_id = anchorage.s2id
+)
+#
+# Finally, generate a unique event id and write out in the normalized event schema
+#
+SELECT
+  TO_HEX(MD5(FORMAT("%s|%s|%t",event_type, vessel_id, timestamp))) AS event_id,
+  'port' AS event_type,
+  vessel_id,
+  timestamp AS event_start,
+  next_timestamp AS event_end,
+  vessel_lat AS lat_mean,
+  vessel_lon AS lon_mean,
+  lat AS lat_min,
+  lat AS lat_max,
+  lon AS lon_min,
+  lon AS lon_max,
+  TO_JSON_STRING(STRUCT(
+    ROUND(lat,6) AS anchorage_lat,
+    ROUND(lon,6) AS anchorage_lon,
+    STRUCT(
+      anchorage_id as `id`,
+      anchorage_label as `name`,
+      anchorage_top_destination AS `top_destination`,
+      anchorage_flag as `flag`
+    ) As anchorage
+  )) AS event_info,
+  TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
+  ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(vessel_lon AS string), ' ', CAST(vessel_lat AS string), ')')) AS event_geography
+FROM
+  complete_port_event
