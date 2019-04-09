@@ -8,6 +8,11 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+### Added
+* [1005](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/1005): Adds
+  more vessel information embedded in the event. It now includes ssvid in
+  addition to name and vessel id.
+
 ## v0.4.1 2019-04-06
 
 ### Added

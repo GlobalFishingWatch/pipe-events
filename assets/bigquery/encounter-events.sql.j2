@@ -41,7 +41,9 @@ WITH
     SELECT
       encounter.*,
       main_vessel.shipname.value AS main_vessel_shipname,
-      encountered_vessel.shipname.value AS encountered_vessel_shipname
+      main_vessel.ssvid AS main_vessel_ssvid,
+      encountered_vessel.shipname.value AS encountered_vessel_shipname,
+      encountered_vessel.ssvid AS encountered_vessel_ssvid
     FROM
       flattened_encounters AS encounter
     LEFT JOIN
@@ -73,8 +75,16 @@ SELECT
     )
   ) AS event_info,
   TO_JSON_STRING([
-    STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`),
-    STRUCT(encountered_vessel_id AS `id`, encountered_vessel_shipname AS `name`)
+    STRUCT(
+      vessel_id AS `id`,
+      main_vessel_ssvid AS `ssvid`,
+      main_vessel_shipname AS `name`
+    ),
+    STRUCT(
+      encountered_vessel_id AS `id`,
+      encountered_vessel_ssvid AS `ssvid`,
+      encountered_vessel_shipname AS `name`
+    )
   ]) as event_vessels,
   ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(mean_longitude AS string), ' ', CAST(mean_latitude AS string), ')')) AS event_geography
 FROM
