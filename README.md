@@ -54,7 +54,7 @@ In addition to this, the following custom settings are required for this pipelin
 
 Finally, the following custom entries do not provide a default value and must be manually configured before using this pipeline:
 
-* `pipe_vessels.postgres_instance`: CloudSQL postgres instance where the tracks are published to.
+* `pipe_events.postgres_instance`: CloudSQL postgres instance where the data is published to.
 * `pipe_events.postgres_connection_string`: Connection string for the postgres database to publish the events to.
 * `pipe_events.postgres_table`: Table in postgres to publish the events to.
 
