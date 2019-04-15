@@ -7,6 +7,7 @@ ARGS=( \
   START_DATE \
   SOURCE \
   TEMP_BUCKET \
+  DEST_INSTANCE \
   DEST_CONNECTION_STRING \
   DEST_TABLE \
   DEST_EVENT_TYPE \
@@ -16,7 +17,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_CONNECTION_STRING DEST_TABLE DEST_EVENT_TYPE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD SOURCE TEMP_BUCKET DEST_INSTANCE DEST_CONNECTION_STRING DEST_TABLE DEST_EVENT_TYPE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -39,6 +40,7 @@ echo "Running $0"
 echo "  START_DATE: $START_DATE"
 echo "  SOURCE: $SOURCE"
 echo "  TEMP_BUCKET: $TEMP_BUCKET"
+echo "  DEST_INSTANCE: $DEST_INSTANCE"
 echo "  DEST_CONNECTION_STRING: $DEST_CONNECTION_STRING"
 echo "  DEST_TABLE: $DEST_TABLE"
 echo "  DEST_EVENT_TYPE: $DEST_EVENT_TYPE"
@@ -95,6 +97,13 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 echo "  Coverted events from JSON to CSV"
+
+################################################################################
+# Start the cloudsql proxy
+################################################################################
+echo "Starting the cloudsql proxy"
+cloud_sql_proxy -instances=${DEST_INSTANCE}=tcp:5432 &
+sleep 5
 
 ################################################################################
 # Load data into postgres

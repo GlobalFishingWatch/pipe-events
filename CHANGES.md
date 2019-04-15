@@ -9,6 +9,10 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 ## [Unreleased]
 
 ### Added
+* [1007](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/1007): Restores
+  the cloudsql configuration options and code since google just released a new
+  version of their postgres offering which includes cloudsql. This requires new
+  configuration options, check the [README.md](README.md) for more information
 * [1005](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/1005): Adds
   more vessel information embedded in the event. It now includes ssvid in
   addition to name and vessel id.
