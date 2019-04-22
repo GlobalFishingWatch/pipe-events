@@ -157,7 +157,8 @@ WITH
   complete_gap_event AS (
     SELECT
       event.*,
-      vessel.shipname.value AS main_vessel_shipname
+      vessel.shipname.value AS main_vessel_shipname,
+      vessel.ssvid AS main_vessel_ssvid
     FROM
       clean_events AS event
     LEFT JOIN
@@ -183,7 +184,11 @@ SELECT
       STRUCT(message_count) AS stats,
       distance_from_shore_m
   )) AS event_info,
-  TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
+  TO_JSON_STRING([STRUCT(
+    vessel_id AS `id`,
+    main_vessel_ssvid AS `ssvid`,
+    main_vessel_shipname AS `name`
+  )]) as event_vessels,
   IF( next_lat IS NULL OR next_lon IS NULL,
     ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(lon AS string), ' ', CAST(lat AS string), ')')),
     ST_GEOGFROMTEXT(CONCAT(

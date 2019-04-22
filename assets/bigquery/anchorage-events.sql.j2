@@ -48,6 +48,7 @@ WITH
     SELECT
       event.*,
       vessel.shipname.value AS main_vessel_shipname,
+      vessel.ssvid AS main_vessel_ssvid,
       IF(anchorage.label_source = 'top_destination', NULL, anchorage.label) AS anchorage_label,
       anchorage.top_destination AS anchorage_top_destination,
       anchorage.iso3 AS anchorage_flag
@@ -87,7 +88,11 @@ SELECT
       anchorage_flag as `flag`
     ) As anchorage
   )) AS event_info,
-  TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
+  TO_JSON_STRING([STRUCT(
+    vessel_id AS `id`, 
+    main_vessel_ssvid as `ssvid`,
+    main_vessel_shipname AS `name`
+  )]) as event_vessels,
   ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(vessel_lon AS string), ' ', CAST(vessel_lat AS string), ')')) AS event_geography
 FROM
   complete_port_event
