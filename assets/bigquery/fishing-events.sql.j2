@@ -221,7 +221,8 @@ WITH
   complete_fishing_event AS (
   SELECT
     event.*,
-    vessel.shipname.value AS main_vessel_shipname
+    vessel.shipname.value AS main_vessel_shipname,
+    vessel.ssvid AS main_vessel_ssvid
   FROM
     fishing_event_dateline AS event
   LEFT JOIN 
@@ -246,7 +247,11 @@ SELECT
   TO_JSON_STRING(STRUCT(
     STRUCT(message_count) AS stats
   )) AS event_info,
-  TO_JSON_STRING([STRUCT(vessel_id AS `id`, main_vessel_shipname AS `name`)]) as event_vessels,
+  TO_JSON_STRING([STRUCT(
+    vessel_id AS `id`,
+    main_vessel_ssvid AS `ssvid`,
+    main_vessel_shipname AS `name`
+  )]) as event_vessels,
   ST_GEOGFROMTEXT(CONCAT( 'MULTIPOINT', " (", points_wkt, ')')) AS event_geography
 FROM
   complete_fishing_event

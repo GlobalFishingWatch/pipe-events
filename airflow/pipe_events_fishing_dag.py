@@ -67,6 +67,7 @@ class PipelineDagFactory(DagFactory):
                 '{date_range} '
                 '{project_id}:{events_dataset}.{events_table} '
                 '{temp_bucket} '
+                '{postgres_instance} '
                 '{postgres_connection_string} '
                 '{postgres_table} '
                 'fishing'.format(**config)
