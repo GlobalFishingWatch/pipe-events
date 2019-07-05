@@ -11,6 +11,9 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 ## v1.2.0 - 2019-05-17
 
 ### Added
+
+* [1070](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/1070): Bugfixes
+  ship names encoded to unicode.
 * [1007](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/1007): Restores
   the cloudsql configuration options and code since google just released a new
   version of their postgres offering which includes cloudsql. This requires new
