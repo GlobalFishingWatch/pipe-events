@@ -22,16 +22,16 @@ with open(csv_file, "wb+") as f:
         normalized_mean_position = "POINT({} {})".format(
             record['lon_mean'], record['lat_mean'])
         try:
-            writer.writerow([
-                record['event_id'],
+            writer.writerows([
+                [record['event_id'],
                 record['event_type'],
                 record['vessel_id'],
                 record['event_start'],
                 record.get('event_end'),
                 record['event_info'],
-                record['event_vessels'],
+                ''.join([s.encode('utf-8') for s in record['event_vessels']]),
                 normalized_geography,
-                normalized_mean_position
+                normalized_mean_position]
             ])
         except:
             print("Unable to convert record to csv at {}".format(record))
