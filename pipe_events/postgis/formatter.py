@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import json
 import csv
@@ -29,7 +30,7 @@ with open(csv_file, "wb+") as f:
                 record['event_start'],
                 record.get('event_end'),
                 record['event_info'],
-                record['event_vessels'],
+                ''.join([s.encode('utf-8') for s in record['event_vessels']]),
                 normalized_geography,
                 normalized_mean_position
             ])
