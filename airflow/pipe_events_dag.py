@@ -1,9 +1,9 @@
-import posixpath as pp
-import imp
-
 from airflow import DAG
 from airflow.operators.subdag_operator import SubDagOperator
 from airflow_ext.gfw.models import DagFactory
+
+import imp
+import posixpath as pp
 
 PIPELINE = "pipe_events"
 
@@ -15,29 +15,35 @@ subpipelines = {
 }
 
 
-class PipelineDagFactory(DagFactory):
+class PipelineDagsFactory(DagFactory):
     def __init__(self, pipeline=PIPELINE, **kwargs):
-        super(PipelineDagFactory, self).__init__(pipeline=pipeline, **kwargs)
+        super(PipelineDagsFactory, self).__init__(pipeline=pipeline, **kwargs)
 
     def build(self, dag_id):
-        with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
-            for subdag_name, dag_factory in subpipelines.iteritems():
-                subdag_pipeline = '{}.{}'.format(self.pipeline, subdag_name)
-                subdag_id = '{}.{}'.format(dag_id, subdag_name)
-                subdag_factory = dag_factory.PipelineDagFactory(
-                    pipeline=subdag_pipeline, schedule_interval=self.schedule_interval, base_config=self.config)
+        dags={}
+        for name, dag_factory in subpipelines.iteritems():
+            dag_pipeline = '{}.{}'.format(self.pipeline, name)
+            newdag_id = '{}.{}'.format(dag_id, name)
+            sub_factory = dag_factory.PipelineDagFactory(
+                pipeline = dag_pipeline,
+                schedule_interval = self.schedule_interval,
+                base_config = self.config
+            )
 
-                subdag = SubDagOperator(
-                    subdag=subdag_factory.build(dag_id=subdag_id),
-                    task_id=subdag_name,
-                    depends_on_past=True,
-                    dag=dag
-                )
-            return dag
+            dags[newdag_id] = sub_factory.build(dag_id=newdag_id)
+
+        return dags
 
 
-events_daily_dag = PipelineDagFactory().build('pipe_events_daily')
-events_monthly_dag = PipelineDagFactory(
+events_daily_dags = PipelineDagsFactory().build('pipe_events_daily')
+events_monthly_dags = PipelineDagsFactory(
     schedule_interval='@monthly').build('pipe_events_monthly')
-events_yearly_dag = PipelineDagFactory(
+events_yearly_dags = PipelineDagsFactory(
     schedule_interval='@yearly').build('pipe_events_yearly')
+
+event_dags = {}
+event_dags.update(events_daily_dags)
+event_dags.update(events_monthly_dags)
+event_dags.update(events_yearly_dags)
+for name, dag in event_dags.iteritems():
+    globals()[name] = dag
