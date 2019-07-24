@@ -1,12 +1,24 @@
-from datetime import datetime, timedelta
-
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 
+from airflow_ext.gfw import config as config_tools
 from airflow_ext.gfw.models import DagFactory
 
+from datetime import datetime, timedelta
 
-class PipelineDagFactory(DagFactory):
+import sys
+import os
+# https://stackoverflow.com/questions/50150384/importing-local-module-python-script-in-airflow-dag
+# can not import under dag_folder from an easy way
+sys.path.insert(0,os.path.abspath(os.path.dirname(__file__)))
+from pipe_events_dag import PipelineEventsDagFactory
+
+
+class PipelineDagFactory(PipelineEventsDagFactory):
+    def __init__(self, gaps_config, **kwargs):
+        super(PipelineDagFactory, self).__init__(**kwargs)
+        self.gaps_config = gaps_config
+
     def source_date_range(self):
         # shift the date range one day back
         if self.schedule_interval == '@daily':
@@ -24,7 +36,8 @@ class PipelineDagFactory(DagFactory):
                 self.schedule_interval))
 
     def build(self, dag_id):
-        config = self.config
+        config = self.config.copy()
+        config.update(self.gaps_config)
         config['date_range'] = ','.join(self.source_date_range())
 
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
@@ -33,6 +46,7 @@ class PipelineDagFactory(DagFactory):
             publish_events_bigquery = BashOperator(
                 task_id='publish_events_bigquery',
                 pool='bigquery',
+                depends_on_past=True,
                 bash_command='{docker_run} {docker_image} generate_gap_events '
                              '{date_range} '
                              '{project_id}:{source_dataset}.{source_table} '
@@ -60,3 +74,8 @@ class PipelineDagFactory(DagFactory):
                 dag >> sensor >> publish_events_bigquery >> publish_events_postgres
 
             return dag
+
+gaps_config = config_tools.load_config('pipe_events.gaps')
+events_gaps_daily_dag = PipelineDagFactory(gaps_config).build('pipe_events_daily.gaps')
+events_gaps_monthly_dag = PipelineDagFactory(gaps_config, schedule_interval='@monthly').build('pipe_events_monthly.gaps')
+events_gaps_yearly_dag = PipelineDagFactory(gaps_config, schedule_interval='@yearly').build('pipe_events_yearly.gaps')

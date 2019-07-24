@@ -1,12 +1,25 @@
-from datetime import datetime, timedelta
-
 from airflow import DAG
-from airflow.operators.bash_operator import BashOperator
 from airflow.models import Variable
+from airflow.operators.bash_operator import BashOperator
+
+from airflow_ext.gfw import config as config_tools
 from airflow_ext.gfw.models import DagFactory
 
+from datetime import datetime, timedelta
 
-class PipelineDagFactory(DagFactory):
+import sys
+import os
+# https://stackoverflow.com/questions/50150384/importing-local-module-python-script-in-airflow-dag
+# can not import under dag_folder from an easy way
+sys.path.insert(0,os.path.abspath(os.path.dirname(__file__)))
+from pipe_events_dag import PipelineEventsDagFactory
+
+
+class PipelineDagFactory(PipelineEventsDagFactory):
+    def __init__(self, fishing_config, **kwargs):
+        super(PipelineDagFactory, self).__init__(**kwargs)
+        self.fishing_config = fishing_config
+
     def source_date_range(self):
         # The scored messages only have logistic scores for a couple of days
         # while we accumulate the amount of data we need to refine that score
@@ -41,7 +54,8 @@ class PipelineDagFactory(DagFactory):
                 self.schedule_interval))
 
     def build(self, dag_id):
-        config = self.config
+        config = self.config.copy()
+        config.update(self.fishing_config)
         config['date_range'] = ','.join(self.source_date_range())
 
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
@@ -50,6 +64,7 @@ class PipelineDagFactory(DagFactory):
             publish_events_bigquery = BashOperator(
                 task_id='publish_events_bigquery',
                 pool='bigquery',
+                depends_on_past=True,
                 bash_command='{docker_run} {docker_image} generate_fishing_events '
                 '{date_range} '
                 '{project_id}:{source_dataset}.{source_table} '
@@ -77,3 +92,8 @@ class PipelineDagFactory(DagFactory):
                 dag >> sensor >> publish_events_bigquery >> publish_events_postgres
 
             return dag
+
+fishing_config = config_tools.load_config('pipe_events.fishing')
+events_fishing_daily_dag = PipelineDagFactory(fishing_config).build('pipe_events_daily.fishing')
+events_fishing_monthly_dag = PipelineDagFactory(fishing_config, schedule_interval='@monthly').build('pipe_events_monthly.fishing')
+events_fishing_yearly_dag = PipelineDagFactory(fishing_config, schedule_interval='@yearly').build('pipe_events_yearly.fishing')
