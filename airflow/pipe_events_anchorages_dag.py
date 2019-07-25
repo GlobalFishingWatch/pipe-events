@@ -20,9 +20,11 @@ class PipelineDagFactory(PipelineEventsDagFactory):
     def build(self, dag_id):
         config = self.config.copy()
         config.update(self.anchorages_config)
+        print '>>>>>> Anchorages config {}'.format(config)
         config['date_range'] = ','.join(self.source_date_range())
 
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
+            self.config = config
             source_sensors = self.source_table_sensors(dag)
 
             publish_events_bigquery = BashOperator(
