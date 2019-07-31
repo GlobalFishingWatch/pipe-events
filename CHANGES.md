@@ -11,7 +11,7 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 ### Added
 
 * [1100](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/1100): Adds
-  Support to handle FlexibleOperator. Also moves the pipe-events subdags to
+  Supports the handler of FlexibleOperator. Also moves the pipe-events subdags to
   independent dags. and converts each operator to a KubernetesPodOperator.
 
 
