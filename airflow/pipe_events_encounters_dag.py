@@ -24,6 +24,7 @@ class PipelineDagFactory(PipelineEventsDagFactory):
         config['date_range'] = ','.join(self.source_date_range())
 
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
+            self.config = config
             publish_events_bigquery_params = {
                 'task_id':'publish_events_bigquery',
                 'pool':'bigquery',
