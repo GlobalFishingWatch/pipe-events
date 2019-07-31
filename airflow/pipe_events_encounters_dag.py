@@ -3,6 +3,7 @@ from airflow.operators.bash_operator import BashOperator
 
 from airflow_ext.gfw import config as config_tools
 from airflow_ext.gfw.models import DagFactory
+from airflow_ext.gfw.operators.helper.flexible_operator import FlexibleOperator
 
 import sys
 import os
@@ -23,29 +24,38 @@ class PipelineDagFactory(PipelineEventsDagFactory):
         config['date_range'] = ','.join(self.source_date_range())
 
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
-            publish_events_bigquery = BashOperator(
-                task_id='publish_events_bigquery',
-                pool='bigquery',
-                depends_on_past=True,
-                bash_command='{docker_run} {docker_image} generate_encounter_events '
-                             '{project_id}:{source_dataset}.{source_table} '
-                             '{project_id}:{source_dataset}.{vessel_info} '
-                             '{project_id}:{events_dataset}.{events_table}'.format(
-                                 **config)
-            )
+            publish_events_bigquery_params = {
+                'task_id':'publish_events_bigquery',
+                'pool':'bigquery',
+                'depends_on_past':True,
+                'docker_run':'{docker_run}'.format(**config),
+                'image':'{docker_image}'.format(**config),
+                'name':'encounters-publish-events-bigquery',
+                'dag':dag,
+                'cmds':['generate_encounter_events',
+                        '{project_id}:{source_dataset}.{source_table}'.format(**config),
+                        '{project_id}:{source_dataset}.{vessel_info}'.format(**config),
+                        '{project_id}:{events_dataset}.{events_table}'.format(**config)]
+            }
+            publish_events_bigquery = FlexibleOperator(publish_events_bigquery_params).build_operator(self.config['flexible_operator'])
 
-            publish_events_postgres = BashOperator(
-                task_id='publish_events_postgres',
-                pool='postgres',
-                bash_command='{docker_run} {docker_image} publish_postgres '
-                '{date_range} '
-                '{project_id}:{events_dataset}.{events_table} '
-                '{temp_bucket} '
-                '{postgres_instance} '
-                '{postgres_connection_string} '
-                '{postgres_table} '
-                'encounter'.format(**config)
-            )
+            publish_events_postgres_params = {
+                'task_id':'publish_events_postgres',
+                'pool':'postgres',
+                'docker_run':'{docker_run}'.format(**config),
+                'image':'{docker_image}'.format(**config),
+                'name':'encounters-publish-events-postgres',
+                'dag':dag,
+                'cmds':['publish_postgres',
+                        '{date_range}'.format(**config),
+                        '{project_id}:{events_dataset}.{events_table}'.format(**config),
+                        '{temp_bucket}'.format(**config),
+                        '{postgres_instance}'.format(**config),
+                        '{postgres_connection_string}'.format(**config),
+                        '{postgres_table}'.format(**config),
+                        'encounter'.format(**config)]
+            }
+            publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(self.config['flexible_operator'])
 
             dag >> publish_events_bigquery >> publish_events_postgres
 

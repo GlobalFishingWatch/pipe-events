@@ -4,6 +4,7 @@ from airflow.operators.bash_operator import BashOperator
 
 from airflow_ext.gfw import config as config_tools
 from airflow_ext.gfw.models import DagFactory
+from airflow_ext.gfw.operators.helper.flexible_operator import FlexibleOperator
 
 from datetime import datetime, timedelta
 
@@ -62,32 +63,42 @@ class PipelineDagFactory(PipelineEventsDagFactory):
             self.config = config
             source_sensors = self.source_table_sensors(dag)
 
-            publish_events_bigquery = BashOperator(
-                task_id='publish_events_bigquery',
-                pool='bigquery',
-                depends_on_past=True,
-                bash_command='{docker_run} {docker_image} generate_fishing_events '
-                '{date_range} '
-                '{project_id}:{source_dataset}.{source_table} '
-                '{project_id}:{source_dataset}.{segment_vessel} '
-                '{project_id}:{source_dataset}.{segment_info} '
-                '{project_id}:{source_dataset}.{vessel_info} '
-                '{project_id}:{events_dataset}.{events_table} '
-                '{min_event_duration}'.format(**config)
-            )
+            publish_events_bigquery_params = {
+                'task_id':'publish_events_bigquery',
+                'pool':'bigquery',
+                'depends_on_past':True,
+                'docker_run':'{docker_run}'.format(**config),
+                'image':'{docker_image}'.format(**config),
+                'name':'fishing-publish-events-bigquery',
+                'dag':dag,
+                'cmds':['generate_fishing_events',
+                        '{date_range}'.format(**config),
+                        '{project_id}:{source_dataset}.{source_table}'.format(**config),
+                        '{project_id}:{source_dataset}.{segment_vessel}'.format(**config),
+                        '{project_id}:{source_dataset}.{segment_info}'.format(**config),
+                        '{project_id}:{source_dataset}.{vessel_info}'.format(**config),
+                        '{project_id}:{events_dataset}.{events_table}'.format(**config),
+                        '{min_event_duration}'.format(**config)]
+            }
+            publish_events_bigquery = FlexibleOperator(publish_events_bigquery_params).build_operator(self.config['flexible_operator'])
 
-            publish_events_postgres = BashOperator(
-                task_id='publish_events_postgres',
-                pool='postgres',
-                bash_command='{docker_run} {docker_image} publish_postgres '
-                '{date_range} '
-                '{project_id}:{events_dataset}.{events_table} '
-                '{temp_bucket} '
-                '{postgres_instance} '
-                '{postgres_connection_string} '
-                '{postgres_table} '
-                'fishing'.format(**config)
-            )
+            publish_events_postgres_params = {
+                'task_id':'publish_events_postgres',
+                'pool':'postgres',
+                'docker_run':'{docker_run}'.format(**config),
+                'image':'{docker_image}'.format(**config),
+                'name':'fishing-publish-events-postgres',
+                'dag':dag,
+                'cmds':['publish_postgres',
+                        '{date_range}'.format(**config),
+                        '{project_id}:{events_dataset}.{events_table}'.format(**config),
+                        '{temp_bucket}'.format(**config),
+                        '{postgres_instance}'.format(**config),
+                        '{postgres_connection_string}'.format(**config),
+                        '{postgres_table}'.format(**config),
+                        'fishing']
+            }
+            publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(self.config['flexible_operator'])
 
             for sensor in source_sensors:
                 dag >> sensor >> publish_events_bigquery >> publish_events_postgres
