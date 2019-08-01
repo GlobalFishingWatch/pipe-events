@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.bash_operator import BashOperator
+from airflow.models import Variable
 
 from airflow_ext.gfw import config as config_tools
 from airflow_ext.gfw.models import DagFactory
@@ -42,7 +42,7 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                         '{project_id}:{anchorages_dataset}.{named_anchorages}'.format(**config),
                         '{project_id}:{events_dataset}.{events_table}'.format(**config)]
             }
-            publish_events_bigquery = FlexibleOperator(publish_events_bigquery_params).build_operator('{flexible_operator}'.format(**config))
+            publish_events_bigquery = FlexibleOperator(publish_events_bigquery_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
 
             publish_events_postgres_params = {
                 'task_id':'publish_events_postgres',
@@ -60,7 +60,7 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                         '{postgres_table}'.format(**config),
                         'port']
             }
-            publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator('{flexible_operator}'.format(**config))
+            publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
 
             for sensor in source_sensors:
                 dag >> sensor >> publish_events_bigquery >> publish_events_postgres
