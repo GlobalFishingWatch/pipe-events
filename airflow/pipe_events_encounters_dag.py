@@ -33,10 +33,10 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                 'image':'{docker_image}'.format(**config),
                 'name':'encounters-publish-events-bigquery',
                 'dag':dag,
-                'cmds':['generate_encounter_events',
-                        '{project_id}:{source_dataset}.{source_table}'.format(**config),
-                        '{project_id}:{source_dataset}.{vessel_info}'.format(**config),
-                        '{project_id}:{events_dataset}.{events_table}'.format(**config)]
+                'arguments':['generate_encounter_events',
+                             '{project_id}:{source_dataset}.{source_table}'.format(**config),
+                             '{project_id}:{source_dataset}.{vessel_info}'.format(**config),
+                             '{project_id}:{events_dataset}.{events_table}'.format(**config)]
             }
             publish_events_bigquery = FlexibleOperator(publish_events_bigquery_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
 
@@ -47,14 +47,14 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                 'image':'{docker_image}'.format(**config),
                 'name':'encounters-publish-events-postgres',
                 'dag':dag,
-                'cmds':['publish_postgres',
-                        '{date_range}'.format(**config),
-                        '{project_id}:{events_dataset}.{events_table}'.format(**config),
-                        '{temp_bucket}'.format(**config),
-                        '{postgres_instance}'.format(**config),
-                        '{postgres_connection_string}'.format(**config),
-                        '{postgres_table}'.format(**config),
-                        'encounter'.format(**config)]
+                'arguments':['publish_postgres',
+                             '{date_range}'.format(**config),
+                             '{project_id}:{events_dataset}.{events_table}'.format(**config),
+                             '{temp_bucket}'.format(**config),
+                             '{postgres_instance}'.format(**config),
+                             '{postgres_connection_string}'.format(**config),
+                             '{postgres_table}'.format(**config),
+                             'encounter'.format(**config)]
             }
             publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
 
