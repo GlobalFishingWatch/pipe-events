@@ -29,6 +29,7 @@ The pipeline exposes the following standard settings:
 In addition to this, the following custom settings are required for this pipeline, and come with default values:
 
 * `INFERENCE_BUFFER_DAYS`: Global airflow variable which determines the amount of days to reprocess because nnet scores might be avaialble. Defaults to `7`.
+* `FLEXIBLE_OPERATOR`: Global airflow variable which determines the operator that will be used to process the events, the possible values could be `bash` or `kubernetes`. Defaults to `bash`.
 * `pipe_events.events_dataset`: BigQuery dataset which will contain the published events. Defaults to `EVENTS_DATASET`.
 * `pipe_events.source_dataset`: BigQuery dataset which contains the different tables that are read to produce the summarized events. Defaults to `PIPELINE_DATASET`.
 * `pipe_events.gaps.source_table`: BigQuery table to read gaps from. Defaults to `position_messages_`.
