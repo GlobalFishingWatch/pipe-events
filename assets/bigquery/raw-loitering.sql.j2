@@ -1,0 +1,375 @@
+#standardsql
+
+-- Loitering query
+-- David Kroodsma, August 16, 2019
+-- This fairly convoluted query does the following:
+--  - groups information by hour by vessel
+--  - gets the average speed and first and last point for each hour
+--  - identifies consecutive hour blocks where the implied speed is below a given threshold
+-- 
+-- note this doesn't work on vessels that are spoofing. Current
+-- query eliminates overlapping segments. There is also some complicated parts where the 
+-- query needs to look one position backward from the first position, because the calculated 
+-- distance and time is between the previous position and the current position.
+----------------------------------------
+
+
+
+With
+--------------------
+-- AIS Source data
+-- adjust the time range here 
+--------------------
+source_table as 
+(select * from 
+  `gfw_research.pipe_production_v20190502`   
+    WHERE
+   _partitiontime between timestamp("2017-01-01") and timestamp("2018-01-01")
+),
+
+------------------------------------------------------
+-- What is a carrier mmsi? This selects these vessels. 
+-- Note that we should exclude any mmsi that are spoofing
+------------------------------------------------------
+carrier_mmsi as ( SELECT
+      identity.mmsi AS mmsi
+      FROM
+     `vessel_database.all_vessels_v20191001` WHERE is_carrier AND matched),
+
+--------------------------------------------
+-- What are we including as good segments?
+-- note that we exclude overlaping and short here
+-- becauase we are doing this by ssvid
+-------------------------------------------
+
+good_segs as (select seg_id 
+from `gfw_research.pipe_production_v20190502_segs` where good_seg
+and not overlapping_and_short ),
+
+-----------------------------------------------
+-- FIND PREVIOUS AND NEXT SPEEDS and TIMESTAMPS 
+-- (note speed in km/hr)
+-----------------------------------------------
+prev_next_speeds AS (
+SELECT
+    ssvid,
+    t, # t is an integer value specific to each hour
+    avg_speed,
+    # these lag and leads get the value for the next or previous hour with data
+    LEAD(avg_speed, 1) OVER (PARTITION BY ssvid ORDER BY t) next_speed, # next average speed for hour not in this hour
+    LAG(avg_speed, 1) OVER (PARTITION BY ssvid ORDER BY t) last_speed, # previous average speed not in this hour
+    LEAD(start_timestamp, 1) OVER (PARTITION BY ssvid ORDER BY t) next_timestamp, # next timestamp not in this hour
+    LAG(end_timestamp, 1) OVER (PARTITION BY ssvid ORDER BY t) last_timestamp, # last timestamp not in this hour
+    start_timestamp, # first timestamp of the hour period
+    end_timestamp, # last timestamp of the hour period
+    hours, # total hours of time associated with positions in this hour
+    km, # total distance associated with positions in this hour
+    positions, # number of positions in this hour
+    distance_from_shore # average distance to shore this hour
+  FROM (
+    SELECT
+      ssvid,
+      # t is a unique integer for each hour
+      EXTRACT(YEAR FROM timestamp)*100000 + EXTRACT(DAYOFYEAR FROM timestamp)*100 + EXTRACT(HOUR FROM timestamp) t,
+      EXTRACT(HOUR FROM timestamp) hour,
+      EXTRACT(DAY FROM timestamp) day,
+      EXTRACT(MONTH FROM timestamp) month,
+      EXTRACT( YEAR FROM timestamp) year,
+      # avg_speed is the average implied speed for all points in a given hour block
+      safe_divide(SUM(meters_to_prev /1000),SUM(hours)) avg_speed,
+      # the first and last timestamp in this hour block
+      CAST(MIN(timestamp) AS TIMESTAMP) start_timestamp,
+      CAST(MAX(timestamp) AS TIMESTAMP) end_timestamp,
+      SUM(hours) hours,
+      SUM(meters_to_prev/1000) km,
+      AVG(distance_from_shore_m) distance_from_shore,
+      COUNT(*) positions
+    FROM
+      source_table where
+      lat <90
+      AND lat>-90
+      AND lon>-180
+      AND lon<180
+      AND SAFE_CAST(ssvid AS INT64) IN (
+     select mmsi from carrier_mmsi)
+      AND seg_id IN (
+      SELECT
+        seg_id
+      FROM
+        good_segs)
+    GROUP BY
+      ssvid,
+      t,
+      hour,
+      day,
+      month,
+      year)),
+
+#
+##
+# IF THE CURRENT SPEED IS LESS THAN 2 KNOTS (2 * 1.852, convert from km/hour)
+# THIS IS A SLOW POINT, IDENTIFY IF THE NEXT POINT IS SLOW AND IF THE LAST ONE WAS.
+# ALSO IF THE TIME DIFFERENCE BETWEEN THE CURRENT POINT AND THE PREVIOUS OR NEXT POINT
+# IS GREATER THAN 24 HOUR. SLOW SEGMENTS CANNOT CONTAIN GAPS > 24 HOURS
+##
+#
+
+slow_segments AS (SELECT
+    -- convert to to knots
+    avg_speed < 2*1.852 as  slow, # if the speed this hour is below cutoff, then it is slow
+    next_speed < 2*1.852 as next_slow, # if the speed in the next hour with data is below cutoff, then next_slow
+    last_speed < 2*1.852 as last_slow, # if the speed in the previous hour with data is below cutoff, then prev_slow
+    IF(TIMESTAMP_DIFF(start_timestamp, last_timestamp, MICROSECOND)/3600000000 > 24
+      OR last_timestamp IS NULL, TRUE, FALSE) segment_start, # if it is the start of a segment
+    IF(TIMESTAMP_DIFF(next_timestamp, start_timestamp, MICROSECOND)/3600000000 > 24
+      OR next_timestamp IS NULL, TRUE, FALSE) segment_end, # if it is the end of a segment
+    *
+      FROM 
+    prev_next_speeds),
+
+#
+##
+# IDENTIFY IF A POINT IS THE BEGINNING OR ENDING OF A SLOW SEGMENT (LOITERING)
+##
+#
+start_end_slow AS (
+SELECT
+  IF(slow
+    AND (segment_start
+      OR NOT last_slow ), TRUE, FALSE) begin_slow,
+  IF(slow
+    AND (segment_end
+      OR NOT next_slow), TRUE, FALSE) end_slow,
+      *
+FROM
+  slow_segments),
+
+#
+##
+# FILTER THE TABLE TO JUST THOSE POSITIONS THAT ARE A BEGINNING OR END
+##
+#
+
+just_start_end AS (
+SELECT
+  *
+FROM 
+  start_end_slow
+WHERE 
+  ( begin_slow -- it is the start or end of a slow segment
+    OR end_slow)
+  AND NOT (begin_slow -- it is not a lone loitering point
+    AND end_slow)
+    ),
+
+#
+##
+
+---------------------------------
+-- Do a lag and lead on positions that are only at the start and end of loitering events
+-- the start timestamp of the first one is the start, the end time of the second is the end
+--
+--------------------------------
+
+loitering_start_end AS (
+SELECT
+  start_timestamp AS loitering_start_timestamp,
+  LEAD(end_timestamp, 1 ) OVER(PARTITION BY ssvid ORDER BY t) AS loitering_end_timestamp,
+  distance_from_shore AS start_distance_from_shore_m,
+  LEAD(distance_from_shore,1) OVER (PARTITION BY ssvid ORDER BY t) AS end_distance_from_shore_m,
+  *
+FROM 
+  just_start_end),
+    
+#
+##
+# LOITERING EVENT TIME RANGES, ONE TIMESTAMP TOO SHORT
+----------------------------------
+-- Now, filter the above table to the rows where the loitering event starts,
+-- thus getting one row per loitering event.
+-- Then restrict this to when the average distance from shore is above a given distance
+-- (originally set at 20 nautical miles)
+--
+------------------------------
+##
+#
+loitering_event_ranges_short AS (
+SELECT
+  ssvid,
+  loitering_start_timestamp,
+  loitering_end_timestamp,
+  ROUND(TIMESTAMP_DIFF(loitering_end_timestamp, loitering_start_timestamp, MICROSECOND)/3600000000,1) hours,
+  ROUND((start_distance_from_shore_m + end_distance_from_shore_m)/2/1852,1) avg_distance_from_shore_nm
+FROM 
+  loitering_start_end
+WHERE
+  begin_slow
+  AND (start_distance_from_shore_m + end_distance_from_shore_m)/2 > 1852*20), 
+  # filter for only events that have an average distance to shore above a given distance
+
+  
+#
+##
+------------------------------
+-- Okay, this is tricky. Bear with me:
+-- we have time ranges, with start and ending timestamps. But we have 
+-- lost the total distance traveled (we need to get the sum of the distances of
+-- all points in bertween), so we need to join back to get the right range.
+---------------------------
+##
+#
+
+padding_loitering_1 AS (
+SELECT
+  loitering_start_timestamp,
+  loitering_end_timestamp,
+  a.hours hours,
+  a.avg_distance_from_shore_nm avg_distance_from_shore_nm,
+  a.ssvid AS ssvid,
+  safe_divide(SUM(avg_distance_km),sum(b.hours)) km_per_hour,
+  SUM(avg_distance_km ) tot_distance_km,
+  SUM(b.hours) tot_hours
+FROM 
+  loitering_event_ranges_short  a
+LEFT JOIN (
+  SELECT  
+    ssvid,
+    meters_to_prev/1000 AS avg_distance_km,
+    hours,
+    timestamp
+  FROM 
+    source_table
+  WHERE
+    seg_id IN (
+    SELECT
+      seg_id
+    FROM
+      good_segs) )b
+ON
+  a.ssvid = b.ssvid
+WHERE
+  b.timestamp >= loitering_start_timestamp
+  AND b.timestamp <= loitering_end_timestamp
+GROUP BY
+  ssvid,
+  loitering_start_timestamp,
+  loitering_end_timestamp,
+  hours,
+  avg_distance_from_shore_nm),
+
+#
+##
+# LOITERING EVENT PADDING 1
+--------------------------
+-- The measured time associated with each position is the time to the *previous*
+-- position, so we have to look one position back from the first position to get the
+-- actualy starting point of the loitering event. This will also make it easier to
+-- join loitering events across different days later.
+-- 
+--------------------------
+##
+#
+  
+
+loitering_padding_2 AS (
+SELECT 
+   # note that because the hours is time to previous
+  # in this version of the research tables, we have to look backward one position to get
+  # the first position in the loitering 
+  if(actual_loitering_start_timestamp is null or
+  TIMESTAMP_DIFF(loitering_start_timestamp, actual_loitering_start_timestamp, MICROSECOND)/3600000000 > 24,
+  loitering_start_timestamp,
+  actual_loitering_start_timestamp) loitering_start_timestamp,
+  loitering_end_timestamp,
+  hours,
+  a.ssvid AS ssvid,
+  if(actual_loitering_start_timestamp is null or
+  TIMESTAMP_DIFF(loitering_start_timestamp, actual_loitering_start_timestamp, MICROSECOND)/3600000000 > 24,
+  lat,
+  actual_start_lat) start_lat,
+  if(actual_loitering_start_timestamp is null or
+  TIMESTAMP_DIFF(loitering_start_timestamp, actual_loitering_start_timestamp, MICROSECOND)/3600000000 > 24,
+  lon,
+  actual_start_lon) start_lon,
+  km_per_hour/1.85 AS speed_knots,
+  tot_distance_km,
+  tot_hours,
+  avg_distance_from_shore_nm
+FROM 
+  padding_loitering_1 a
+LEFT JOIN (
+SELECT 
+  lat,
+  lon,
+  LAG(lat, 1) OVER (PARTITION BY ssvid ORDER BY timestamp) actual_start_lat, # get the lat before the start
+  LAG(lon, 1) OVER (PARTITION BY ssvid ORDER BY timestamp) actual_start_lon, # get the lon before the start
+  LAG(timestamp, 1) OVER (PARTITION BY ssvid ORDER BY timestamp) actual_loitering_start_timestamp, # get the timestamp before
+  timestamp, 
+  seg_id,
+  ssvid  
+FROM
+source_table
+  WHERE
+    seg_id IN (
+    SELECT
+      seg_id
+    FROM
+      good_segs)) b
+ON 
+  a.ssvid = b.ssvid
+WHERE
+  b.timestamp = a.loitering_start_timestamp
+  ),
+  
+
+#
+##
+# LOITERING EVENT PADDING 2
+-- Now get the lat and lon of the final position.
+-- This could be done more simply with some lag and leads earlier, but then
+-- we wouldn't be able to do as many joins.
+##
+#
+
+loitering_final as (
+
+SELECT
+  a.ssvid AS ssvid,
+  seg_id,
+  start_lat,
+  start_lon, 
+  b.lat end_lat, 
+  b.lon end_lon,
+  loitering_start_timestamp,
+  loitering_end_timestamp,
+  speed_knots as avg_speed_knots,
+  tot_distance_km,
+  tot_hours as loitering_hours,
+  avg_distance_from_shore_nm
+FROM
+  loitering_padding_2 a
+LEFT JOIN (SELECT * 
+  FROM (SELECT 
+  lat,
+  lon, 
+  seg_id,
+  timestamp, 
+  ssvid
+FROM
+   source_table  
+    )
+  WHERE 
+    seg_id IN (
+    SELECT
+      seg_id
+    FROM
+      good_segs ) ) b
+ON
+  a.ssvid = b.ssvid
+WHERE
+  b.timestamp = a.loitering_end_timestamp
+  )
+ --
+ --
+  
+select * from loitering_final

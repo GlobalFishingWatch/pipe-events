@@ -1,0 +1,475 @@
+#standardSQL
+--
+-- Creates a port-id based in the iso3 and the label of the port
+--
+CREATE TEMPORARY FUNCTION
+  generate_port_id (iso3 STRING,
+    label STRING) AS ( LOWER(CONCAT(iso3,"-",REGEXP_REPLACE(NORMALIZE(label),' ',''))) );
+--
+-- Converts a UVI to the RFMO authorizations apply to
+--
+CREATE TEMPORARY FUNCTION
+  extract_rfmo_from_list_uvi(uvi STRING) AS (
+    CASE SPLIT(uvi, "-")[
+  OFFSET
+    (0)]
+      WHEN "TWN3" THEN "IOTC"
+      WHEN "WCPFC" THEN "WCPFC"
+      WHEN "WCPFC2" THEN "WCPFC"
+      WHEN "IATTC" THEN "IATTC"
+      WHEN "IATTC2" THEN "IATTC"
+      WHEN "IATTC3" THEN "IATTC"
+      WHEN "ICCAT" THEN "ICCAT"
+      WHEN "ICCAT2" THEN "ICCAT"
+      WHEN "ICCAT3" THEN "ICCAT"
+      WHEN "IOTC" THEN "IOTC"
+      WHEN "CCSBT" THEN "CCSBT"
+  END
+    );
+--
+-- Returns true an rfmo is whitelisted so that authorizations should be
+-- computed for it
+--
+CREATE TEMPORARY FUNCTION
+  is_whitelisted_rfmo(rfmo STRING) AS ( rfmo IN ( "ICCAT",
+      "IOTC",
+      "WCPFC",
+      "IATTC",
+      "CCSBT" ) );
+WITH
+  --
+  -- Declare the source tables we are going to use through the entire query
+  --
+  source_encounters AS (
+  SELECT
+    *
+  FROM
+    `{{ source }}`),
+  source_vessel_info AS (
+  SELECT
+    *
+  FROM
+    `{{ vessel_info }}`),
+  source_vessel_database AS (
+  SELECT
+    *
+  FROM
+    `{{ vessel_database }}`),
+  source_spatial_measures AS (
+  SELECT
+    *
+  FROM
+    `{{ spatial_measures }}`),
+  source_country_codes AS (
+  SELECT
+    *
+  FROM
+    `{{ country_codes }}` ),
+  source_voyages AS (
+  SELECT
+    *
+  FROM
+    `{{ voyages }}`),
+  source_anchorages AS (
+  SELECT
+    *
+  FROM
+    `{{ named_anchorages }}`),
+  source_fishing_vessels AS (
+  SELECT
+    *
+  FROM
+    `{{ fishing_vessels }}`),
+  --
+  -- We need to flatten voyages so that we have a record for each vessel id
+  --
+  flattened_voyages AS (
+  SELECT
+    trip_id,
+    trip_start,
+    trip_end,
+    trip_start_anchorage_id,
+    trip_end_anchorage_id,
+    vessel_id
+  FROM
+    source_voyages
+  CROSS JOIN
+    UNNEST(vessel_ids) AS vessel_id ),
+  --
+  -- Good encounter events
+  --
+  encounters AS (
+  SELECT
+    *
+  FROM
+    source_encounters
+  WHERE
+    TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
+    AND median_speed_knots < 2),
+  --
+  -- Only consider encounters between a carrier and fishing vessel.
+  --
+  filtered_encounters AS (
+  SELECT
+    encounters.*,
+  IF
+    (vessel_database_1.registry IS NOT NULL,
+      vessel_1_id,
+      vessel_2_id) AS carrier_vessel_id,
+  IF
+    (vessel_database_1.registry IS NOT NULL,
+      vessel_database_1.registry,
+      vessel_database_2.registry) AS carrier_registry
+  FROM
+    encounters
+  INNER JOIN
+    source_vessel_info AS vessel_info_1
+  ON
+    encounters.vessel_1_id = vessel_info_1.vessel_id
+  INNER JOIN
+    source_vessel_info AS vessel_info_2
+  ON
+    encounters.vessel_2_id = vessel_info_2.vessel_id
+  LEFT JOIN
+    source_vessel_database AS vessel_database_1
+  ON
+    vessel_info_1.ssvid = vessel_database_1.identity.ssvid
+    AND encounters.start_time > (
+    SELECT
+      MIN(first_timestamp)
+    FROM
+      vessel_database_1.activity)
+    AND encounters.end_time < (
+    SELECT
+      MAX(last_timestamp)
+    FROM
+      vessel_database_1.activity)
+    AND vessel_database_1.matched
+    AND vessel_database_1.is_carrier
+  LEFT JOIN
+    source_vessel_database AS vessel_database_2
+  ON
+    vessel_info_2.ssvid = vessel_database_2.identity.ssvid
+    AND encounters.start_time > (
+    SELECT
+      MIN(first_timestamp)
+    FROM
+      vessel_database_2.activity)
+    AND encounters.end_time < (
+    SELECT
+      MAX(last_timestamp)
+    FROM
+      vessel_database_2.activity)
+    AND vessel_database_2.matched
+    AND vessel_database_2.is_carrier
+  LEFT JOIN
+    source_fishing_vessels AS fishing_1
+  ON
+    vessel_info_1.ssvid = fishing_1.ssvid
+    AND EXTRACT(year
+    FROM
+      encounters.start_time) = fishing_1.year
+  LEFT JOIN
+    source_fishing_vessels AS fishing_2
+  ON
+    vessel_info_2.ssvid = fishing_2.ssvid
+    AND EXTRACT(year
+    FROM
+      encounters.start_time) = fishing_2.year
+  WHERE
+    -- Either we matched to a carrier on vessel 1 and to a fishing vessel for vessel 2
+    ( vessel_database_1.matched IS NOT NULL
+      AND fishing_2.ssvid IS NOT NULL ) OR
+    -- or we matched to a fishing vessel on vessel 1 and to a carrier for vessel 2
+    ( vessel_database_2.matched IS NOT NULL
+      AND fishing_1.ssvid IS NOT NULL ) ),
+  --
+  -- Duplicate encounters so that we have an event for each vessel
+  --
+  flattened_encounters AS (
+  SELECT
+    vessel_1_id AS vessel_id,
+    vessel_2_id AS encountered_vessel_id,
+    CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t", vessel_1_id,vessel_2_id, start_time, end_time))), ".1" ) AS event_id,
+    * EXCEPT(vessel_1_id,
+      vessel_2_id)
+  FROM
+    filtered_encounters
+  UNION ALL
+  SELECT
+    vessel_2_id AS vessel_id,
+    vessel_1_id AS encountered_vessel_id,
+    CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t", vessel_1_id,vessel_2_id, start_time, end_time))), ".2" ) AS event_id,
+    * EXCEPT(vessel_1_id,
+      vessel_2_id)
+  FROM
+    filtered_encounters ),
+  --
+  -- Include additional information on the final event, such as basic vessel
+  -- information for each vessel involved in the encounter or regional and
+  -- spatial information
+  --
+  complete_encounter_event AS (
+  SELECT
+    encounter.*,
+    main_vessel.shipname.value AS main_vessel_shipname,
+    main_vessel.ssvid AS main_vessel_ssvid,
+    main_vessel_country.iso3 AS main_vessel_flag,
+    encountered_vessel.shipname.value AS encountered_vessel_shipname,
+    encountered_vessel.ssvid AS encountered_vessel_ssvid,
+    encountered_vessel_country.iso3 AS encountered_vessel_flag,
+    main_vessel_trip_start_anchorages.s2id AS main_vessel_trip_start_anchorage_id,
+    main_vessel_trip_start_anchorages.iso3 AS main_vessel_trip_start_iso3,
+    main_vessel_trip_start_anchorages.label AS main_vessel_trip_start_label,
+    main_vessel_trip_end_anchorages.s2id AS main_vessel_trip_end_anchorage_id,
+    main_vessel_trip_end_anchorages.iso3 AS main_vessel_trip_end_iso3,
+    main_vessel_trip_end_anchorages.label AS main_vessel_trip_end_label,
+    encountered_vessel_trip_start_anchorages.s2id AS encountered_vessel_trip_start_anchorage_id,
+    encountered_vessel_trip_start_anchorages.iso3 AS encountered_vessel_trip_start_iso3,
+    encountered_vessel_trip_start_anchorages.label AS encountered_vessel_trip_start_label,
+    encountered_vessel_trip_end_anchorages.s2id AS encountered_vessel_trip_end_anchorage_id,
+    encountered_vessel_trip_end_anchorages.iso3 AS encountered_vessel_trip_end_iso3,
+    encountered_vessel_trip_end_anchorages.label AS encountered_vessel_trip_end_label,
+    measures.distance_from_shore_m AS distance_from_shore_m,
+    measures.distance_from_port_m AS distance_from_port_m,
+    measures.elevation_m AS elevation_m,
+    measures.regions AS regions
+  FROM
+    flattened_encounters AS encounter
+  INNER JOIN
+    source_vessel_info AS main_vessel
+  USING
+    (vessel_id)
+  INNER JOIN
+    source_vessel_info AS encountered_vessel
+  ON
+    encountered_vessel_id = encountered_vessel.vessel_id
+  INNER JOIN
+    source_spatial_measures AS measures
+  ON
+    FORMAT("lon:%+07.2f_lat:%+07.2f", ROUND(encounter.mean_longitude/0.01)*0.01, ROUND(encounter.mean_latitude/0.01)*0.01) = measures.gridcode
+    AND measures.distance_from_shore_m > 10000
+  INNER JOIN
+    source_country_codes AS main_vessel_country
+  ON
+    SUBSTR(main_vessel.ssvid, 1, 3) = CAST(main_vessel_country.code AS string)
+  INNER JOIN
+    source_country_codes AS encountered_vessel_country
+  ON
+    SUBSTR(encountered_vessel.ssvid, 1, 3) = CAST(encountered_vessel_country.code AS string)
+  LEFT JOIN
+    flattened_voyages AS main_vessel_voyages
+  ON
+    main_vessel.vessel_id = main_vessel_voyages.vessel_id
+    AND main_vessel_voyages.trip_start < encounter.start_time
+    AND main_vessel_voyages.trip_end > encounter.end_time
+  LEFT JOIN
+    source_anchorages AS main_vessel_trip_start_anchorages
+  ON
+    main_vessel_voyages.trip_start_anchorage_id = main_vessel_trip_start_anchorages.s2id
+  LEFT JOIN
+    source_anchorages AS main_vessel_trip_end_anchorages
+  ON
+    main_vessel_voyages.trip_end_anchorage_id = main_vessel_trip_end_anchorages.s2id
+  LEFT JOIN
+    flattened_voyages AS encountered_vessel_voyages
+  ON
+    encountered_vessel.vessel_id = encountered_vessel_voyages.vessel_id
+    AND encountered_vessel_voyages.trip_start < encounter.start_time
+    AND encountered_vessel_voyages.trip_end > encounter.end_time
+  LEFT JOIN
+    source_anchorages AS encountered_vessel_trip_start_anchorages
+  ON
+    encountered_vessel_voyages.trip_start_anchorage_id = encountered_vessel_trip_start_anchorages.s2id
+  LEFT JOIN
+    source_anchorages AS encountered_vessel_trip_end_anchorages
+  ON
+    encountered_vessel_voyages.trip_end_anchorage_id = encountered_vessel_trip_end_anchorages.s2id ),
+  --
+  -- Calculate authorization data for each carrier vessel, only getting authorization
+  -- data for ICCAT, IOTC, WCPFC, IATTC and CCSBT
+  --
+  authorizations AS (
+  SELECT
+    carrier_vessel_id,
+    extract_rfmo_from_list_uvi(registry.list_uvi) AS rfmo,
+    registry.authorized_from,
+    registry.authorized_to
+  FROM
+    flattened_encounters
+  CROSS JOIN
+    UNNEST(carrier_registry) AS registry
+  WHERE
+    -- Only include authorizations records from whitelisted rfmos
+    is_whitelisted_rfmo(extract_rfmo_from_list_uvi(list_uvi))
+    AND authorized_from IS NOT NULL
+    AND authorized_to IS NOT NULL),
+  --
+  -- Flatten and filter the regions where the encounters happen, so that we end
+  -- up with a table with multiple records per each encounter, one per rfmo
+  -- region where the encounter happened when the region is one of the
+  -- interesting rfmos, including authorization status for each of those
+  -- regions
+  --
+  encounter_regions_with_authorizations AS (
+  SELECT
+    encounters.event_id,
+    rfmo,
+    authorizations.rfmo AS authorized_rfmo
+  FROM
+    complete_encounter_event AS encounters
+  CROSS JOIN
+    UNNEST(regions.rfmo) AS rfmo
+  LEFT JOIN
+    authorizations
+  ON
+    encounters.carrier_vessel_id = authorizations.carrier_vessel_id
+    AND rfmo = authorizations.rfmo
+    AND encounters.start_time > authorizations.authorized_from
+    AND encounters.end_time < authorizations.authorized_to
+  WHERE
+    rfmo IN ("ICCAT",
+      "IOTC",
+      "WCPFC",
+      "IATTC",
+      "CCSBT")
+  GROUP BY
+    encounters.event_id,
+    rfmo,
+    authorizations.rfmo),
+  --
+  -- Calculate the final encounter authorization status. An encounter is only
+  -- authorized if it's authorized in all the rfmos, if it happened outside an
+  -- rfmo or in an rfmo we are not interested about.
+  --
+  encounter_authorizations AS (
+  SELECT
+    encounters.event_id,
+    -- Here we decide if the encounter is authorized or not. The rfmo field
+    -- contains a non-null value if the encounter happened inside one of the
+    -- interesting rfmos. The authorized_rfmo field contains a non-null value
+    -- if the encounter happened inside an interesting rfmo and it was
+    -- authorized to do so. So, if all the records for a given event_id have
+    -- null rfmo and null authorized_rfmo, then that means that it's an
+    -- encounter happening outside of the interesting rfmos. If all the records
+    -- for a given event_id have both fields with non-null values, it happened
+    -- inside one or more rfmos of the interesting rfmos and all of them were
+    -- authorized. Any other case means it's an unauthorized encounter
+    LOGICAL_AND(encounter_authorizations.rfmo IS NULL
+      AND encounter_authorizations.authorized_rfmo IS NULL)
+    OR LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL
+      AND encounter_authorizations.authorized_rfmo IS NOT NULL) AS is_authorized,
+    -- We also compute authorization status. We are talking about 3 different
+    -- values here: An encounter can be authorized on the same conditions as
+    -- before, but unauthorized encounters can either be fully unauthorized (if
+      -- the vessel is not authorized for all the regions it is happenning in)
+    -- or partially unauthorized if authorized in some but unauthorized in
+    -- others.
+    CASE
+      WHEN LOGICAL_AND(encounter_authorizations.rfmo IS NULL AND encounter_authorizations.authorized_rfmo IS NULL) OR LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND encounter_authorizations.authorized_rfmo IS NOT NULL) THEN 'authorized'
+      WHEN LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND encounter_authorizations.authorized_rfmo IS NULL) THEN 'unauthorized'
+    ELSE
+    'partial'
+  END
+    AS authorization_status,
+    -- Finally, we need to compute per-region authorization status. For each
+    -- authorization record in this event, we generate a struct containing the
+    -- name of the region and the authorization status.
+    ARRAY_AGG(STRUCT( encounter_authorizations.rfmo AS `rfmo`,
+        encounter_authorizations.authorized_rfmo IS NOT NULL AS `is_authorized` )) AS region_authorizations
+  FROM
+    complete_encounter_event AS encounters
+  LEFT JOIN
+    encounter_regions_with_authorizations AS encounter_authorizations
+  USING
+    (event_id)
+  GROUP BY
+    event_id),
+  --
+  -- Join the original encounters each with their authorization status. We also
+  -- do a final round of cleanup, removing problematic encounters happenning
+  -- too close to shore.
+  --
+  complete_encounter_with_authorizations AS (
+  SELECT
+    encounter.*,
+    authorization.is_authorized,
+    authorization.authorization_status,
+    authorization.region_authorizations
+  FROM
+    complete_encounter_event AS encounter
+  INNER JOIN
+    encounter_authorizations AS authorization
+  USING
+    (event_id)),
+  --
+  -- Main events query
+  --
+  result AS (
+  SELECT
+    event_id,
+    'encounter' AS event_type,
+    vessel_id,
+    start_time AS event_start,
+    end_time AS event_end,
+    mean_latitude AS lat_mean,
+    mean_longitude AS lon_mean,
+    mean_latitude AS lat_min,
+    mean_latitude AS lat_max,
+    mean_longitude AS lon_min,
+    mean_longitude AS lon_max,
+    TO_JSON_STRING( STRUCT( ROUND(median_distance_km,3) AS median_distance_km,
+        ROUND(median_speed_knots,3) AS median_speed_knots,
+        encountered_vessel_id,
+        elevation_m,
+        distance_from_shore_m,
+        distance_from_port_m,
+        is_authorized,
+        authorization_status,
+        region_authorizations,
+        STRUCT(regions.eez,
+          regions.fao,
+          regions.rfmo) AS regions ) ) AS event_info,
+    TO_JSON_STRING([ STRUCT( vessel_id AS `id`,
+      IF
+        (vessel_id = carrier_vessel_id,
+          'carrier',
+          'fishing') AS `type`,
+        main_vessel_ssvid AS `ssvid`,
+        main_vessel_shipname AS `name`,
+        main_vessel_flag AS `flag`,
+        STRUCT(main_vessel_trip_start_anchorage_id AS anchorage_id,
+          generate_port_id(main_vessel_trip_start_iso3,
+            main_vessel_trip_start_label) AS port_id,
+          main_vessel_trip_start_iso3 AS iso,
+          main_vessel_trip_start_label AS label) AS origin_port,
+        STRUCT(main_vessel_trip_end_anchorage_id AS anchorage_id,
+          generate_port_id(main_vessel_trip_end_iso3,
+            main_vessel_trip_end_label) AS port_id,
+          main_vessel_trip_end_iso3 AS iso,
+          main_vessel_trip_end_label AS label) AS destination_port ),
+      STRUCT( encountered_vessel_id AS `id`,
+      IF
+        (encountered_vessel_id = carrier_vessel_id,
+          'carrier',
+          'fishing') AS `type`,
+        encountered_vessel_ssvid AS `ssvid`,
+        encountered_vessel_shipname AS `name`,
+        encountered_vessel_flag AS `flag`,
+        STRUCT(encountered_vessel_trip_start_anchorage_id AS anchorage_id,
+          generate_port_id(encountered_vessel_trip_start_iso3,
+            encountered_vessel_trip_start_label) AS port_id,
+          encountered_vessel_trip_start_iso3 AS iso,
+          encountered_vessel_trip_start_label AS label) AS origin_port,
+        STRUCT(encountered_vessel_trip_end_anchorage_id AS anchorage_id,
+          generate_port_id(encountered_vessel_trip_end_iso3,
+            encountered_vessel_trip_end_label) AS port_id,
+          encountered_vessel_trip_end_iso3 AS iso,
+          encountered_vessel_trip_end_label AS label) AS destination_port ) ]) AS event_vessels,
+    ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(mean_longitude AS string), ' ', CAST(mean_latitude AS string), ')')) AS event_geography
+  FROM
+    complete_encounter_with_authorizations )
+SELECT
+  *
+FROM
+  result

@@ -1,0 +1,155 @@
+#standardSQL
+--
+-- Creates a port-id based in the iso3 and the label of the port
+--
+CREATE TEMPORARY FUNCTION
+  generate_port_id (iso3 STRING,
+    label STRING) AS ( LOWER(CONCAT(iso3,"-",REGEXP_REPLACE(NORMALIZE(label),' ',''))) );
+WITH
+  --
+  -- Source tables
+  --
+  source_raw_loitering_events AS (
+  SELECT
+    *
+  FROM
+    `scratch_enrique_ttl_60_days.raw_loitering_2017_v2`),
+  source_segment_info AS (
+  SELECT
+    *
+  FROM
+    `pipe_production_v20190502.segment_info`),
+  source_spatial_measures AS (
+  SELECT
+    *
+  FROM
+    `pipe_static.spatial_measures_20181025` ),
+  source_country_codes AS (
+  SELECT
+    *
+  FROM
+    `gfw_research.country_codes` ),
+  source_voyages AS (
+  SELECT
+    *
+  FROM
+    `pipe_production_v20190502.voyages`),
+  source_anchorages AS (
+  SELECT
+    *
+  FROM
+    `anchorages.named_anchorages_v20190827` ),
+  --
+  -- Precompute loitering centroid
+  --
+  raw_loitering_event_with_centroid AS (
+  SELECT
+    *,
+    ST_CENTROID( ST_UNION(ST_GEOGPOINT(start_lon,
+          start_lat),
+        ST_GEOGPOINT(end_lon,
+          end_lat)) ) centroid
+  FROM
+    source_raw_loitering_events),
+  --
+  -- We need to flatten voyages so that we have a record for each vessel id
+  --
+  flattened_voyages AS (
+  SELECT
+    trip_id,
+    trip_start,
+    trip_end,
+    trip_start_anchorage_id,
+    trip_end_anchorage_id,
+    vessel_id
+  FROM
+    source_voyages
+  CROSS JOIN
+    UNNEST(vessel_ids) AS vessel_id ),
+  --
+  -- Join the loitering events with all the tables to include the associated data for each event, such as vessel and voyage information, etc.
+  --
+  complete_loitering_event AS (
+  SELECT
+    raw_loitering_event_with_centroid.* EXCEPT (centroid),
+    ST_Y(centroid) AS lat_mean,
+    ST_X(centroid) AS lon_mean,
+    CONCAT( TO_HEX(MD5(FORMAT("loitering|%s|%t|%t", source_segment_info.vessel_id, loitering_start_timestamp, loitering_end_timestamp)))) AS event_id,
+    source_segment_info.vessel_id AS vessel_id,
+    source_segment_info.shipname.value AS vessel_shipname,
+    source_segment_info.ssvid AS vessel_ssvid,
+    vessel_country.iso3 AS vessel_flag,
+    trip_start_anchorages.s2id AS trip_start_anchorage_id,
+    trip_start_anchorages.iso3 AS trip_start_iso3,
+    trip_start_anchorages.label AS trip_start_label,
+    trip_end_anchorages.s2id AS trip_end_anchorage_id,
+    trip_end_anchorages.iso3 AS trip_end_iso3,
+    trip_end_anchorages.label AS trip_end_label,
+    measures.distance_from_shore_m AS distance_from_shore_m,
+    measures.distance_from_port_m AS distance_from_port_m,
+    measures.elevation_m AS elevation_m,
+    measures.regions AS regions
+  FROM
+    raw_loitering_event_with_centroid
+  JOIN
+    source_segment_info
+  USING
+    (seg_id)
+  LEFT JOIN
+    source_spatial_measures AS measures
+  ON
+    FORMAT("lon:%+07.2f_lat:%+07.2f", ROUND(ST_X(centroid)/0.01)*0.01, ROUND(ST_Y(centroid)/0.01)*0.01) = measures.gridcode
+  LEFT JOIN
+    source_country_codes AS vessel_country
+  ON
+    SUBSTR(raw_loitering_event_with_centroid.ssvid, 1, 3) = CAST(vessel_country.code AS string)
+  LEFT JOIN
+    flattened_voyages AS voyages
+  ON
+    source_segment_info.vessel_id = voyages.vessel_id
+    AND voyages.trip_start < raw_loitering_event_with_centroid.loitering_start_timestamp
+    AND voyages.trip_end > raw_loitering_event_with_centroid.loitering_end_timestamp
+  LEFT JOIN
+    source_anchorages AS trip_end_anchorages
+  ON
+    voyages.trip_end_anchorage_id = trip_end_anchorages.s2id
+  LEFT JOIN
+    source_anchorages AS trip_start_anchorages
+  ON
+    voyages.trip_start_anchorage_id = trip_start_anchorages.s2id )
+SELECT
+  event_id,
+  'loitering' AS event_type,
+  vessel_id,
+  loitering_start_timestamp AS event_start,
+  loitering_end_timestamp AS event_end,
+  lat_mean,
+  lon_mean,
+  start_lat AS lat_min,
+  end_lat AS lat_max,
+  start_lon AS lon_min,
+  end_lon AS lon_max,
+  TO_JSON_STRING( STRUCT( ROUND(avg_distance_from_shore_nm,3) AS median_distance_from_shore_nm,
+      ROUND(avg_speed_knots,3) AS median_speed_knots,
+      ROUND(tot_distance_km,3) AS total_distance_km,
+      ROUND(loitering_hours,3) AS loitering_hours,
+      STRUCT(trip_start_anchorage_id AS anchorage_id,
+        generate_port_id(trip_start_iso3,
+          trip_start_label) AS port_id,
+        trip_start_iso3 AS iso,
+        trip_start_label AS label) AS origin_port,
+      STRUCT(trip_end_anchorage_id AS anchorage_id,
+        generate_port_id(trip_end_iso3,
+          trip_end_label) AS port_id,
+        trip_end_iso3 AS iso,
+        trip_end_label AS label) AS destination_port,
+      STRUCT(regions.eez,
+        regions.fao,
+        regions.rfmo) AS regions ) ) AS event_info,
+  TO_JSON_STRING([ STRUCT( vessel_id AS `id`,
+      vessel_ssvid AS `ssvid`,
+      vessel_shipname AS `name`,
+      vessel_flag AS `flag`)]) AS event_vessels,
+  ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(lon_mean AS string), ' ', CAST(lat_mean AS string), ')')) AS event_geography
+FROM
+  complete_loitering_event

@@ -1,4 +1,4 @@
-FROM python:2.7
+FROM python:2.7-stretch
 
 # Configure the working directory
 RUN mkdir -p /opt/project

@@ -120,7 +120,7 @@ if [ "$?" -ne 0 ]; then
 fi
 
 echo "  Importing data"
-COPY_COMMAND="\copy ${DEST_TABLE} (event_id, event_type, vessel_id, event_start, event_end, event_info, event_vessels, event_geography, event_mean_position) from stdin with (format 'csv')"
+COPY_COMMAND="\copy ${DEST_TABLE} (event_id, event_type, vessel_id, event_start, event_end, event_info, event_vessels, event_mean_position) from stdin with (format 'csv')"
 cat ${LOCAL_CSV_FILE} | psql -v ON_ERROR_STOP=ON "${DEST_CONNECTION_STRING}" -c "$COPY_COMMAND"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to import data into postgres"

@@ -5,16 +5,7 @@ services:
     build: .
     volumes:
       - ".:/opt/project"
-      - "gcp:/root/.config/"
-
-  gcloud:
-    image: gfw/pipe-events
-    build: .
-    entrypoint:
-      - gcloud
-    volumes:
-      - ".:/opt/project"
-      - "gcp:/root/.config/"
+      - "~/.config/gcloud:/root/.config/gcloud"
 
   py.test:
     image: gfw/pipe-events
@@ -23,13 +14,4 @@ services:
       - py.test
     volumes:
       - ".:/opt/project"
-      - "gcp:/root/.config/"
-
-# Use an external named volume so that we can share gcp auth across containers
-# Before first use, this volume must be manually created with
-#   docker volume create --name=gcp
-volumes:
-  gcp:
-    external: true
-
-
+      - "~/.config/gcloud:/root/.config/gcloud"
