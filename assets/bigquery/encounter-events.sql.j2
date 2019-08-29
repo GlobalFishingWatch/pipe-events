@@ -19,7 +19,8 @@ WITH
   SELECT
     vessel_1_id AS vessel_id,
     vessel_2_id AS encountered_vessel_id,
-    CONCAT( TO_HEX(MD5(FORMAT("encouter|%s|%t",vessel_1_id,start_time))), ".1" ) AS event_id,
+    CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t",
+        vessel_1_id,vessel_2_id, start_time, end_time))), ".1" ) AS event_id,
     * EXCEPT(vessel_1_id,
       vessel_2_id)
   FROM
@@ -28,7 +29,8 @@ WITH
   SELECT
     vessel_2_id AS vessel_id,
     vessel_1_id AS encountered_vessel_id,
-    CONCAT( TO_HEX(MD5(FORMAT("encouter|%s|%t",vessel_1_id,start_time))), ".2" ) AS event_id,
+    CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t",
+        vessel_1_id,vessel_2_id, start_time, end_time))), ".2" ) AS event_id,
     * EXCEPT(vessel_1_id,
       vessel_2_id)
   FROM

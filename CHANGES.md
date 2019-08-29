@@ -8,6 +8,16 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+
+## v1.4.0 - 2019-08-29
+
+### Changed
+
+* [33](https://github.com/GlobalFishingWatch/pipe-events/pull/33): Improved
+  the id generation hash to be unique by including both of the vessel ids and 
+  the start and end times. Previous version used only one vessel id and start time.
+
+
 ## v1.3.0 - 2019-08-05
 
 ### Added
