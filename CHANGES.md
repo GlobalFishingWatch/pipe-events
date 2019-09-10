@@ -8,6 +8,12 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v1.4.1 - 2019-09-10
+
+### Added
+
+* [1125](https://github.com/GlobalFishingWatch/pipe-events/pull/1125): Adds
+    a flag to indicate if we want to publish the results on postgres.
 
 ## v1.4.0 - 2019-08-29
 
