@@ -25,6 +25,8 @@ class PipelineDagFactory(PipelineEventsDagFactory):
 
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
             self.config = config
+            publish_to_postgres = config.get('publish_to_postgres',False)
+
             publish_events_bigquery_params = {
                 'task_id':'publish_events_bigquery',
                 'pool':'bigquery',
@@ -56,9 +58,12 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                              '{postgres_table}'.format(**config),
                              'encounter'.format(**config)]
             }
-            publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
 
-            dag >> publish_events_bigquery >> publish_events_postgres
+            dag >> publish_events_bigquery
+
+            if publish_to_postgres:
+                publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
+                publish_events_bigquery >> publish_events_postgres
 
             return dag
 
