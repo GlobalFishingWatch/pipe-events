@@ -61,7 +61,7 @@ class PipelineDagFactory(PipelineEventsDagFactory):
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
             self.config = config
             source_sensors = self.source_table_sensors(dag)
-            publish_to_postgres = config.get('publish_to_postgres',false)
+            publish_to_postgres = config.get('publish_to_postgres',False)
 
             publish_events_bigquery_params = {
                 'task_id':'publish_events_bigquery',
