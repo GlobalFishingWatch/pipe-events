@@ -61,6 +61,7 @@ class PipelineDagFactory(PipelineEventsDagFactory):
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
             self.config = config
             source_sensors = self.source_table_sensors(dag)
+            publish_to_postgres = '{publish_to_postgres}'.format(**config) == 'True'
 
             publish_events_bigquery_params = {
                 'task_id':'publish_events_bigquery',
@@ -97,10 +98,13 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                              '{postgres_table}'.format(**config),
                              'fishing']
             }
-            publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
 
             for sensor in source_sensors:
-                dag >> sensor >> publish_events_bigquery >> publish_events_postgres
+                dag >> sensor >> publish_events_bigquery
+
+            if publish_to_postgres:
+                publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
+                publish_events_bigquery >> publish_events_postgres
 
             return dag
 
