@@ -32,7 +32,7 @@ In addition to this, the following custom settings are required for this pipelin
 * `FLEXIBLE_OPERATOR`: Global airflow variable which determines the operator that will be used to process the events, the possible values could be `bash` or `kubernetes`. Defaults to `bash`.
 * `pipe_events.events_dataset`: BigQuery dataset which will contain the published events. Defaults to `EVENTS_DATASET`.
 * `pipe_events.source_dataset`: BigQuery dataset which contains the different tables that are read to produce the summarized events. Defaults to `PIPELINE_DATASET`.
-* `pipe_events.publish_to_postgres`: Flag to decide if the results are published to posgres. Defaults to `False`.
+* `pipe_events.publish_to_postgres`: Flag to decide if the results are published to posgres. It also can be specified at event level instead of pipe_events level. Since if you only want to publish ports, encounters and fishing but not gaps you can do it. Defaults to `false`.
 * `pipe_events.gaps.source_table`: BigQuery table to read gaps from. Defaults to `position_messages_`.
 * `pipe_events.gaps.events_table`: BigQuery table to publish gap events to. Defaults to `published_events_gaps`.
 * `pipe_events.gaps.segment_vessel`: BigQuery table containing segment information, used to calculate gaps. Defaults to `segment_vessel`.

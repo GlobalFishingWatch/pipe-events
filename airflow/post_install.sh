@@ -18,11 +18,6 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
     pipeline_dataset="{{ var.value.PIPELINE_DATASET }}" \
     events_dataset="{{ var.value.EVENTS_DATASET }}" \
     source_dataset="{{ var.value.PIPELINE_DATASET }}" \
-    publish_to_postgres="False" \
-    flexible_operator="bash" \
-    postgres_connection_string="postgresql://postgres:51aulOyho1OPIbOy@127.0.0.1:5432/api" \
-    postgres_instance="world-fishing-827:us-central1:api" \
-    postgres_table="matias_test" \
 
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
