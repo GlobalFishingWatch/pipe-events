@@ -1,10 +1,5 @@
 #standardSQL
---
--- Creates a port-id based in the iso3 and the label of the port
---
-CREATE TEMPORARY FUNCTION
-  generate_port_id (iso3 STRING,
-    label STRING) AS ( LOWER(CONCAT(iso3,"-",REGEXP_REPLACE(NORMALIZE(label),' ',''))) );
+{% include 'util.sql.j2' %}
 WITH
   --
   -- Source tables
