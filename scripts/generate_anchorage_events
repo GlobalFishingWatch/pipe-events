@@ -6,7 +6,7 @@ THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
-  SOURCE_TABLE \
+  SOURCE_QUERY \
   VESSEL_INFO \
   NAMED_ANCHORAGES \
   DEST_TABLE \
@@ -16,7 +16,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE VESSEL_INFO NAMED_ANCHORAGES DEST_TABLE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_QUERY VESSEL_INFO NAMED_ANCHORAGES DEST_TABLE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -39,7 +39,7 @@ fi
 
 echo "Running $0"
 echo "  DATE_RANGE: $DATE_RANGE"
-echo "  SOURCE_TABLE: $SOURCE_TABLE"
+echo "  SOURCE_QUERY: $SOURCE_QUERY"
 echo "  VESSEL_INFO: $VESSEL_INFO"
 echo "  NAMED_ANCHORAGES: $NAMED_ANCHORAGES"
 echo "  DEST_TABLE: $DEST_TABLE"
@@ -49,7 +49,7 @@ echo "  DEST_TABLE: $DEST_TABLE"
 echo "Ensuring events table ${DEST_TABLE} exists"
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${SOURCE_TABLE}"
+  "* Source: ${SOURCE_QUERY}"
   "* Command:"
   "$(basename $0)"
   "$@"
@@ -88,12 +88,12 @@ fi
 INSERT_SQL=${ASSETS}/bigquery/anchorage-events.sql.j2
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 jinja2 ${INSERT_SQL} \
-   -D source=${SOURCE_TABLE//:/.} \
+   -D source_query=${SOURCE_QUERY//:/.} \
    -D vessel_info=${VESSEL_INFO//:/.} \
    -D named_anchorages=${NAMED_ANCHORAGES//:/.} \
    -D start_date=${START_DATE} \
    -D end_date=${END_DATE} \
-   | bq query --max_rows=0 --allow_large_results --replace --destination_table ${DEST_TABLE}
+   | bq query --max_rows=0 --allow_large_results --append_table --destination_table ${DEST_TABLE}
 
 
 if [ "$?" -ne 0 ]; then

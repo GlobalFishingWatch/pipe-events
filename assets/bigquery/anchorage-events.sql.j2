@@ -5,10 +5,8 @@ WITH
   -- Declare the source tables we are going to use through the entire query
   --
   source_port_events AS (
-  SELECT
-    *
-  FROM
-    `{{ source }}` ),
+    {{ source_query }}
+  ),
   source_vessel_info AS (
   SELECT
     *

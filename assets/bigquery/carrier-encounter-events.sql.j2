@@ -36,10 +36,8 @@ WITH
   -- Declare the source tables we are going to use through the entire query
   --
   source_encounters AS (
-  SELECT
-    *
-  FROM
-    `{{ source }}`),
+    {{ source_query }}
+  ),
   source_vessel_info AS (
   SELECT
     *
@@ -100,7 +98,7 @@ WITH
     source_encounters
   WHERE
     TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
-    AND median_speed_knots < 2),
+    AND median_speed_knots < {{ max_median_speed_knots }}),
   --
   -- Only consider encounters between a carrier and fishing vessel.
   --

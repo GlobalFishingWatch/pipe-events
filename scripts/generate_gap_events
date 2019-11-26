@@ -6,8 +6,9 @@ source ${THIS_SCRIPT_DIR}/pipeline.sh
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
-  MESSAGES_TABLE \
-  EVENTS_TABLE \
+  SOURCE_TABLE \
+  SOURCE_FILTER \
+  DEST_TABLE \
   SEGMENT_VESSEL \
   VESSEL_INFO \
   MIN_POS_COUNT \
@@ -18,7 +19,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] MESSAGES_TABLE EVENTS_TABLE SEGMENT_VESSEL VESSEL_INFO MIN_POS_COUNT MIN_DIST\n"
+	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_QUERY SOURCE_FILTER DEST_TABLE SEGMENT_VESSEL VESSEL_INFO MIN_POS_COUNT MIN_DIST\n"
 	}
 
 
@@ -42,8 +43,9 @@ fi
 
 echo "Running $0"
 echo "  DATE_RANGE: $DATE_RANGE"
-echo "  MESSAGES_TABLE: $MESSAGES_TABLE"
-echo "  EVENTS_TABLE: $EVENTS_TABLE"
+echo "  SOURCE_TABLE: $SOURCE_TABLE"
+echo "  SOURCE_FILTER: $SOURCE_FILTER"
+echo "  DEST_TABLE: $DEST_TABLE"
 echo "  SEGMENT_VESSEL: $SEGMENT_VESSEL"
 echo "  VESSEL_INFO: $VESSEL_INFO"
 echo "  MIN_POS_COUNT: $MIN_POS_COUNT"
@@ -52,10 +54,10 @@ echo "  MIN_DIST: $MIN_DIST"
 ################################################################################
 # Force that the destination table exists
 ################################################################################
-echo "Ensuring events table ${EVENTS_TABLE} exists"
+echo "Ensuring events table ${DEST_TABLE} exists"
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${MESSAGES_TABLE}"
+  "* Source: ${SOURCE_QUERY}"
   "* Command:"
   "$(basename $0)"
   "$@"
@@ -66,9 +68,9 @@ bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
   --time_partitioning_field=event_start \
-  ${EVENTS_TABLE}
+  ${DEST_TABLE}
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to create table ${EVENTS_TABLE}"
+  echo "  Unable to create table ${DEST_TABLE}"
   exit 1
 fi
 echo "  Events table exists"
@@ -79,12 +81,12 @@ echo "  Events table exists"
 DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
 echo "Deleting existing records for ${START_DATE} to ${END_DATE}"
 jinja2 ${DELETE_SQL} \
-  -D table=${EVENTS_TABLE//:/.} \
+  -D table=${DEST_TABLE//:/.} \
   -D start_date=${START_DATE} \
   -D end_date=${END_DATE} \
   | bq query --max_rows=0
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to delete records for table ${EVENTS_TABLE} from ${START_DATE} to ${END_DATE}"
+  echo "  Unable to delete records for table ${DEST_TABLE} from ${START_DATE} to ${END_DATE}"
   exit 1
 fi
 
@@ -94,20 +96,20 @@ fi
 INSERT_SQL=${ASSETS}/bigquery/gap-events.sql.j2
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 jinja2 ${INSERT_SQL} \
-   -D source=${MESSAGES_TABLE//:/.} \
-   -D dest=${EVENTS_TABLE//:/.} \
+   -D source_table=${SOURCE_TABLE//:/.} \
+   -D source_filter=${SOURCE_FILTER} \
    -D start_date=${START_DATE} \
    -D end_date=${END_DATE} \
    -D min_pos_count=${MIN_POS_COUNT} \
    -D min_dist=${MIN_DIST} \
    -D segment_vessel=${SEGMENT_VESSEL//:/.} \
    -D vessel_info=${VESSEL_INFO//:/.} \
-   | bq query --max_rows=0
+   | bq query --max_rows=0 --allow_large_results --append_table --destination_table ${DEST_TABLE}
 
 
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to insert records for table ${EVENTS_TABLE} from ${START_DATE} to ${END_DATE}"
+  echo "  Unable to insert records for table ${DEST_TABLE} from ${START_DATE} to ${END_DATE}"
   exit 1
 fi
 
-echo "${EVENTS_TABLE} Done."
+echo "${DEST_TABLE} Done."

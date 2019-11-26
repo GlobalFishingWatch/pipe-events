@@ -1,23 +1,8 @@
 #standardSQL
-INSERT INTO
-  `{{ dest }}` ( event_id,
-    event_type,
-    vessel_id,
-    event_start,
-    event_end,
-    lat_mean,
-    lon_mean,
-    lat_min,
-    lat_max,
-    lon_min,
-    lon_max,
-    event_info,
-    event_vessels,
-    event_geography )
 WITH
-  #
-  # Individual positional messages
-  #
+  --
+  -- Individual positional messages
+  --
   message AS (
   SELECT
     seg_id,
@@ -26,25 +11,29 @@ WITH
     lon,
     distance_from_shore_m
   FROM
-    `{{source}}*`
+    `{{source_table}}`
   WHERE
     _TABLE_SUFFIX BETWEEN FORMAT_DATE('%Y%m%d', DATE_SUB( DATE '{{ start_date }}', INTERVAL 1 DAY) )
-    AND FORMAT_DATE('%Y%m%d', DATE_ADD( DATE '{{ end_date }}', INTERVAL 1 DAY) ) ),
-  #
-  # Vessel_ids for each seg_id. NB the vessel_id that is in the mssages have
-  # some problems, so ignore this and get the vessel_id from the segment_vessel
-  # table
-  #
+    AND FORMAT_DATE('%Y%m%d', DATE_ADD( DATE '{{ end_date }}', INTERVAL 1 DAY) )
+    {% if source_filter %}
+    AND ({{ source_filter }})
+    {% endif %} 
+  ),
+  --
+  -- Vessel_ids for each seg_id. NB the vessel_id that is in the mssages have
+  -- some problems, so ignore this and get the vessel_id from the segment_vessel
+  -- table
+  --
   best_segment_vessel AS (
   SELECT
     DISTINCT seg_id,
     FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
   FROM
     `{{ segment_vessel }}` ),
-  #
-  # Extract seg_ids from the messages and filter to only segments that have the
-  # minimum number of positions
-  #
+  --
+  -- Extract seg_ids from the messages and filter to only segments that have the
+  -- minimum number of positions
+  --
   segment AS (
   SELECT
     seg_id,
@@ -55,10 +44,10 @@ WITH
     seg_id
   HAVING
     message_count >= {{ min_pos_count }} ),
-  #
-  # Filter messages to only ones in the filtered segments
-  # and add in vessel_id
-  #
+  --
+  -- Filter messages to only ones in the filtered segments
+  -- and add in vessel_id
+  --
   filtered_message AS (
   SELECT
     *
@@ -72,9 +61,9 @@ WITH
     best_segment_vessel
   USING
     (seg_id) ),
-  #
-  # Get prev and next timestamps within a vessel_id
-  #
+  --
+  -- Get prev and next timestamps within a vessel_id
+  --
   lead_lag_message AS (
   SELECT
     *,
@@ -82,9 +71,9 @@ WITH
     LAG(timestamp) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS prev_timestamp
   FROM
     filtered_message ),
-  #
-  # Detect transponder off events
-  #
+  --
+  -- Detect transponder off events
+  --
   off_message AS (
   SELECT
     *,
@@ -97,9 +86,9 @@ WITH
     AND (next_timestamp IS NULL
       OR TIMESTAMP_DIFF(next_timestamp, timestamp, HOUR) >= 24)
     AND distance_from_shore_m >= {{ min_dist }} ),
-  #
-  # Detect transponder on events
-  #
+  --
+  -- Detect transponder on events
+  --
   on_message AS (
   SELECT
     *,
@@ -112,9 +101,9 @@ WITH
     AND (prev_timestamp IS NULL
       OR TIMESTAMP_DIFF(timestamp, prev_timestamp, HOUR) >= 24)
     AND distance_from_shore_m >= {{ min_dist }} ),
-  #
-  # Assemble a list of all transponder on and off events
-  #
+  --
+  -- Assemble a list of all transponder on and off events
+  --
   raw_events AS (
   SELECT
     *
@@ -125,9 +114,9 @@ WITH
     *
   FROM
     on_message ),
-  #
-  # Generate a list of off events with the corresponding on event, if it exists
-  #
+  --
+  -- Generate a list of off events with the corresponding on event, if it exists
+  --
   events_with_leads AS (
   SELECT
     *,
@@ -137,10 +126,10 @@ WITH
     LEAD(lon) OVER (PARTITION BY vessel_id ORDER BY timestamp) AS next_lon
   FROM
     raw_events ),
-  #
-  # Clean up the list of events by taking only off events, and their
-  # corresponding on event if it exists
-  #
+  --
+  -- Clean up the list of events by taking only off events, and their
+  -- corresponding on event if it exists
+  --
   clean_events AS (
   SELECT
     *
@@ -151,9 +140,9 @@ WITH
     AND (next_event_type = 'TRANSPONDER_OFF'
       OR next_event_type IS NULL) ),
 
-  #
-  # Include basic vessel information on the event
-  #
+  --
+  -- Include basic vessel information on the event
+  --
   complete_gap_event AS (
     SELECT
       event.*,
@@ -165,9 +154,9 @@ WITH
       `{{ vessel_info }}` as vessel
     USING
       (vessel_id) )
-#
-# assemble the event output
-#
+--
+-- assemble the event output
+--
 SELECT
   TO_HEX(MD5(FORMAT('%s|%s|%t', event_type, vessel_id, timestamp))) AS event_id,
   'gap' AS event_type,
