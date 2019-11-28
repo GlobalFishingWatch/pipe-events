@@ -17,10 +17,6 @@ class PipelineDagFactory(DagFactory):
             extra_config=config_tools.load_config(subpipeline_config_key),
             interval=interval
         )
-        self.flexible_operator = Variable.get('FLEXIBLE_OPERATOR')
-
-    def build_docker_image_task(self, params):
-        FlexibleOperator(params).build_operator(self.flexible_operator)
 
     def build(self, dag_id):
         if self.config.get('enabled', False):
@@ -30,7 +26,7 @@ class PipelineDagFactory(DagFactory):
             self.config['date_range'] = ','.join(self.source_date_range())
             source_sensors = self.source_table_sensors(dag)
 
-            publish_events_bigquery = self.build_docker_image_task({
+            publish_events_bigquery = self.build_docker_task({
                 'task_id': 'publish_events_bigquery',
                 'pool': 'bigquery',
                 'depends_on_past': True,
@@ -52,7 +48,7 @@ class PipelineDagFactory(DagFactory):
                 dag >> sensor >> publish_events_bigquery
 
             if self.config.get('publish_to_postgres', False):
-                publish_events_postgres = self.build_docker_image_task({
+                publish_events_postgres = self.build_docker_task({
                     'task_id': 'publish_events_postgres',
                     'pool': 'postgres',
                     'docker_run': self.config['docker_run'],

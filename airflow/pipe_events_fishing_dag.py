@@ -19,10 +19,6 @@ class PipelineDagFactory(DagFactory):
             extra_config=config_tools.load_config(subpipeline_config_key),
             interval=interval
         )
-        self.flexible_operator = Variable.get('PLEXIBLE_OPERATOR')
-
-    def build_docker_image_task(self, params):
-        FlexibleOperator(params).build_operator(self.flexible_operator)
 
     def source_date_range(self):
         # The scored messages only have logistic scores for a couple of days
@@ -65,7 +61,7 @@ class PipelineDagFactory(DagFactory):
             self.config['date_range'] = ','.join(self.source_date_range())
             source_sensors = self.source_table_sensors(dag)
 
-            publish_events_bigquery = self.build_docker_image_task({
+            publish_events_bigquery = self.build_docker_task({
                 'task_id': 'publish_events_bigquery',
                 'pool': 'bigquery',
                 'depends_on_past': True,
