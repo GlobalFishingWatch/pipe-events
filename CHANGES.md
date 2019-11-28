@@ -10,14 +10,22 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ### Changed
 
-- Added the `SAFE.` in the BQ fishing event scripts since with some coordinates for VMS it was throwing the `results in precision loss of more than 1mm` error. 
+* Added the `SAFE.` in the BQ fishing event scripts since with some coordinates
+  for VMS it was throwing the `results in precision loss of more than 1mm`
+  error. 
+* [#1163](https://github.com/GlobalFishingWatch/GFW-Tasks/issues/1163):
+  Consolidates the functionality from the carrier portal queries into the
+  regular events. Adds a new event dag which contains the carrier-spefic
+  encounters. Adds new functionality to enable or disable specific event types
+  from an installation. Adds new functionality which allows an installation to
+  specify source filters for a given event type.
 
 ## v1.4.1 - 2019-09-10
 
 ### Added
 
 * [1125](https://github.com/GlobalFishingWatch/pipe-events/pull/1125): Adds
-    a flag to indicate if we want to publish the results on postgres.
+  a flag to indicate if we want to publish the results on postgres.
 
 ## v1.4.0 - 2019-08-29
 
