@@ -7,18 +7,22 @@ from airflow_ext.gfw.operators.helper.flexible_operator import FlexibleOperator
 
 from datetime import datetime, timedelta
 
-import sys
-import os
-# https://stackoverflow.com/questions/50150384/importing-local-module-python-script-in-airflow-dag
-# can not import under dag_folder from an easy way
-sys.path.insert(0,os.path.abspath(os.path.dirname(__file__)))
-from pipe_events_dag import PipelineEventsDagFactory
+PIPELINE = 'pipe_events'
+SUBPIPELINE = 'fishing'
 
 
-class PipelineDagFactory(PipelineEventsDagFactory):
-    def __init__(self, fishing_config, **kwargs):
-        super(PipelineDagFactory, self).__init__(**kwargs)
-        self.fishing_config = fishing_config
+class PipelineDagFactory(DagFactory):
+    def __init__(self, interval):
+        subpipeline_config_key = '{}.{}'.format(PIPELINE, SUBPIPELINE)
+        super(DagFactory, self).__init__(
+            pipeline=PIPELINE,
+            extra_config=config_tools.load_config(subpipeline_config_key),
+            interval=interval
+        )
+        self.flexible_operator = Variable.get('PLEXIBLE_OPERATOR')
+
+    def build_docker_image_task(self, params):
+        FlexibleOperator(params).build_operator(self.flexible_operator)
 
     def source_date_range(self):
         # The scored messages only have logistic scores for a couple of days
@@ -54,61 +58,61 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                 self.schedule_interval))
 
     def build(self, dag_id):
-        config = self.config.copy()
-        config.update(self.fishing_config)
-        config['date_range'] = ','.join(self.source_date_range())
+        if self.config.get('enabled', False):
+            return
 
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
-            self.config = config
+            self.config['date_range'] = ','.join(self.source_date_range())
             source_sensors = self.source_table_sensors(dag)
-            publish_to_postgres = config.get('publish_to_postgres',False)
 
-            publish_events_bigquery_params = {
-                'task_id':'publish_events_bigquery',
-                'pool':'bigquery',
-                'depends_on_past':True,
-                'docker_run':'{docker_run}'.format(**config),
-                'image':'{docker_image}'.format(**config),
-                'name':'fishing-publish-events-bigquery',
-                'dag':dag,
-                'arguments':['generate_fishing_events',
-                             '{date_range}'.format(**config),
-                             '{project_id}:{source_dataset}.{source_table}'.format(**config),
-                             '{project_id}:{source_dataset}.{segment_vessel}'.format(**config),
-                             '{project_id}:{source_dataset}.{segment_info}'.format(**config),
-                             '{project_id}:{source_dataset}.{vessel_info}'.format(**config),
-                             '{project_id}:{events_dataset}.{events_table}'.format(**config),
-                             '{min_event_duration}'.format(**config)]
-            }
-            publish_events_bigquery = FlexibleOperator(publish_events_bigquery_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
-
-            publish_events_postgres_params = {
-                'task_id':'publish_events_postgres',
-                'pool':'postgres',
-                'docker_run':'{docker_run}'.format(**config),
-                'image':'{docker_image}'.format(**config),
-                'name':'fishing-publish-events-postgres',
-                'dag':dag,
-                'arguments':['publish_postgres',
-                             '{date_range}'.format(**config),
-                             '{project_id}:{events_dataset}.{events_table}'.format(**config),
-                             '{temp_bucket}'.format(**config),
-                             '{postgres_instance}'.format(**config),
-                             '{postgres_connection_string}'.format(**config),
-                             '{postgres_table}'.format(**config),
-                             'fishing']
-            }
+            publish_events_bigquery = self.build_docker_image_task({
+                'task_id': 'publish_events_bigquery',
+                'pool': 'bigquery',
+                'depends_on_past': True,
+                'docker_run': self.config['docker_run'],
+                'image': self.config['docker_image'],
+                'name': 'fishing-publish-events-bigquery',
+                'dag': dag,
+                'arguments': map(lambda x: x.format(**self.config), [
+                    'generate_fishing_events',
+                    '{date_range}',
+                    '{project_id}:{source_dataset}.{source_table}',
+                    '{project_id}:{source_dataset}.{segment_vessel}',
+                    '{project_id}:{source_dataset}.{segment_info}',
+                    '{project_id}:{source_dataset}.{vessel_info}',
+                    '{project_id}:{events_dataset}.{events_table}',
+                    '{min_event_duration}'
+                ])
+            })
 
             for sensor in source_sensors:
                 dag >> sensor >> publish_events_bigquery
 
-            if publish_to_postgres:
-                publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
+            if self.config.get('publish_to_postgres', False):
+                publish_events_postgres = self.build_docker_image({
+                    'task_id': 'publish_events_postgres',
+                    'pool': 'postgres',
+                    'docker_run': self.config['docker_run'],
+                    'image': self.config['docker_image'],
+                    'name': 'fishing-publish-events-postgres',
+                    'dag': dag,
+                    'arguments': map(lambda x: x.format(**self.config), [
+                        'publish_postgres',
+                        '{date_range}',
+                        '{project_id}:{events_dataset}.{events_table}',
+                        '{temp_bucket}',
+                        '{postgres_instance}',
+                        '{postgres_connection_string}',
+                        '{postgres_table}',
+                        'fishing'
+                    ])
+                })
                 publish_events_bigquery >> publish_events_postgres
 
             return dag
 
-fishing_config = config_tools.load_config('pipe_events.fishing')
-events_fishing_daily_dag = PipelineDagFactory(fishing_config).build('pipe_events_daily.fishing')
-events_fishing_monthly_dag = PipelineDagFactory(fishing_config, schedule_interval='@monthly').build('pipe_events_monthly.fishing')
-events_fishing_yearly_dag = PipelineDagFactory(fishing_config, schedule_interval='@yearly').build('pipe_events_yearly.fishing')
+
+for interval in ['daily', 'monthly', 'yearly']:
+    dag_id = '{}_{}.{}'.format(PIPELINE, interval, SUBPIPELINE)
+    interval = '@{}'.format(interval)
+    globals()[dag_id] = PipelineDagFactory(interval).build(dag_id)

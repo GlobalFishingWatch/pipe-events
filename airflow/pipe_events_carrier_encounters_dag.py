@@ -6,7 +6,7 @@ from airflow_ext.gfw.models import DagFactory
 from airflow_ext.gfw.operators.helper.flexible_operator import FlexibleOperator
 
 PIPELINE = 'pipe_events'
-SUBPIPELINE = 'encounters'
+SUBPIPELINE = 'carrier_encounters'
 
 
 class PipelineDagFactory(DagFactory):
@@ -38,7 +38,7 @@ class PipelineDagFactory(DagFactory):
                 'name': 'encounters-publish-events-bigquery',
                 'dag': dag,
                 'arguments': map(lambda x: x.format(**self.config), [
-                    'generate_encounter_events',
+                    'generate_carrier_encounter_events',
                     ':{source_query}',
                     '{project_id}:{source_dataset}.{vessel_info}',
                     '{project_id}:{events_dataset}.{events_table}'
