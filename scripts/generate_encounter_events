@@ -5,7 +5,8 @@ THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 # source ${THIS_SCRIPT_DIR}/pipeline.sh
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
-  SOURCE_QUERY \
+  SOURCE_TABLE \
+  SOURCE_FILTER \
   VESSEL_INFO \
   SPATIAL_MEASURES \
   COUNTRY_CODES \
@@ -19,7 +20,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 SOURCE_QUERY VESSEL_INFO SPATIAL_MEASURES COUNTRY_CODES VOYAGES NAMED_ANCHORAGES MAX_MEDIAN_SPEED_KNOTS DEST_TABLE"
+  echo -e "\nUsage:\n$0 SOURCE_TABLE SOURCE_FILTER VESSEL_INFO SPATIAL_MEASURES COUNTRY_CODES VOYAGES NAMED_ANCHORAGES MAX_MEDIAN_SPEED_KNOTS DEST_TABLE"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -36,7 +37,8 @@ for index in ${!ARGS[*]}; do
 done
 
 echo "Running $0"
-echo "  SOURCE_QUERY: $SOURCE_QUERY"
+echo "  SOURCE_TABLE: $SOURCE_TABLE"
+echo "  SOURCE_FILTER: $SOURCE_FILTER"
 echo "  VESSEL_INFO: $VESSEL_INFO"
 echo "  SPATIAL_MEASURES: $SPATIAL_MEASURES"
 echo "  COUNTRY_CODES: $COUNTRY_CODES"
@@ -50,7 +52,7 @@ echo "  DEST_TABLE: $DEST_TABLE"
 echo "Ensuring events table ${DEST_TABLE} exists"
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${SOURCE_QUERY}"
+  "* Source: ${SOURCE_TABLE}"
   "* Command:"
   "$(basename $0)"
   "$@"
@@ -73,7 +75,8 @@ echo "  Events table exists"
 echo "Regenerating records"
 SQL=${ASSETS}/bigquery/encounter-events.sql.j2
 jinja2 ${SQL} \
-  -D source_query=${SOURCE_QUERY//:/.} \
+  -D source_table=${SOURCE_TABLE//:/.} \
+  -D source_filter=${SOURCE_FILTER} \
   -D vessel_info=${VESSEL_INFO//:/.} \
   -D spatial_measures=${SPATIAL_MEASURES//:/.} \
   -D country_codes=${COUNTRY_CODES//:/.} \

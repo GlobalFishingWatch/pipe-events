@@ -13,7 +13,7 @@ WITH
     lon,
     ifnull(nnet_score, logistic_score) AS score
   FROM
-    `{{ source_table }}`
+    `{{ source_table }}*`
   WHERE
     _TABLE_SUFFIX BETWEEN '{{ start_yyyymmdd }}'
     AND '{{ end_yyyymmdd }}'

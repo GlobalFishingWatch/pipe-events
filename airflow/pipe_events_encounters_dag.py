@@ -35,8 +35,14 @@ class PipelineDagFactory(DagFactory):
                 'dag': dag,
                 'arguments': map(lambda x: x.format(**self.config), [
                     'generate_encounter_events',
-                    ':{source_query}',
+                    '{project_id}:{source_dataset}.{source_table}',
+                    '{source_filter}',
                     '{project_id}:{source_dataset}.{vessel_info}',
+                    '{project_id}:{spatial_measures_table}',
+                    '{project_id}:{country_codes_table}',
+                    '{project_id}:{source_dataset}.{voyages}',
+                    '{project_id}:{named_anchorages_table}',
+                    '{max_median_speed_knots}',
                     '{project_id}:{events_dataset}.{events_table}'
                 ])
             })

@@ -19,7 +19,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_QUERY SOURCE_FILTER DEST_TABLE SEGMENT_VESSEL VESSEL_INFO MIN_POS_COUNT MIN_DIST\n"
+	echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE SOURCE_FILTER DEST_TABLE SEGMENT_VESSEL VESSEL_INFO MIN_POS_COUNT MIN_DIST\n"
 	}
 
 
@@ -57,7 +57,7 @@ echo "  MIN_DIST: $MIN_DIST"
 echo "Ensuring events table ${DEST_TABLE} exists"
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${SOURCE_QUERY}"
+  "* Source: ${SOURCE_TABLE}"
   "* Command:"
   "$(basename $0)"
   "$@"

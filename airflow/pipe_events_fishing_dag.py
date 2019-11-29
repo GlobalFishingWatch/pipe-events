@@ -73,6 +73,7 @@ class PipelineDagFactory(DagFactory):
                     'generate_fishing_events',
                     '{date_range}',
                     '{project_id}:{source_dataset}.{source_table}',
+                    '{source_filter}',
                     '{project_id}:{source_dataset}.{segment_vessel}',
                     '{project_id}:{source_dataset}.{segment_info}',
                     '{project_id}:{source_dataset}.{vessel_info}',

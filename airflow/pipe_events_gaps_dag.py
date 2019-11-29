@@ -56,6 +56,7 @@ class PipelineDagFactory(DagFactory):
                     'generate_gap_events',
                     '{date_range}',
                     '{project_id}:{source_dataset}.{source_table}',
+                    '{source_filter}',
                     '{project_id}:{events_dataset}.{events_table}',
                     '{project_id}:{source_dataset}.{segment_vessel}',
                     '{project_id}:{source_dataset}.{vessel_info}',

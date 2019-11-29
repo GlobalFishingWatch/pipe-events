@@ -37,9 +37,10 @@ class PipelineDagFactory(DagFactory):
                 'arguments': map(lambda x: x.format(**self.config), [
                     'generate_anchorage_events',
                     '{date_range}',
-                    '{source_query}',
+                    '{project_id}:{source_dataset}.{source_table}',
+                    '{source_filter}',
                     '{project_id}:{source_dataset}.{vessel_info}',
-                    '{project_id}:{anchorages_dataset}.{named_anchorages}',
+                    '{project_id}:{named_anchorages_table}',
                     '{project_id}:{events_dataset}.{events_table}'
                 ])
             })
@@ -74,4 +75,6 @@ class PipelineDagFactory(DagFactory):
 for interval in ['daily', 'monthly', 'yearly']:
     dag_id = '{}_{}.{}'.format(PIPELINE, interval, SUBPIPELINE)
     interval = '@{}'.format(interval)
-    globals()[dag_id] = PipelineDagFactory(interval).build(dag_id)
+    dag = PipelineDagFactory(interval).build(dag_id)
+    if dag is not None:
+        globals()[dag_id] = dag

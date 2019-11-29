@@ -7,7 +7,7 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
   SOURCE_TABLE \
-  SOURCE_QUERY \
+  SOURCE_FILTER \
   SEGMENT_VESSEL \
   SEGMENT_INFO \
   VESSEL_INFO \
@@ -55,7 +55,7 @@ echo "  MIN_DURATION: $MIN_DURATION"
 echo "Ensuring events table ${DEST_TABLE} exists"
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${SOURCE_QUERY}"
+  "* Source: ${SOURCE_TABLE}"
   "* Command:"
   "$(basename $0)"
   "$@"

@@ -35,8 +35,16 @@ class PipelineDagFactory(DagFactory):
                 'dag': dag,
                 'arguments': map(lambda x: x.format(**self.config), [
                     'generate_carrier_encounter_events',
-                    ':{source_query}',
-                    '{project_id}:{source_dataset}.{vessel_info}',
+                    '{project_id}:{source_dataset}.{source_table}',
+                    '{source_filter}',
+                    '{project_id}:{source_dataset}.{vesel_info}',
+                    '{project_id}:{all_vessels_table}',
+                    '{project_id}:{spatial_measures_table}',
+                    '{project_id}:{country_codes_table}',
+                    '{project_id}:{source_dataset}.{voyages}',
+                    '{project_id}:{named_anchorages_table}',
+                    '{project_id}:{fishing_vessels_table}',
+                    '{max_median_speed_knots}',
                     '{project_id}:{events_dataset}.{events_table}'
                 ])
             })
@@ -70,4 +78,6 @@ class PipelineDagFactory(DagFactory):
 for interval in ['daily', 'monthly', 'yearly']:
     dag_id = '{}_{}.{}'.format(PIPELINE, interval, SUBPIPELINE)
     interval = '@{}'.format(interval)
-    globals()[dag_id] = PipelineDagFactory(interval).build(dag_id)
+    dag = PipelineDagFactory(interval).build(dag_id)
+    if dag is not None:
+        globals()[dag_id] = dag
