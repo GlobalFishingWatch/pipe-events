@@ -111,5 +111,5 @@ class PipelineDagFactory(DagFactory):
 
 for interval in ['daily', 'monthly', 'yearly']:
     dag_id = '{}_{}.{}'.format(PIPELINE, interval, SUBPIPELINE)
-    interval = '@{}'.format(interval)
-    globals()[dag_id] = PipelineDagFactory(interval).build(dag_id)
+    interval_string = '@{}'.format(interval)
+    globals()[dag_id] = PipelineDagFactory(interval_string).build(dag_id)

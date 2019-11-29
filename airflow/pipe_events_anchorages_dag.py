@@ -74,7 +74,7 @@ class PipelineDagFactory(DagFactory):
 
 for interval in ['daily', 'monthly', 'yearly']:
     dag_id = '{}_{}.{}'.format(PIPELINE, interval, SUBPIPELINE)
-    interval = '@{}'.format(interval)
-    dag = PipelineDagFactory(interval).build(dag_id)
+    interval_string = '@{}'.format(interval)
+    dag = PipelineDagFactory(interval_string).build(dag_id)
     if dag is not None:
         globals()[dag_id] = dag

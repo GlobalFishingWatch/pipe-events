@@ -54,15 +54,15 @@ The following are settings intended to be global to all the events pipelines:
 
 The following are anchorages specific settings:
 
-* `pipe_events.fishing.source_table`: BigQuery table containing the scored messages to read from. Defaults to `port_events_`.
-* `pipe_events.fishing.source_filter`: Optional filter applied to the source table to restrict which records are processed by default. Defaults to an empty value, might be set to any WHERE clause condition, such as `vessel_id IN (...)`.
+* `pipe_events.anchorages.source_table`: BigQuery table containing the scored messages to read from. Defaults to `port_events_`.
+* `pipe_events.anchorages.source_filter`: Optional filter applied to the source table to restrict which records are processed by default. Defaults to an empty value, might be set to any WHERE clause condition, such as `vessel_id IN (...)`.
 * `pipe_events.anchorages.enabled`: Setting which enables or disables the anchorages pipeline. Defaults to `false`.
 * `pipe_events.anchorages.events_table`: Table to push results to. Defaults to `published_events_ports`.
 
 The following are carrier encounter specific settings:
 
-* `pipe_events.fishing.source_table`: BigQuery table containing the scored messages to read from. Defaults to `encounters`.
-* `pipe_events.fishing.source_filter`: Optional filter applied to the source table to restrict which records are processed by default. Defaults to an empty value, might be set to any WHERE clause condition, such as `vessel_id IN (...)`.
+* `pipe_events.carrier_encounters.source_table`: BigQuery table containing the scored messages to read from. Defaults to `encounters`.
+* `pipe_events.carrier_encounters.source_filter`: Optional filter applied to the source table to restrict which records are processed by default. Defaults to an empty value, might be set to any WHERE clause condition, such as `vessel_id IN (...)`.
 * `pipe_events.carrier_encounters.max_median_speed_knots`: Maximum median speed in knots for the encounters to be included in the results. Defaults to `2`.
 * `pipe_events.carrier_encounters.enabled`: Setting which enables or disables the carrier encounters pipeline. Defaults to `false`.
 * `pipe_events.carrier_encounters.fishing_vessels_table`: BigQuery dataset and table containing the list of fishing vessels to use. Only encounters between a carrier and one of these fishing vessels are going to be included in the results. Defaults to `proj_carrier_portal_pew.carrier_portal_fishing_vessels_v20190916`.
@@ -70,8 +70,8 @@ The following are carrier encounter specific settings:
 
 The following are encounter specific settings:
 
-* `pipe_events.fishing.source_table`: BigQuery table containing the scored messages to read from. Defaults to `encounters`.
-* `pipe_events.fishing.source_filter`: Optional filter applied to the source table to restrict which records are processed by default. Defaults to an empty value, might be set to any WHERE clause condition, such as `vessel_id IN (...)`.
+* `pipe_events.encounters.source_table`: BigQuery table containing the scored messages to read from. Defaults to `encounters`.
+* `pipe_events.encounters.source_filter`: Optional filter applied to the source table to restrict which records are processed by default. Defaults to an empty value, might be set to any WHERE clause condition, such as `vessel_id IN (...)`.
 * `pipe_events.encounters.max_median_speed_knots`: Maximum median speed in knots for the encounters to be included in the results. Defaults to `2`.
 * `pipe_events.encounters.enabled`: Setting which enables or disables the encounters pipeline. Defaults to `false`.
 * `pipe_events.encounters.events_table`: BigQuery table to publish the encounters to. Defaults to `published_events_encounters`.
