@@ -177,8 +177,8 @@ WITH
       encounters.start_time) = fishing_2.year
   WHERE
     ( vessel_database_1.is_carrier
-      AND fishing_2.ssvid IS NOT NULL ) OR
-    ( vessel_database_2.is_carrier
+      AND fishing_2.ssvid IS NOT NULL )
+    OR ( vessel_database_2.is_carrier
       AND fishing_1.ssvid IS NOT NULL ) ),
   --
   -- Duplicate encounters so that we have an event for each vessel.
@@ -191,7 +191,12 @@ WITH
     vessel_2_id AS encountered_vessel_id,
     vessel_2_is_carrier AS encountered_vessel_is_carrier,
     CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t", vessel_1_id, vessel_2_id, start_time, end_time))), ".1" ) AS event_id,
-    * EXCEPT(vessel_1_id, vessel_1_is_carrier, vessel_1_registry, vessel_2_id, vessel_2_is_carrier, vessel_2_registry)
+    * EXCEPT(vessel_1_id,
+      vessel_1_is_carrier,
+      vessel_1_registry,
+      vessel_2_id,
+      vessel_2_is_carrier,
+      vessel_2_registry)
   FROM
     filtered_encounters
   UNION ALL
@@ -202,7 +207,12 @@ WITH
     vessel_1_id AS encountered_vessel_id,
     vessel_1_is_carrier AS encountered_vessel_is_carrier,
     CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t", vessel_1_id, vessel_2_id, start_time, end_time))), ".2" ) AS event_id,
-    * EXCEPT(vessel_1_id, vessel_1_is_carrier, vessel_1_registry, vessel_2_id, vessel_2_is_carrier, vessel_2_registry)
+    * EXCEPT(vessel_1_id,
+      vessel_1_is_carrier,
+      vessel_1_registry,
+      vessel_2_id,
+      vessel_2_is_carrier,
+      vessel_2_registry)
   FROM
     filtered_encounters ),
   --
@@ -223,7 +233,12 @@ WITH
     -- Only include authorizations records from whitelisted rfmos
     is_whitelisted_rfmo(extract_rfmo_from_list_uvi(list_uvi))
     AND authorized_from IS NOT NULL
-    AND authorized_to IS NOT NULL),
+    AND authorized_to IS NOT NULL
+  GROUP BY
+    vessel_id,
+    rfmo,
+    authorized_from,
+    authorized_to),
   --
   -- Include additional information on the final event, such as basic vessel
   -- information for each vessel involved in the encounter or regional and
@@ -332,7 +347,7 @@ WITH
   LEFT JOIN
     authorizations AS encountered_vessel_authorization
   ON
-    encounters.vessel_id = encountered_vessel_authorization.vessel_id
+    encounters.encountered_vessel_id = encountered_vessel_authorization.vessel_id
     AND rfmo = encountered_vessel_authorization.rfmo
     AND encounters.start_time > encountered_vessel_authorization.authorized_from
     AND encounters.end_time < encountered_vessel_authorization.authorized_to
@@ -369,11 +384,13 @@ WITH
     --
     --  * If all the records for a given event_id have all fields with
     --  non-null values, it happened inside one or more rfmos of the
-    --  interesting rfmos and all the involved vessels were authorized.  
+    --  interesting rfmos and all the involved vessels were authorized.
     --
     --  * Any other case means it's an unauthorized encounter
     LOGICAL_AND(encounter_authorizations.rfmo IS NULL)
-    OR LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND encounter_authorizations.authorized_rfmo IS NOT NULL AND encounter_authorizations.encountered_vessel_authorized_rfmo IS NOT NULL) AS is_authorized,
+    OR LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL
+      AND encounter_authorizations.authorized_rfmo IS NOT NULL
+      AND encounter_authorizations.encountered_vessel_authorized_rfmo IS NOT NULL) AS is_authorized,
     -- We also compute authorization status. We are talking about 3 different
     -- values here:
     --
@@ -386,7 +403,9 @@ WITH
     --  all of the regions it is happening in.
     CASE
       WHEN LOGICAL_AND(encounter_authorizations.rfmo IS NULL) OR LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND encounter_authorizations.authorized_rfmo IS NOT NULL AND encounter_authorizations.encountered_vessel_authorized_rfmo IS NOT NULL) THEN 'authorized'
-      WHEN LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND encounter_authorizations.authorized_rfmo IS NULL AND encounter_authorizations.encountered_vessel_authorized_rfmo IS NULL) THEN 'unauthorized'
+      WHEN LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL
+      AND encounter_authorizations.authorized_rfmo IS NULL
+      AND encounter_authorizations.encountered_vessel_authorized_rfmo IS NULL) THEN 'unauthorized'
     ELSE
     'partial'
   END
@@ -406,7 +425,7 @@ WITH
   GROUP BY
     event_id),
   --
-  -- Join the original encounters each with their authorization status. 
+  -- Join the original encounters each with their authorization status.
   --
   complete_encounter_with_authorizations AS (
   SELECT
