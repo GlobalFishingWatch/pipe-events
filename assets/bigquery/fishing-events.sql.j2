@@ -39,7 +39,7 @@ WITH
   SELECT
     seg_id,
     timestamp,
-    ST_GEOGPOINT(lon, lat) AS point,
+    SAFE.ST_GEOGPOINT(lon, lat) AS point,
     lat,
     lon,
     ifnull(nnet_score, logistic_score) AS score
