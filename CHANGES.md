@@ -8,6 +8,8 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v1.4.2 - 2019-09-19
+
 ### Changed
 
 - Added the `SAFE.` in the BQ fishing event scripts since with some coordinates for VMS it was throwing the `results in precision loss of more than 1mm` error. 
