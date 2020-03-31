@@ -1,9 +1,7 @@
 from airflow import DAG
-from airflow.models import Variable
 
 from airflow_ext.gfw import config as config_tools
 from airflow_ext.gfw.models import DagFactory
-from airflow_ext.gfw.operators.helper.flexible_operator import FlexibleOperator
 
 import sys
 import os
@@ -28,7 +26,7 @@ class PipelineDagFactory(PipelineEventsDagFactory):
             source_sensors = self.source_table_sensors(dag)
             publish_to_postgres = config.get('publish_to_postgres',False)
 
-            publish_events_bigquery_params = {
+            publish_events_bigquery = self.build_docker_task({
                 'task_id':'publish_events_bigquery',
                 'pool':'bigquery',
                 'depends_on_past':True,
@@ -42,31 +40,29 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                              '{project_id}:{source_dataset}.{vessel_info}'.format(**config),
                              '{project_id}:{anchorages_dataset}.{named_anchorages}'.format(**config),
                              '{project_id}:{events_dataset}.{events_table}'.format(**config)]
-            }
-            publish_events_bigquery = FlexibleOperator(publish_events_bigquery_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
+            })
 
-            publish_events_postgres_params = {
-                'task_id':'publish_events_postgres',
-                'pool':'postgres',
-                'docker_run':'{docker_run}'.format(**config),
-                'image':'{docker_image}'.format(**config),
-                'name':'anchorages-publish-events-postgres',
-                'dag':dag,
-                'arguments':['publish_postgres',
-                             '{date_range}'.format(**config),
-                             '{project_id}:{events_dataset}.{events_table}'.format(**config),
-                             '{temp_bucket}'.format(**config),
-                             '{postgres_instance}'.format(**config),
-                             '{postgres_connection_string}'.format(**config),
-                             '{postgres_table}'.format(**config),
-                             'port']
-            }
 
             for sensor in source_sensors:
                 dag >> sensor >> publish_events_bigquery
 
             if publish_to_postgres:
-                publish_events_postgres = FlexibleOperator(publish_events_postgres_params).build_operator(Variable.get('FLEXIBLE_OPERATOR'))
+                publish_events_postgres = self.build_docker_task({
+                    'task_id':'publish_events_postgres',
+                    'pool':'postgres',
+                    'docker_run':'{docker_run}'.format(**config),
+                    'image':'{docker_image}'.format(**config),
+                    'name':'anchorages-publish-events-postgres',
+                    'dag':dag,
+                    'arguments':['publish_postgres',
+                                 '{date_range}'.format(**config),
+                                 '{project_id}:{events_dataset}.{events_table}'.format(**config),
+                                 '{temp_bucket}'.format(**config),
+                                 '{postgres_instance}'.format(**config),
+                                 '{postgres_connection_string}'.format(**config),
+                                 '{postgres_table}'.format(**config),
+                                 'port']
+                })
                 publish_events_bigquery >> publish_events_postgres
 
             return dag
