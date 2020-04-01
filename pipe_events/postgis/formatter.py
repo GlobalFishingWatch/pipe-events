@@ -31,8 +31,8 @@ with open(csv_file, "wb+") as f:
                 record.get('event_end'),
                 record['event_info'],
                 b''.join([s.encode('utf-8') for s in record['event_vessels']]),
-                normalized_geography,
-                normalized_mean_position
+                normalized_geography.encode('utf-8'),
+                normalized_mean_position.encode('utf-8')
             ])
         except:
             print("Unable to convert record to csv at {}".format(record))
