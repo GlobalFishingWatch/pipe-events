@@ -30,7 +30,7 @@ with open(csv_file, "wb+") as f:
                 record['event_start'],
                 record.get('event_end'),
                 record['event_info'],
-                ''.join([s.encode('utf-8') for s in record['event_vessels']]),
+                (b''.join([s.encode('utf-8') for s in record['event_vessels']])).decode('utf-8'),
                 normalized_geography,
                 normalized_mean_position
             ])
