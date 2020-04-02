@@ -21,11 +21,11 @@ package = __import__('pipe_events')
 DEPENDENCIES = [
     "pytest",
     "nose",
-    "ujson",
+    "ujson==1.35",
     "pytz",
     "udatetime",
     "newlinejson",
-    "pipe-tools==2.0.0",
+    "pipe-tools==3.1.1",
     "jinja2-cli",
     "statistics"
 ]
