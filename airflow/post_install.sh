@@ -22,6 +22,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
     pipe_events.gaps \
+    dag_install_path="${THIS_SCRIPT_DIR}" \
     source_table="position_messages_" \
     events_table="published_events_gaps" \
     segment_vessel="segment_vessel" \
@@ -32,6 +33,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
     pipe_events.encounters \
+    dag_install_path="${THIS_SCRIPT_DIR}" \
     source_table="encounters" \
     vessel_info="vessel_info" \
     events_table="published_events_encounters" \
@@ -39,6 +41,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
     pipe_events.anchorages \
+    dag_install_path="${THIS_SCRIPT_DIR}" \
     source_table="port_events_" \
     vessel_info="vessel_info" \
     events_table="published_events_ports" \
@@ -48,6 +51,7 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
     pipe_events.fishing \
+    dag_install_path="${THIS_SCRIPT_DIR}" \
     source_table="messages_scored_" \
     segment_vessel="segment_vessel" \
     segment_info="segment_info" \

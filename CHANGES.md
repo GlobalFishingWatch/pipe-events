@@ -8,6 +8,13 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v3.0.0 - 2020-04-01
+
+### Added
+
+* [GlobalFishingWatch/gfw-eng-tasks#39](https://github.com/GlobalFishingWatch/gfw-eng-tasks/issues/39): Adds
+    support to python3.7 and pipe-tools:v3.1.1 and pin ujson:1.35
+
 ## v1.4.2 - 2019-09-19
 
 ### Changed
