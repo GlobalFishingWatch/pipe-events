@@ -21,17 +21,6 @@ python $AIRFLOW_HOME/utils/set_default_variables.py \
 
 python $AIRFLOW_HOME/utils/set_default_variables.py \
     --force docker_image=$1 \
-    pipe_events.gaps \
-    dag_install_path="${THIS_SCRIPT_DIR}" \
-    source_table="position_messages_" \
-    events_table="published_events_gaps" \
-    segment_vessel="segment_vessel" \
-    vessel_info="vessel_info" \
-    gap_min_pos_count="3" \
-    gap_min_dist="10000" \
-
-python $AIRFLOW_HOME/utils/set_default_variables.py \
-    --force docker_image=$1 \
     pipe_events.encounters \
     dag_install_path="${THIS_SCRIPT_DIR}" \
     source_table="encounters" \
