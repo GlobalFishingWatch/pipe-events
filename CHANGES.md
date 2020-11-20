@@ -8,6 +8,13 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v3.0.1 - 2020-11-20
+
+### Removed
+
+* [GlobalFishingWatch/gfw-eng-tasks#206](https://github.com/GlobalFishingWatch/gfw-eng-tasks/issues/206):
+  removes the gaps query that it was marked as deprecated and are not in use.
+
 ## v3.0.0 - 2020-04-01
 
 ### Added
