@@ -10,21 +10,21 @@
 # A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
 # messages with score=null are ignored
 
-#INSERT INTO
-#  `{{ dest }}` ( event_id,
-#    event_type,
-#    vessel_id,
-#    event_start,
-#    event_end,
-#    lat_mean,
-#    lon_mean,
-#    lat_min,
-#    lat_max,
-#    lon_min,
-#    lon_max,
-#    event_info,
-#    event_vessels,
-#    event_geography )
+INSERT INTO
+  `{{ dest }}` ( event_id,
+    event_type,
+    vessel_id,
+    event_start,
+    event_end,
+    lat_mean,
+    lon_mean,
+    lat_min,
+    lat_max,
+    lon_min,
+    lon_max,
+    event_info,
+    event_vessels,
+    event_geography )
 
 WITH
 --# Collect scored position messages
