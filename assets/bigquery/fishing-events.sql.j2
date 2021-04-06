@@ -104,15 +104,15 @@ WITH
   FROM(
     SELECT
      message_vessel_id.*,
-     vesselinfo.best.best_vessel_class AS best_best_vessel_class,
+     vesselinfo.best_vessel_class AS best_best_vessel_class,
      vesselinfo.ssvid AS main_vessel_ssvid,
      main_vessel_shipname
     FROM
      message_vessel_id
     LEFT JOIN 
-     `{{ vessel_info }}` AS vesselinfo
+     `{{ fishing_vessels }}` AS vesselinfo
     USING
-     (ssvid)
+     (ssvid, year)
     LEFT JOIN
       shipnames
     USING
