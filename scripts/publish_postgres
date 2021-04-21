@@ -1,0 +1,190 @@
+#!/bin/bash
+source pipe-tools-utils
+
+THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
+ASSETS=${THIS_SCRIPT_DIR}/../assets
+ARGS=( \
+  START_DATE \
+  END_DATE \
+  SOURCE \
+  TEMP_BUCKET \
+  DEST_PROJECT_ID \
+  DEST_DB_REGION \
+  DEST_DB_INSTANCE_NAME \
+  DEST_DATABASE \
+  DEST_DB_USER \
+  DEST_DB_PASSWORD \
+  DEST_DB_TABLE \
+  DEST_EVENT_TYPE \
+)
+
+################################################################################
+# Validate and extract arguments
+################################################################################
+display_usage() {
+  echo -e "\nUsage:\n$0 YYYY-MM-DD YYYY-MM-DD SOURCE TEMP_BUCKET DEST_PROJECT_ID DEST_DB_REGION DEST_DB_INSTANCE_NAME DEST_DATABASE DEST_DB_USER DEST_DB_PASSWORD DEST_DB_TABLE DEST_EVENT_TYPE\n"
+}
+
+if [[ $# -ne ${#ARGS[@]} ]]
+then
+    display_usage
+    exit 1
+fi
+
+ARG_VALUES=("$@")
+PARAMS=()
+for index in ${!ARGS[*]}; do
+  echo "${ARGS[$index]}=${ARG_VALUES[$index]}"
+  declare "${ARGS[$index]}"="${ARG_VALUES[$index]}"
+done
+
+echo "Running $0"
+echo "  START DATE: $START_DATE"
+echo "  END DATE: $END_DATE"
+echo "  SOURCE: $SOURCE"
+echo "  TEMP_BUCKET: $TEMP_BUCKET"
+echo "  DEST_PROJECT_ID: $DEST_PROJECT_ID"
+echo "  DEST_DB_REGION: $DEST_PROJECT_ID"
+echo "  DEST_DB_INSTANCE_NAME: $DEST_DB_INSTANCE_NAME"
+echo "  DEST_DB_USER: $DEST_DB_USER"
+echo "  DEST_DATABASE: $DEST_DATABASE"
+echo "  DEST_DB_PASSWORD: ********"
+echo "  DEST_DB_TABLE: $DEST_DB_TABLE"
+echo "  DEST_EVENT_TYPE: $DEST_EVENT_TYPE"
+
+
+################################################################################
+# Create required variables from params
+################################################################################
+start_date_formatted="${START_DATE//-/$''}"
+end_date_formatted="${END_DATE//-/$''}"
+temporal_table=${SOURCE}_${start_date_formatted}_${end_date_formatted}
+query_source="${SOURCE//:/$'.'}"
+
+temporal_filename=temp_${start_date_formatted}_${end_date_formatted}-
+temporal_bucket_objects=gs://${TEMP_BUCKET}/pipe-events/${DEST_EVENT_TYPE}/${temporal_filename}
+
+dest_instance=${DEST_PROJECT_ID}:${DEST_DB_REGION}:${DEST_DB_INSTANCE_NAME}
+dest_connection_string="user=${DEST_DB_USER} dbname=${DEST_DATABASE} password=${DEST_DB_PASSWORD} host=127.0.0.1 sslmode=disable"
+
+
+################################################################################
+# Create temporal table
+################################################################################
+echo "Creating temporal table ${temporal_table}"
+bq rm -f -t "${temporal_table}"
+
+echo "Importing data to temporal table"
+
+echo ${ASSETS}/bigquery/get-events.sql.j2
+
+GET_EVENTS_SQL=${ASSETS}/bigquery/get-events.sql.j2
+jinja2 "${GET_EVENTS_SQL}" \
+  -D source="${query_source}" \
+  -D start_date="${START_DATE}" \
+  -D end_date="${END_DATE}" \
+  | bq query --destination_table "${temporal_table}" --use_legacy_sql=false
+
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to generate the temporal table ${temporal_table} from ${START_DATE} to ${END_DATE}"
+  exit 1
+fi
+
+################################################################################
+# Export events to csv
+################################################################################
+echo "Exporting data from temporal table [${temporal_table}] to the temporal bucket [${temporal_bucket_objects}]"
+bq extract \
+  --destination_format CSV \
+  --compression GZIP \
+  --print_header=false \
+  ${temporal_table} \
+  "${temporal_bucket_objects}*.csv.gz"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to extract data from temporal table ${temporal_table}"
+  exit 1
+fi
+
+#################################################################################
+## Delete intermediate table
+#################################################################################
+echo "Removing temporal table [${temporal_table}]"
+bq rm -f -t "${temporal_table}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to remove temporal table ${temporal_table}"
+  exit 1
+fi
+
+
+################################################################################
+# Start the cloudsql proxy
+################################################################################
+echo "Starting the cloudsql proxy"
+cloud_sql_proxy -instances=${dest_instance}=tcp:0.0.0.0:5432 &
+sleep 5
+
+
+
+################################################################################
+# Setup postgres db
+################################################################################
+echo "Setting up database for data import"
+SETUP_SQL=${ASSETS}/postgres/setup.j2.sql
+jinja2 ${SETUP_SQL} \
+  -D table_name=${DEST_DB_TABLE} \
+  -D event_type=${DEST_EVENT_TYPE} \
+  | psql -v ON_ERROR_STOP=ON "${dest_connection_string}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to set database up for data import"
+  exit 1
+fi
+
+
+################################################################################
+# List objects, import data and delete object
+################################################################################
+echo "Listing objects from [${temporal_bucket_objects}]"
+objects="$(gsutil ls -r ${temporal_bucket_objects}*)"
+
+for object in $objects
+do
+    if [ "$object" != gs://${TEMP_BUCKET}/pipe-events/${DEST_EVENT_TYPE}/: ];
+    then
+
+      echo "Importing ${object}"
+      gcloud sql import csv -q \
+        "${DEST_DB_INSTANCE_NAME}" \
+        "${object}" \
+        --database=${DEST_DATABASE} \
+        --table="${DEST_DB_TABLE}"
+      if [ "$?" -ne 0 ]; then
+        echo "  Unable to import data from bucket ${object} to ${DEST_DATABASE}.${DEST_DB_TABLE}"
+        exit 1
+      fi
+
+
+      echo "Deleting ${object}"
+      gsutil rm "$object"
+      if [ "$?" -ne 0 ]; then
+        echo "  Unable to remove object ${object}"
+        exit 1
+      fi
+
+    fi
+done
+
+
+################################################################################
+# Index data
+################################################################################
+echo "Indexing data"
+INDEX_SQL=${ASSETS}/postgres/index.j2.sql
+jinja2 ${INDEX_SQL} \
+  -D table_name=${DEST_DB_TABLE} \
+  | psql -v ON_ERROR_STOP=ON "${dest_connection_string}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to set up indices for imported data"
+  exit 1
+fi
+
+echo "  Done importing data"
