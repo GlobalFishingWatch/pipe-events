@@ -19,7 +19,11 @@ class PipelineDagFactory(PipelineEventsDagFactory):
     def build(self, dag_id):
         config = self.config.copy()
         config.update(self.anchorages_config)
-        config['date_range'] = ','.join(self.source_date_range())
+
+        range=self.source_date_range()
+        config['date_range'] = range[0] + ',' + range[1]
+        config['start_date'] = range[0]
+        config['end_date'] = range[1]
 
         with DAG(dag_id, schedule_interval=self.schedule_interval, default_args=self.default_args) as dag:
             self.config = config
@@ -55,12 +59,17 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                     'name':'anchorages-publish-events-postgres',
                     'dag':dag,
                     'arguments':['publish_postgres',
-                                 '{date_range}'.format(**config),
+                                 '{start_date}'.format(**config),
+                                 '{end_date}'.format(**config),
                                  '{project_id}:{events_dataset}.{events_table}'.format(**config),
                                  '{temp_bucket}'.format(**config),
-                                 '{postgres_instance}'.format(**config),
-                                 '{postgres_connection_string}'.format(**config),
-                                 '{postgres_table}'.format(**config),
+                                 '{project_id}'.format(**config),
+                                 '{postgres_database_region}'.format(**config),
+                                 '{postgres_db_instance_name}'.format(**config),
+                                 '{postgres_database}'.format(**config),
+                                 '{postgres_db_user}'.format(**config),
+                                 '{postgres_db_password}'.format(**config),
+                                 '{postgres_db_table}'.format(**config),
                                  'port']
                 })
                 publish_events_bigquery >> publish_events_postgres
