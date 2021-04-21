@@ -1,0 +1,18 @@
+#standardSQL
+
+#
+# Get Events
+#
+# Get the events including the required properties to import in postgres
+#
+
+SELECT
+   event_id,
+   event_type,
+   vessel_id,
+   event_start,
+   event_end,
+   event_info,
+   event_vessels
+FROM `{{ source }}`
+WHERE event_start >= '{{ start_date }}' AND event_start <= '{{ end_date }}'
