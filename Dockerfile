@@ -8,10 +8,10 @@ WORKDIR /opt/project
 # https://hub.docker.com/r/google/cloud-sdk/~/dockerfile/
 ENV CLOUD_SDK_APT_DEPS="curl gcc python-dev python-setuptools apt-transport-https lsb-release openssh-client git"
 ENV CLOUD_SDK_PIP_DEPS="crcmod"
-ENV CLOUD_SDK_VERSION="268.0.0"
+ENV CLOUD_SDK_VERSION="335.0.0"
 RUN  \
   apt-get -y update && \
-  apt-get install -y $CLOUD_SDK_APT_DEPS && \
+  apt-get install -y $CLOUD_SDK_APT_DEPS uuid-runtime && \
   pip install -U $CLOUD_SDK_PIP_DEPS && \
   export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
   echo "deb https://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
