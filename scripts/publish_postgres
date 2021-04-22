@@ -44,7 +44,7 @@ echo "  END DATE: $END_DATE"
 echo "  SOURCE: $SOURCE"
 echo "  TEMP_BUCKET: $TEMP_BUCKET"
 echo "  DEST_PROJECT_ID: $DEST_PROJECT_ID"
-echo "  DEST_DB_REGION: $DEST_PROJECT_ID"
+echo "  DEST_DB_REGION: $DEST_DB_REGION"
 echo "  DEST_DB_INSTANCE_NAME: $DEST_DB_INSTANCE_NAME"
 echo "  DEST_DB_USER: $DEST_DB_USER"
 echo "  DEST_DATABASE: $DEST_DATABASE"
@@ -76,7 +76,7 @@ bq rm -f -t "${temporal_table}"
 
 echo "Importing data to temporal table"
 
-echo ${ASSETS}/bigquery/get-events.sql.j2
+echo "${ASSETS}"/bigquery/get-events.sql.j2
 
 GET_EVENTS_SQL=${ASSETS}/bigquery/get-events.sql.j2
 jinja2 "${GET_EVENTS_SQL}" \
@@ -98,7 +98,7 @@ bq extract \
   --destination_format CSV \
   --compression GZIP \
   --print_header=false \
-  ${temporal_table} \
+  "${temporal_table}" \
   "${temporal_bucket_objects}*.csv.gz"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to extract data from temporal table ${temporal_table}"
@@ -120,7 +120,7 @@ fi
 # Start the cloudsql proxy
 ################################################################################
 echo "Starting the cloudsql proxy"
-cloud_sql_proxy -instances=${dest_instance}=tcp:0.0.0.0:5432 &
+cloud_sql_proxy -instances="${dest_instance}"=tcp:0.0.0.0:5432 &
 sleep 5
 
 
@@ -130,9 +130,11 @@ sleep 5
 ################################################################################
 echo "Setting up database for data import"
 SETUP_SQL=${ASSETS}/postgres/setup.j2.sql
-jinja2 ${SETUP_SQL} \
-  -D table_name=${DEST_DB_TABLE} \
-  -D event_type=${DEST_EVENT_TYPE} \
+jinja2 "${SETUP_SQL}" \
+  -D table_name="${DEST_DB_TABLE}" \
+  -D event_type="${DEST_EVENT_TYPE}" \
+  -D start_date="${START_DATE}" \
+  -D end_date="${END_DATE}" \
   | psql -v ON_ERROR_STOP=ON "${dest_connection_string}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to set database up for data import"
@@ -144,18 +146,18 @@ fi
 # List objects, import data and delete object
 ################################################################################
 echo "Listing objects from [${temporal_bucket_objects}]"
-objects="$(gsutil ls -r ${temporal_bucket_objects}*)"
+objects="$(gsutil ls -r "${temporal_bucket_objects}"*)"
 
 for object in $objects
 do
-    if [ "$object" != gs://${TEMP_BUCKET}/pipe-events/${DEST_EVENT_TYPE}/: ];
+    if [ "$object" != gs://"${TEMP_BUCKET}"/pipe-events/"${DEST_EVENT_TYPE}"/: ];
     then
 
       echo "Importing ${object}"
       gcloud sql import csv -q \
         "${DEST_DB_INSTANCE_NAME}" \
         "${object}" \
-        --database=${DEST_DATABASE} \
+        --database="${DEST_DATABASE}" \
         --table="${DEST_DB_TABLE}"
       if [ "$?" -ne 0 ]; then
         echo "  Unable to import data from bucket ${object} to ${DEST_DATABASE}.${DEST_DB_TABLE}"
@@ -179,8 +181,8 @@ done
 ################################################################################
 echo "Indexing data"
 INDEX_SQL=${ASSETS}/postgres/index.j2.sql
-jinja2 ${INDEX_SQL} \
-  -D table_name=${DEST_DB_TABLE} \
+jinja2 "${INDEX_SQL}" \
+  -D table_name="${DEST_DB_TABLE}" \
   | psql -v ON_ERROR_STOP=ON "${dest_connection_string}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to set up indices for imported data"
