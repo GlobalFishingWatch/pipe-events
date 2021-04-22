@@ -13,6 +13,7 @@ SELECT
    event_start,
    event_end,
    event_info,
-   event_vessels
+   event_vessels,
+   ST_GEOGPOINT(lon_mean, lat_mean) AS event_mean_position
 FROM `{{ source }}`
 WHERE event_start >= '{{ start_date }}' AND event_start <= '{{ end_date }}'
