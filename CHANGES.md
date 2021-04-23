@@ -8,6 +8,16 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v3.1.0 - 2021-04-22
+
+### Added
+
+* [PIPELINE-328](https://globalfishingwatch.atlassian.net/browse/PIPELINE-328): Adds
+  Dockerfile: Update google sdk version
+  Refactor import to Postgres script to use import instead of the copy command
+  DAGs: Configure the new parameters required
+  Assets: Remove unnecessary properties and statements.
+
 ## v3.0.1 - 2020-11-20
 
 ### Removed
