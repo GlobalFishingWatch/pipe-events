@@ -80,8 +80,9 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                              '{project_id}:{source_dataset}.{segment_vessel}'.format(**config),
                              '{project_id}:{source_dataset}.{segment_info}'.format(**config),
                              '{project_id}:{source_dataset}.{vessel_info}'.format(**config),
-                             '{project_id}:{events_dataset}.{events_table}'.format(**config),
-                             '{min_event_duration}'.format(**config)]
+                             '{project_id}:{source_dataset}.{fishing_vessels}'.format(**config),
+                             '{project_id}:{events_dataset}.{events_table}'.format(**config)
+                             ]
             })
 
 
