@@ -11,6 +11,7 @@ ARGS=( \
   DEST_PROJECT_ID \
   DEST_DB_REGION \
   DEST_DB_INSTANCE_NAME \
+  DEST_DB_INSTANCE_SERVICE \
   DEST_DATABASE \
   DEST_DB_USER \
   DEST_DB_PASSWORD \
@@ -22,7 +23,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD YYYY-MM-DD SOURCE TEMP_BUCKET DEST_PROJECT_ID DEST_DB_REGION DEST_DB_INSTANCE_NAME DEST_DATABASE DEST_DB_USER DEST_DB_PASSWORD DEST_DB_TABLE DEST_EVENT_TYPE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD YYYY-MM-DD SOURCE TEMP_BUCKET DEST_PROJECT_ID DEST_DB_REGION DEST_DB_INSTANCE_NAME DEST_DB_INSTANCE_SERVICE DEST_DATABASE DEST_DB_USER DEST_DB_PASSWORD DEST_DB_TABLE DEST_EVENT_TYPE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -46,6 +47,7 @@ echo "  TEMP_BUCKET: $TEMP_BUCKET"
 echo "  DEST_PROJECT_ID: $DEST_PROJECT_ID"
 echo "  DEST_DB_REGION: $DEST_DB_REGION"
 echo "  DEST_DB_INSTANCE_NAME: $DEST_DB_INSTANCE_NAME"
+echo "  DEST_DB_INSTANCE_SERVICE: $DEST_DB_INSTANCE_SERVICE"
 echo "  DEST_DB_USER: $DEST_DB_USER"
 echo "  DEST_DATABASE: $DEST_DATABASE"
 echo "  DEST_DB_PASSWORD: ********"
@@ -64,8 +66,8 @@ query_source="${SOURCE//:/$'.'}"
 temporal_filename=temp_${start_date_formatted}_${end_date_formatted}-
 temporal_bucket_objects=gs://${TEMP_BUCKET}/pipe-events/${DEST_EVENT_TYPE}/${temporal_filename}
 
-dest_instance=${DEST_PROJECT_ID}:${DEST_DB_REGION}:${DEST_DB_INSTANCE_NAME}
-dest_connection_string="user=${DEST_DB_USER} dbname=${DEST_DATABASE} password=${DEST_DB_PASSWORD} host=127.0.0.1 sslmode=disable"
+# dest_instance=${DEST_PROJECT_ID}:${DEST_DB_REGION}:${DEST_DB_INSTANCE_NAME}
+dest_connection_string="user=${DEST_DB_USER} dbname=${DEST_DATABASE} password=${DEST_DB_PASSWORD} host=${DEST_DB_INSTANCE_SERVICE} sslmode=disable"
 
 
 ################################################################################
@@ -117,9 +119,9 @@ fi
 ################################################################################
 # Start the cloudsql proxy
 ################################################################################
-echo "Starting the cloudsql proxy"
-cloud_sql_proxy -instances="${dest_instance}"=tcp:0.0.0.0:5432 &
-sleep 5
+# echo "Starting the cloudsql proxy"
+# cloud_sql_proxy -instances="${dest_instance}"=tcp:0.0.0.0:5432 &
+# sleep 5
 
 
 

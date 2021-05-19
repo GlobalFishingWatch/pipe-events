@@ -327,7 +327,7 @@ WITH
 #
   final_fishing_event AS (
   SELECT
-  TO_HEX(MD5(FORMAT("%s|%s|%t",'fishing', vessel_id, event_start))) AS event_id,
+  TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'fishing', vessel_id, event_start, event_end))) AS event_id,
   'fishing' AS event_type,
   vessel_id,
   event_start,
