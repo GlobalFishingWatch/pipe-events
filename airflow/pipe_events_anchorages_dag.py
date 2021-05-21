@@ -3,6 +3,8 @@ from airflow import DAG
 from airflow_ext.gfw import config as config_tools
 from airflow_ext.gfw.models import DagFactory
 
+from datetime import timedelta
+
 import sys
 import os
 # https://stackoverflow.com/questions/50150384/importing-local-module-python-script-in-airflow-dag
@@ -38,6 +40,11 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                 'image':'{docker_image}'.format(**config),
                 'name':'anchorages-publish-events-bigquery',
                 'dag':dag,
+                'retries':6,
+                'execution_timeout':timedelta(days=1),     # TimeOut of 1 days.
+                'retry_delay':timedelta(minutes=30),       # Delay in retries 30 minutes.
+                'max_retry_delay':timedelta(minutes=30),   # Max Delay in retries 30 minutes
+                'on_failure_callback':config_tools.failure_callback_gfw,
                 'arguments':['generate_anchorage_events',
                              '{date_range}'.format(**config),
                              '{project_id}:{source_dataset}.{source_table}'.format(**config),
@@ -58,6 +65,11 @@ class PipelineDagFactory(PipelineEventsDagFactory):
                     'image':'{docker_image}'.format(**config),
                     'name':'anchorages-publish-events-postgres',
                     'dag':dag,
+                    'retries':3,
+                    'execution_timeout':timedelta(days=1),     # TimeOut of 1 days.
+                    'retry_delay':timedelta(minutes=30),       # Delay in retries 30 minutes.
+                    'max_retry_delay':timedelta(minutes=30),   # Max Delay in retries 30 minutes
+                    'on_failure_callback':config_tools.failure_callback_gfw,
                     'arguments':['publish_postgres',
                                  '{start_date}'.format(**config),
                                  '{end_date}'.format(**config),

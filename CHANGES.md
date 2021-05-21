@@ -8,6 +8,14 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v3.1.1 - 2021-05-21
+
+### Added
+
+* [PIPELINE-83](https://globalfishingwatch.atlassian.net/browse/PIPELINE-83): Adds
+  alert report using execution_timeout and retry schema as limited.
+  incrementes Google SDK to version `v341.0.0`.
+
 ## v3.1.0 - 2021-04-22
 
 ### Added
