@@ -59,7 +59,7 @@ echo "  DEST_EVENT_TYPE: $DEST_EVENT_TYPE"
 start_date_formatted="${START_DATE//-/$''}"
 end_date_formatted="${END_DATE//-/$''}"
 UUID=$(uuidgen)
-temporal_table="${SOURCE}.${UUID//-/_}"
+temporal_table="${SOURCE}${UUID//-/_}"
 query_source="${SOURCE//:/$'.'}"
 temporal_filename=temp_${start_date_formatted}_${end_date_formatted}-
 temporal_bucket_objects=gs://${TEMP_BUCKET}/pipe-events/${DEST_EVENT_TYPE}/${temporal_filename}
