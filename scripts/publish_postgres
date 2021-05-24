@@ -79,11 +79,11 @@ echo "Importing data to temporal table"
 echo "${ASSETS}"/bigquery/get-events.sql.j2
 
 GET_EVENTS_SQL=${ASSETS}/bigquery/get-events.sql.j2
-jinja2 "${GET_EVENTS_SQL}" \
-  -D source="${query_source}" \
-  -D start_date="${START_DATE}" \
-  -D end_date="${END_DATE}" \
-  | bq query --destination_table "${temporal_table}" --use_legacy_sql=false
+jinja2 ${GET_EVENTS_SQL} \
+  -D source=${query_source} \
+  -D start_date=${START_DATE} \
+  -D end_date=${END_DATE} \
+  | bq query --destination_table ${temporal_table} --use_legacy_sql=false
 
 if [ "$?" -ne 0 ]; then
   echo "  Unable to generate the temporal table ${temporal_table} from ${START_DATE} to ${END_DATE}"
