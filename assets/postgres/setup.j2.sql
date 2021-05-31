@@ -32,4 +32,3 @@ DROP INDEX IF EXISTS {{ table_name }}_event_id;
 DROP INDEX IF EXISTS {{ table_name }}_event_type;
 DROP INDEX IF EXISTS {{ table_name }}_event_start;
 DROP INDEX IF EXISTS {{ table_name }}_vessel_id;
-DROP INDEX IF EXISTS {{ table_name }}_event_mean_position_gis;
