@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
   event_start timestamp without time zone NOT NULL,
   event_end timestamp without time zone,
   lat_mean double precision NOT NULL,
-  lot_mean double precision NOT NULL,
+  lon_mean double precision NOT NULL,
   lat_min double precision NOT NULL,
   lon_min double precision NOT NULL,
   lat_max double precision NOT NULL,
@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
   start_distance_from_port_km double precision,
   end_distance_from_port_km double precision,
   event_info jsonb NOT NULL,
-  event_vessels jsonb NOT NULL
+  event_vessels jsonb NOT NULL,
+  event_mean_position public.geography(Point, 4326) NOT NULL
 );
 
 -- Ensure the table is empty
@@ -32,3 +33,4 @@ DROP INDEX IF EXISTS {{ table_name }}_event_id;
 DROP INDEX IF EXISTS {{ table_name }}_event_type;
 DROP INDEX IF EXISTS {{ table_name }}_event_start;
 DROP INDEX IF EXISTS {{ table_name }}_vessel_id;
+DROP INDEX IF EXISTS {{ table_name }}_event_mean_position_gis;
