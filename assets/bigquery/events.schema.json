@@ -18,6 +18,12 @@
     "description": "Id of the main vessel involved in the event. When an event has multiple vessels associated with it (for example, encounters) you will find multiple records, one for each vessel involved."
   },
   {
+    "name": "seg_id",
+    "mode": "REQUIRED",
+    "type": "STRING",
+    "description": "Id of the segment involved in the event."
+  },
+  {
     "name": "event_start",
     "mode": "NULLABLE",
     "type": "TIMESTAMP",
@@ -66,6 +72,52 @@
     "description": "Maximum longitude of a bounded event. When an event occurs in a single position (such as port in and out), both lon_min and lon_max are equal to the main longitude field. Otherwise, lat_min, lat_max, lon_min and lon_max  define the spatial boundaries of the event."
   },
   {
+    "name": "regions_mean_position",
+    "type": "RECORD",
+    "mode": "NULLABLE",
+    "fields": [
+      { "name": "mregion", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "arg", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "eez", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "mparu", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "vme", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "kkp", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "ocean", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "hsp", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "other", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "fao", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "mpant", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "ames", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "rfmo", "type": "STRING",  "mode": "REPEATED" },
+      { "name": "major_fao", "type": "STRING",  "mode": "REPEATED" }
+    ],
+    "description": "The regions where the event happened. Calculated using the mean position."
+  },
+  {
+    "name": "start_distance_from_shore_km",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Distance from shore when the event starts."
+  },
+  {
+    "name": "end_distance_from_shore_km",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Distance from shore when the event ends."
+  },
+  {
+    "name": "start_distance_from_port_km",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Distance from port when the event starts."
+  },
+  {
+    "name": "end_distance_from_port_km",
+    "mode": "NULLABLE",
+    "type": "FLOAT",
+    "description": "Distance from port when the event ends."
+  },
+  {
     "name": "event_info",
     "mode": "NULLABLE",
     "type": "STRING",
@@ -76,11 +128,5 @@
     "mode": "NULLABLE",
     "type": "STRING",
     "description": "JSON array of very basic vessel information on the different vessels involved in the event. Always has at least one record, for the main vessel the event is about."
-  },
-  {
-    "name": "event_geography",
-    "mode": "NULLABLE",
-    "type": "GEOGRAPHY",
-    "description": "Detailed line geometry which describes the geographic area where the event happened. In the case of fishing events, for example, it's a line which includes all the individual positional messages where the vessel was fishing."
   }
 ]
