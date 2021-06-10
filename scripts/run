@@ -32,6 +32,10 @@ case $1 in
     ${THIS_SCRIPT_DIR}/generate_fishing_events "${@:2}"
     ;;
 
+  generate_loitering_events)
+    ${THIS_SCRIPT_DIR}/generate_loitering_events "${@:2}"
+    ;;
+
   publish_postgres)
     ${THIS_SCRIPT_DIR}/publish_postgres "${@:2}"
     ;;
