@@ -18,12 +18,6 @@
     "description": "Id of the main vessel involved in the event. When an event has multiple vessels associated with it (for example, encounters) you will find multiple records, one for each vessel involved."
   },
   {
-    "name": "vessel_type",
-    "mode": "NULLABLE",
-    "type": "STRING",
-    "description": "Type of the main vessel involved in the event."
-  },
-  {
     "name": "seg_id",
     "mode": "REQUIRED",
     "type": "STRING",
