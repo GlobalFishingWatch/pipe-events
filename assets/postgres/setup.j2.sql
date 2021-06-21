@@ -1,8 +1,5 @@
--- CREATE SEQUENCE IF NOT EXISTS public.{{event_type}}_events_sequence start 1 increment 1;
-
 -- Create base events table
 CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
-  --id integer default nextval('public.{{ event_type }}_events_sequence'::regclass),
   id BIGSERIAL,
   event_id character varying NOT NULL,
   event_type character varying NOT NULL,
@@ -27,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.{{ table_name }} (
   primary key (id, {{ time_partitioning_field }})
 ) PARTITION BY RANGE ({{ time_partitioning_field }});
 
-CREATE TABLE IF NOT EXISTS public.{{ table_name }}_{{ partition_year }}  PARTITION OF public.{{ table_name }} FOR VALUES FROM ('{{ start_partition_date }}') TO ('{{ end_partition_date }}');
+CREATE TABLE IF NOT EXISTS public.{{ table_name }}_{{ partition_year }} PARTITION OF public.{{ table_name }} FOR VALUES FROM ('{{ start_partition_date }}') TO ('{{ end_partition_date }}');
 
 -- Ensure the table is empty
 DELETE FROM public.{{ table_name }}
