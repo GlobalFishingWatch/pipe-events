@@ -6,12 +6,12 @@ source ${THIS_SCRIPT_DIR}/pipeline.sh
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
-  EVENT_START_DATE_FILTER \
   SOURCE_TABLE \
-  SEGMENT_VESSEL \
+  FISHING_VESSELS_TABLE \
+  VESSEL_INFO_TABLE \
+  ALL_VESSELS_TABLE \
   SEGMENT_INFO \
-  VESSEL_INFO \
-  FISHING_VESSELS \
+  SPATIAL_MEASURES \
   DEST_TABLE
 )
 
@@ -19,7 +19,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] EVENT_START_DATE_FILTER SOURCE_TABLE SEGMENT_VESSEL SEGMENT_INFO VESSEL_INFO FISHING_VESSELS DEST_TABLE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE FISHING_VESSELS_TABLE VESSEL_INFO_TABLE ALL_VESSELS_TABLE SEGMENT_INFO SPATIAL_MEASURES DEST_TABLE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -42,12 +42,12 @@ fi
 
 echo "Running $0"
 echo "  DATE_RANGE: $DATE_RANGE"
-echo "  EVENT_START_DATE_FILTER: $EVENT_START_DATE_FILTER"
 echo "  SOURCE_TABLE: $SOURCE_TABLE"
-echo "  SEGMENT_VESSEL: $SEGMENT_VESSEL"
+echo "  FISHING_VESSELS_TABLE: $FISHING_VESSELS_TABLE"
+echo "  VESSEL_INFO_TABLE: $VESSEL_INFO_TABLE"
+echo "  ALL_VESSELS_TABLE: $ALL_VESSELS_TABLE"
 echo "  SEGMENT_INFO: $SEGMENT_INFO"
-echo "  VESSEL_INFO: $VESSEL_INFO"
-echo "  FISHING_VESSELS: $FISHING_VESSELS"
+echo "  SPATIAL_MEASURES: $SPATIAL_MEASURES"
 echo "  DEST_TABLE: $DEST_TABLE"
 
 ################################################################################
@@ -78,10 +78,10 @@ echo "  Events table exists"
 # Delete existing records
 ################################################################################
 DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
-echo "Deleting existing records for ${EVENT_START_DATE_FILTER} to ${END_DATE}"
+echo "Deleting existing records for ${START_DATE} to ${END_DATE}"
 jinja2 ${DELETE_SQL} \
   -D table=${DEST_TABLE//:/.} \
-  -D start_date=${EVENT_START_DATE_FILTER} \
+  -D start_date=${START_DATE} \
   -D end_date=${END_DATE} \
   | bq query --max_rows=0
 if [ "$?" -ne 0 ]; then
@@ -92,19 +92,19 @@ fi
 ################################################################################
 # Inserting new records
 ################################################################################
-INSERT_SQL=${ASSETS}/bigquery/fishing-events.sql.j2
-echo "Inserting new records for ${START_DATE} to ${END_DATE}. Event start: ${EVENT_START_DATE_FILTER}"
+INSERT_SQL=${ASSETS}/bigquery/loitering-events.sql.j2
+echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
    -D dest="${DEST_TABLE//:/.}" \
-   -D messages="${SOURCE_TABLE}" \
-   -D start_messages_yyyymmdd="${START_DATE}" \
-   -D end_messages_yyyymmdd="${END_DATE}" \
-   -D start_date_yyyymmdd="${EVENT_START_DATE_FILTER}" \
-   -D segments="${SEGMENT_INFO}" \
-   -D segment_vessel=${SEGMENT_VESSEL} \
-   -D vessel_info=${VESSEL_INFO} \
-   -D fishing_vessels=${FISHING_VESSELS} \
+   -D loitering_table="${SOURCE_TABLE}" \
+   -D fishing_vessels_table="${FISHING_VESSELS_TABLE}" \
+   -D vessel_info_table="${VESSEL_INFO_TABLE}" \
+   -D all_vessels_table="${ALL_VESSELS_TABLE}" \
+   -D start_date="${START_DATE}" \
+   -D end_date="${END_DATE}" \
+   -D segments_info_table="${SEGMENT_INFO}" \
+   -D spatial_measures_table=${SPATIAL_MEASURES} \
    | bq query --max_rows=0
 
 if [ "$?" -ne 0 ]; then
