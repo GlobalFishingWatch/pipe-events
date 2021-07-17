@@ -19,7 +19,7 @@
   },
   {
     "name": "seg_id",
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "type": "STRING",
     "description": "Id of the segment involved in the event."
   },
