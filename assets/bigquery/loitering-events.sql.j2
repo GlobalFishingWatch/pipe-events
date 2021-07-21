@@ -46,8 +46,8 @@ WITH base_loitering_event AS (
         end_lon AS lon_max,
       TO_JSON_STRING(STRUCT(
         loitering_hours,
-        convert_m_to_km(tot_distance_nm) AS total_distance_km,
-        convert_m_to_km(avg_distance_from_shore_nm) AS avg_distance_from_shore_km,
+        convert_nm_to_km(tot_distance_nm) AS total_distance_km,
+        convert_nm_to_km(avg_distance_from_shore_nm) AS avg_distance_from_shore_km,
         avg_speed_knots
       )) AS event_info,
       TO_JSON_STRING([STRUCT(

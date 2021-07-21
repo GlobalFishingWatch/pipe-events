@@ -37,12 +37,6 @@ AS (
   )
 );
 
-
-# Convert meters to kilometers
-# Returns a Float
-
-CREATE TEMPORARY FUNCTION convert_m_to_km (m FLOAT64) AS (m / 1000);
-
 # Format gridcode
 # Generate gridcode from lon and lat
 # Returns a String
@@ -50,3 +44,12 @@ CREATE TEMPORARY FUNCTION convert_m_to_km (m FLOAT64) AS (m / 1000);
 CREATE TEMPORARY FUNCTION format_gridcode (lon FLOAT64, lat FLOAT64) AS (
     FORMAT("lon:%+07.2f_lat:%+07.2f", ROUND(lon /0.01)*0.01, ROUND(lat /0.01)*0.01)
 );
+
+# Convert meters to kilometers
+# Returns a Float
+CREATE TEMPORARY FUNCTION convert_m_to_km (m FLOAT64) AS (m / 1000);
+
+# Convert nautical miles to kilometers
+# Returns a Float
+CREATE TEMPORARY FUNCTION convert_nm_to_km (nm FLOAT64) as (nm * 1.852);
+
