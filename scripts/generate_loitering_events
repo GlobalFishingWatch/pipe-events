@@ -7,9 +7,6 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
   SOURCE_TABLE \
-  FISHING_VESSELS_TABLE \
-  VESSEL_INFO_TABLE \
-  ALL_VESSELS_TABLE \
   SEGMENT_INFO \
   SPATIAL_MEASURES \
   DEST_TABLE
@@ -19,7 +16,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] SOURCE_TABLE FISHING_VESSELS_TABLE VESSEL_INFO_TABLE ALL_VESSELS_TABLE SEGMENT_INFO SPATIAL_MEASURES DEST_TABLE\n"
+  echo -e "\nUsage:\n${0} ${ARGS[*]}\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -39,16 +36,6 @@ IFS=, read START_DATE END_DATE <<<"${DATE_RANGE}"
 if [[ -z $END_DATE ]]; then
   END_DATE=${START_DATE}
 fi
-
-echo "Running $0"
-echo "  DATE_RANGE: $DATE_RANGE"
-echo "  SOURCE_TABLE: $SOURCE_TABLE"
-echo "  FISHING_VESSELS_TABLE: $FISHING_VESSELS_TABLE"
-echo "  VESSEL_INFO_TABLE: $VESSEL_INFO_TABLE"
-echo "  ALL_VESSELS_TABLE: $ALL_VESSELS_TABLE"
-echo "  SEGMENT_INFO: $SEGMENT_INFO"
-echo "  SPATIAL_MEASURES: $SPATIAL_MEASURES"
-echo "  DEST_TABLE: $DEST_TABLE"
 
 ################################################################################
 # Force that the destination table exists
@@ -96,16 +83,13 @@ INSERT_SQL=${ASSETS}/bigquery/loitering-events.sql.j2
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
-   -D dest="${DEST_TABLE//:/.}" \
    -D loitering_table="${SOURCE_TABLE}" \
-   -D fishing_vessels_table="${FISHING_VESSELS_TABLE}" \
-   -D vessel_info_table="${VESSEL_INFO_TABLE}" \
-   -D all_vessels_table="${ALL_VESSELS_TABLE}" \
    -D start_date="${START_DATE}" \
    -D end_date="${END_DATE}" \
    -D segments_info_table="${SEGMENT_INFO}" \
    -D spatial_measures_table=${SPATIAL_MEASURES} \
-   | bq query --max_rows=0
+   | bq query --headless --max_rows=0 --allow_large_results \
+     --destination_table ${DEST_TABLE}
 
 if [ "$?" -ne 0 ]; then
   echo "  Unable to insert records for table ${DEST_TABLE} from ${START_DATE} to ${END_DATE}"
