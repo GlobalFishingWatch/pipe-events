@@ -7,11 +7,11 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
   EVENT_START_DATE_FILTER \
-  SOURCE_TABLE \
-  SEGMENT_VESSEL \
-  SEGMENT_INFO \
-  VESSEL_INFO \
-  FISHING_VESSELS \
+  SOURCE_MESSAGES \
+  SOURCE_SEGMENT_VESSEL \
+  SOURCE_SEGS \
+  SOURCE_VI_SSVID_BY_YEAR \
+  SOURCE_FISHING_VESSELS \
   DEST_TABLE
 )
 
@@ -86,14 +86,14 @@ INSERT_SQL=${ASSETS}/bigquery/fishing-events.sql.j2
 echo "Inserting new records for ${START_DATE} to ${END_DATE}. Event start: ${EVENT_START_DATE_FILTER}"
 
 jinja2 "${INSERT_SQL}" \
-   -D messages="${SOURCE_TABLE}" \
-   -D start_messages_yyyymmdd="${START_DATE}" \
-   -D end_messages_yyyymmdd="${END_DATE}" \
-   -D start_date_yyyymmdd="${EVENT_START_DATE_FILTER}" \
-   -D segments="${SEGMENT_INFO}" \
-   -D segment_vessel=${SEGMENT_VESSEL} \
-   -D vessel_info=${VESSEL_INFO} \
-   -D fishing_vessels=${FISHING_VESSELS} \
+   -D messages="${SOURCE_MESSAGES}" \
+   -D start_messages="${START_DATE}" \
+   -D end_messages="${END_DATE}" \
+   -D start_date="${EVENT_START_DATE_FILTER}" \
+   -D segs="${SOURCE_SEGS}" \
+   -D segment_vessel=${SOURCE_SEGMENT_VESSEL} \
+   -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
+   -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --destination_table ${DEST_TABLE}
 

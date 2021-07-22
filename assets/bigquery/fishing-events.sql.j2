@@ -10,8 +10,32 @@
 -- A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
 -- messages with score=null are ignored
 WITH
-  -- Collect scored position messages
-  message AS (
+  -- Source tables
+  source_segs AS (
+    SELECT
+      *
+    FROM
+      `{{ segs }}`
+  ),
+  source_segment_vessel AS (
+    SELECT
+      *
+    FROM
+      `{{ segment_vessel }}`
+  ),
+  source_vi_ssvid_by_year AS (
+    SELECT
+      *
+    FROM
+      `{{ vi_ssvid_by_year }}`
+  ),
+  source_fishing_vessels AS (
+    SELECT
+      *
+    FROM
+      `{{ fishing_vessels }}`
+  ),
+  source_messages AS (
   SELECT
     ssvid,
     seg_id,
@@ -31,8 +55,8 @@ WITH
   WHERE
     -- specify partition duration (how far back we look in pipe)
     -- still need to confirm duration
-    _partitiontime BETWEEN '{{ start_messages_yyyymmdd }}'
-    AND '{{ end_messages_yyyymmdd }}'
+    _partitiontime BETWEEN '{{ start_messages }}'
+    AND '{{ end_messages }}'
     --AND ssvid = target_ssvid()
     AND lat > -90
     AND lat < 90
@@ -40,7 +64,7 @@ WITH
       SELECT
        seg_id
       FROM
-       `{{ segments }}`
+       source_segs
       WHERE
         good_seg
         AND positions > 10
@@ -55,14 +79,14 @@ WITH
     DISTINCT seg_id,
     FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
   FROM
-    `{{ segment_vessel }}` ),
+    source_segment_vessel),
 
   --
   -- Get vessel_id
   --
   message_vessel_id AS (
   SELECT *
-  FROM message
+  FROM source_messages
   JOIN best_segment_vessel
   USING(seg_id)
  ),
@@ -75,7 +99,7 @@ WITH
    ssvid,
    year,
    ais_identity.shipname_mostcommon.value as main_vessel_shipname
- FROM `{{ vessel_info }}`
+ FROM source_vi_ssvid_by_year
  ),
 
 -- change nnet score for squid jiggers to be 'night_loitering' field
@@ -93,7 +117,7 @@ WITH
     FROM
      message_vessel_id
     LEFT JOIN
-     `{{ fishing_vessels }}` AS vesselinfo
+     source_fishing_vessels AS vesselinfo
     USING
      (ssvid, year)
     LEFT JOIN
@@ -367,4 +391,4 @@ SELECT
 *
 FROM
     final_fishing_event
-WHERE event_start BETWEEN '{{ start_date_yyyymmdd }}' AND '{{ end_messages_yyyymmdd }}'
+WHERE event_start BETWEEN '{{ start_date }}' AND '{{ end_messages }}'
