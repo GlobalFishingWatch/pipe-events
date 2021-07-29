@@ -1,39 +1,41 @@
 #standardSQL
 
-# Include some utility functions
+-- Include some utility functions
 {% include 'util.sql.j2' %}
 
-#
-# Fishing Events
-#
-# Aggregate position messages that have been annotated with a fishing score into fishing events
-# A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
-# messages with score=null are ignored
-
-INSERT INTO
-  `{{ dest }}` ( event_id,
-    event_type,
-    vessel_id,
-    seg_id,
-    event_start,
-    event_end,
-    lat_mean,
-    lon_mean,
-    lat_min,
-    lat_max,
-    lon_min,
-    lon_max,
-    regions_mean_position,
-    start_distance_from_shore_km,
-    end_distance_from_shore_km,
-    start_distance_from_port_km,
-    end_distance_from_port_km,
-    event_info,
-    event_vessels )
-
+--
+-- Fishing Events
+--
+-- Aggregate position messages that have been annotated with a fishing score into fishing events
+-- A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
+-- messages with score=null are ignored
 WITH
---# Collect scored position messages
-  message AS (
+  -- Source tables
+  source_segs AS (
+    SELECT
+      *
+    FROM
+      `{{ segs }}`
+  ),
+  source_segment_vessel AS (
+    SELECT
+      *
+    FROM
+      `{{ segment_vessel }}`
+  ),
+  source_vi_ssvid_by_year AS (
+    SELECT
+      *
+    FROM
+      `{{ vi_ssvid_by_year }}`
+  ),
+  source_fishing_vessels AS (
+    SELECT
+      *
+    FROM
+      `{{ fishing_vessels }}`
+  ),
+  source_messages AS (
   SELECT
     ssvid,
     seg_id,
@@ -51,10 +53,10 @@ WITH
   FROM
     `{{ messages }}`
   WHERE
-    --# specify partition duration (how far back we look in pipe)
-    --# still need to confirm duration
-    _partitiontime BETWEEN '{{ start_messages_yyyymmdd }}'
-    AND '{{ end_messages_yyyymmdd }}'
+    -- specify partition duration (how far back we look in pipe)
+    -- still need to confirm duration
+    _partitiontime BETWEEN '{{ start_messages }}'
+    AND '{{ end_messages }}'
     --AND ssvid = target_ssvid()
     AND lat > -90
     AND lat < 90
@@ -62,46 +64,46 @@ WITH
       SELECT
        seg_id
       FROM
-       `{{ segments }}`
+       source_segs
       WHERE
         good_seg
         AND positions > 10
         AND NOT overlapping_and_short)
     ),
 
-  #
-  # Get a vessel_id for each segment
-  #
+  --
+  -- Get a vessel_id for each segment
+  --
   best_segment_vessel AS (
   SELECT
     DISTINCT seg_id,
     FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
   FROM
-    `{{ segment_vessel }}` ),
+    source_segment_vessel),
 
-  #
-  # Get vessel_id
-  #
+  --
+  -- Get vessel_id
+  --
   message_vessel_id AS (
   SELECT *
-  FROM message
+  FROM source_messages
   JOIN best_segment_vessel
   USING(seg_id)
  ),
 
- #
- # Get most common shipname
- #
+ --
+ -- Get most common shipname
+ --
  shipnames AS (
  SELECT
    ssvid,
    year,
    ais_identity.shipname_mostcommon.value as main_vessel_shipname
- FROM `{{ vessel_info }}`
+ FROM source_vi_ssvid_by_year
  ),
 
---# change nnet score for squid jiggers to be 'night_loitering' field
---# by attaching best best vessel type for vessels using ssvid
+-- change nnet score for squid jiggers to be 'night_loitering' field
+-- by attaching best best vessel type for vessels using ssvid
   good_message AS (
   SELECT
     * EXCEPT (main_vessel_ssvid, nnet_score, night_loitering),
@@ -115,7 +117,7 @@ WITH
     FROM
      message_vessel_id
     LEFT JOIN
-     `{{ fishing_vessels }}` AS vesselinfo
+     source_fishing_vessels AS vesselinfo
     USING
      (ssvid, year)
     LEFT JOIN
@@ -125,8 +127,8 @@ WITH
     )
  ),
 
---# Group messages into events which are consecutive sequences of messages with the same score within the same seg_id
---# First for each message, get the score from the previous message in the segement
+-- Group messages into events which are consecutive sequences of messages with the same score within the same seg_id
+-- First for each message, get the score from the previous message in the segement
   prev_score_message AS (
   SELECT
     ssvid,
@@ -144,9 +146,9 @@ WITH
   FROM
     good_message),
 
---# Now get the time range from the start of a group to the end of the group
---# Do this by filtering to only the first message in each grouping and making a time range from
---# the first message in one group to the prev_timestamp of first message in the next group
+-- Now get the time range from the start of a group to the end of the group
+-- Do this by filtering to only the first message in each grouping and making a time range from
+-- the first message in one group to the prev_timestamp of first message in the next group
   event_range AS (
   SELECT
     ssvid,
@@ -161,21 +163,21 @@ WITH
   FROM
     prev_score_message
   WHERE
-    --# identifies first message in event
+    -- identifies first message in event
     prev_score IS NULL
     OR
     score != prev_score
     OR
-    --# splits fishing events with consecutive nnet fishing positions of 1 if
-    --# previous ais position is farther than 10,000 meters away from current position
-    --# OR if current position was registered more than 2 hours after previous position
+    -- splits fishing events with consecutive nnet fishing positions of 1 if
+    -- previous ais position is farther than 10,000 meters away from current position
+    -- OR if current position was registered more than 2 hours after previous position
     (score = prev_score AND meters_to_prev > 10000)
     OR
     (score = prev_score AND hours > 2)
     ),
 
-    --# Filter event ranges to only those with score = 1.0 (fishing)
---# and for each fishing event get the end of the time range of the previous fishing event
+    -- Filter event ranges to only those with score = 1.0 (fishing)
+-- and for each fishing event get the end of the time range of the previous fishing event
   prev_fishing_event_range AS (
   SELECT
     ssvid,
@@ -184,19 +186,19 @@ WITH
     event_end,
     lat,
     lon,
-    --# calculate time and distance to previous fishing event
-    --# if previous fishing event is within same seg_id
+    -- calculate time and distance to previous fishing event
+    -- if previous fishing event is within same seg_id
     st_distance(st_geogpoint(lon,lat),
        st_geogpoint(lag(lon, 1) over (partition by seg_id order by event_start),
             lag(lat, 1) over (partition by seg_id order by event_start)) ) as distance_to_prev_event_m,
-    --# intermediate step; prev_event_end gets fixed/completed later in query
+    -- intermediate step; prev_event_end gets fixed/completed later in query
     LAG(event_end) OVER (PARTITION BY seg_id ORDER BY event_start) AS prev_event_end
   FROM
     event_range
   WHERE
     score = 1.0 ),
 
---# Create ranges spanning consecutive events that are separated by a small time interval
+-- Create ranges spanning consecutive events that are separated by a small time interval
   fishing_event_range AS (
   SELECT
     ssvid,
@@ -208,15 +210,15 @@ WITH
     prev_fishing_event_range
   WHERE
     prev_event_end IS NULL
-    --# combine fishing events if fishing events are temporally close enough, as defined in restriction below
-    --# combine fishing events less than 1 hour and 2 km apart
-    --# this line will combine fishing events, even if there are null or non-fishing scores between events
+    -- combine fishing events if fishing events are temporally close enough, as defined in restriction below
+    -- combine fishing events less than 1 hour and 2 km apart
+    -- this line will combine fishing events, even if there are null or non-fishing scores between events
     OR (TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > 3600
     AND distance_to_prev_event_m > 2000)
     ),
 
---# Tag all the messages with the start time of the event range that contains the message
---# limit this to just messages with score = 1.0
+-- Tag all the messages with the start time of the event range that contains the message
+-- limit this to just messages with score = 1.0
   fishing_event_message AS (
   SELECT
     good_message.*,
@@ -232,8 +234,8 @@ WITH
     AND (event_end IS NULL OR timestamp <= event_end)
     AND score = 1.0 ),
 
---# Now aggregate all the messages that are in the same range into a single event record
---# Filter out short events or events where vessel is moving too fast
+-- Now aggregate all the messages that are in the same range into a single event record
+-- Filter out short events or events where vessel is moving too fast
   fishing_event AS (
   SELECT
     ssvid,
@@ -242,7 +244,7 @@ WITH
     main_vessel_shipname,
     best_best_vessel_class,
     ST_CENTROID(ST_UNION_AGG(point)) AS centroid,
-    --# compute centoid of all the lat/lon pairs in the event
+    -- compute centoid of all the lat/lon pairs in the event
     event_start,
     MAX(timestamp) AS event_end,
     MIN(lat) AS lat_min,
@@ -250,23 +252,23 @@ WITH
     MIN(lon) AS lon_min,
     MAX(lon) AS lon_max,
     MIN(anti_lon(lon)) AS anti_lon_min,
-    # Also get min/max for the anti_longitude (180 degrees opposite) to deal wiht dateline crossing
+    -- Also get min/max for the anti_longitude (180 degrees opposite) to deal wiht dateline crossing
     MAX(anti_lon(lon)) AS anti_lon_max,
-    --# calculate number of positions, and average vessel speed during event
+    -- calculate number of positions, and average vessel speed during event
     COUNT(*) AS message_count,
     AVG(speed_knots) AS avg_speed_knots,
-    --# remove first implied_speed_knots value in each event summary as value comes from previous position not part of event
+    -- remove first implied_speed_knots value in each event summary as value comes from previous position not part of event
     AVG(CASE WHEN
       event_start = timestamp THEN NULL
       ELSE implied_speed_knots END) AS avg_implied_speed_knots,
-    --# remove first meters_to_prev value in each event summary as value comes from previous position not part of event
+    -- remove first meters_to_prev value in each event summary as value comes from previous position not part of event
     AVG(CASE WHEN
       event_start = timestamp THEN NULL
       ELSE meters_to_prev END) AS avg_meters_to_prev,
      SUM(CASE WHEN
       event_start = timestamp THEN NULL
       ELSE meters_to_prev END) AS event_distance_m,
-    --# remove first hours value in each event summary as value comes from previous position not part of event
+    -- remove first hours value in each event summary as value comes from previous position not part of event
     AVG(CASE WHEN
       event_start = timestamp THEN NULL
       ELSE hours END) AS avg_hours,
@@ -280,19 +282,19 @@ WITH
     main_vessel_shipname,
     best_best_vessel_class,
     event_start
-  --# exclude events too short or with too high an avg vessel speed
+  -- exclude events too short or with too high an avg vessel speed
   HAVING
-    --# fishing events must be longer than 20 minutes
+    -- fishing events must be longer than 20 minutes
     (TIMESTAMP_DIFF(event_end, event_start, SECOND) > 1200
-    --# fishing events must include more than 5 ais positions in event
+    -- fishing events must include more than 5 ais positions in event
     AND message_count > 5
-    --# event average speed must be less than 10 knots
+    -- event average speed must be less than 10 knots
     AND avg_speed_knots < 10)
     ),
 
-  # Correct lon_min and lon_max for crossing the dateline (anti-meridian)
-  # And extract lat and lon from the centriod
-  #
+  -- Correct lon_min and lon_max for crossing the dateline (anti-meridian)
+  -- And extract lat and lon from the centriod
+  --
   fishing_event_dateline AS (
   SELECT
     * EXCEPT (centroid,
@@ -300,12 +302,12 @@ WITH
       lon_max,
       anti_lon_min,
       anti_lon_max),
-    # Get the lat and lon from the computed centroid
+    -- Get the lat and lon from the computed centroid
     geopoint_to_struct(centroid).lat AS lat_mean,
     geopoint_to_struct(centroid).lon AS lon_mean,
-    # determine which direction around the globe is shorter - across the equator (eg -1.0 to 1.0), across the
-    # dateline (eg -179.0 to 179.0) or neither (eg 10.0 to 12.0).  Use this to select which values to use for
-    # min and max longitude
+    -- determine which direction around the globe is shorter - across the equator (eg -1.0 to 1.0), across the
+    -- dateline (eg -179.0 to 179.0) or neither (eg 10.0 to 12.0).  Use this to select which values to use for
+    -- min and max longitude
     IF ( (lon_max - lon_min) <= (anti_lon_max - anti_lon_min),
       lon_min,
       anti_lon(anti_lon_max) ) AS lon_min,
@@ -315,21 +317,21 @@ WITH
   FROM
     fishing_event ),
 
---# remove events that are too short
+-- remove events that are too short
   complete_fishing_event AS (
   SELECT
     *
   FROM
     fishing_event_dateline
   WHERE
-    --# squid jigger fishing events must be longer than 50 meters
+    -- squid jigger fishing events must be longer than 50 meters
     best_best_vessel_class = 'squid_jigger' AND event_distance_m > 50
-    --# all other fishing events must be longer than 500 meters
+    -- all other fishing events must be longer than 500 meters
     OR NOT best_best_vessel_class = 'squid_jigger' AND event_distance_m > 500),
 
-#
-# Finally, generate a unique event id and write out in the normalized event schema
-#
+--
+-- Finally, generate a unique event id and write out in the normalized event schema
+--
   final_fishing_event AS (
     SELECT
       TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'fishing', vessel_id, event_start, event_end))) AS event_id,
@@ -382,11 +384,11 @@ WITH
         format_gridcode(cfe.lon_mean, cfe.lat_mean) = sm.gridcode
 )
 
-#
-# Return final fishing events table
-#
+--
+-- Return final fishing events table
+--
 SELECT
 *
 FROM
     final_fishing_event
-WHERE event_start BETWEEN '{{ start_date_yyyymmdd }}' AND '{{ end_messages_yyyymmdd }}'
+WHERE event_start BETWEEN '{{ start_date }}' AND '{{ end_messages }}'
