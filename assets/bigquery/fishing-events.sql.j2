@@ -372,14 +372,14 @@ WITH
     FROM complete_fishing_event cfe
       JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(lon_min,lat_min) = spatial_measures_start.gridcode
       JOIN source_spatial_measures AS spatial_measures_end ON format_gridcode(lon_max, lat_max) = spatial_measures_end.gridcode
-      JOIN source_spatial_measures AS spatial_measures_mean ON format_gridcode(lon_mean, lat_mean) = spatial_measures_mean.gridcode)
-)
+      JOIN source_spatial_measures AS spatial_measures_mean ON format_gridcode(lon_mean, lat_mean) = spatial_measures_mean.gridcode
+  )
 
---
--- Return final fishing events table
---
-SELECT
-*
-FROM
+  --
+  -- Return final fishing events table
+  --
+  SELECT
+    *
+  FROM
     final_fishing_event
-WHERE event_start BETWEEN '{{ start_date }}' AND '{{ end_messages }}'
+  WHERE event_start BETWEEN '{{ start_date }}' AND '{{ end_messages }}'
