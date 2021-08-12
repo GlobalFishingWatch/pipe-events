@@ -53,3 +53,9 @@ CREATE TEMPORARY FUNCTION convert_m_to_km (m FLOAT64) AS (m / 1000);
 # Returns a Float
 CREATE TEMPORARY FUNCTION convert_nm_to_km (nm FLOAT64) as (nm * 1.852);
 
+--
+-- Creates a port-id based in the iso3 and the label of the port
+--
+CREATE TEMPORARY FUNCTION
+  generate_port_id (iso3 STRING,
+    label STRING) AS ( LOWER(CONCAT(iso3,"-",REGEXP_REPLACE(NORMALIZE(label),' ',''))) );
