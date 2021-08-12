@@ -61,8 +61,8 @@ WITH
   WHERE
     -- specify partition duration (how far back we look in pipe)
     -- still need to confirm duration
-    _partitiontime BETWEEN '{{ start_messages }}'
-    AND '{{ end_messages }}'
+    _partitiontime BETWEEN '{{ start_date }}'
+    AND '{{ end_date }}'
     --AND ssvid = target_ssvid()
     AND lat > -90
     AND lat < 90
@@ -382,4 +382,4 @@ WITH
     *
   FROM
     final_fishing_event
-  WHERE event_start BETWEEN '{{ start_date }}' AND '{{ end_messages }}'
+  WHERE event_start BETWEEN '{{ start_date }}' AND '{{ end_date }}'
