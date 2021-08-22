@@ -220,7 +220,7 @@ WITH
     -- combine fishing events less than 1 hour and 2 km apart
     -- this line will combine fishing events, even if there are null or non-fishing scores between events
     OR (TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > 3600
-    AND distance_to_prev_event_m > 2000)
+    OR distance_to_prev_event_m > 2000)
     ),
 
 -- Tag all the messages with the start time of the event range that contains the message
