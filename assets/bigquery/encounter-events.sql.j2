@@ -1,93 +1,432 @@
 #standardSQL
-WITH
-  #
-  # Good encounter events
-  #
-  encounters AS (
-  SELECT
-    *
-  FROM
-    `{{ source }}`
-  WHERE
-    TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
-    AND median_speed_knots < 2 ),
 
-  #
-  # Duplicate encounters so that we have an event for each vessel
-  #
-  flattened_encounters AS (
-  SELECT
-    vessel_1_id AS vessel_id,
-    vessel_2_id AS encountered_vessel_id,
-    CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t",
-        vessel_1_id,vessel_2_id, start_time, end_time))), ".1" ) AS event_id,
-    * EXCEPT(vessel_1_id,
-      vessel_2_id)
-  FROM
-    encounters
-  UNION ALL
-  SELECT
-    vessel_2_id AS vessel_id,
-    vessel_1_id AS encountered_vessel_id,
-    CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t",
-        vessel_1_id,vessel_2_id, start_time, end_time))), ".2" ) AS event_id,
-    * EXCEPT(vessel_1_id,
-      vessel_2_id)
-  FROM
-    encounters ),
+# Include some utility functions
+{% include 'util.sql.j2' %}
 
-  #
-  # Include basic vessel information on the event
-  #
-  complete_encounter_event AS (
+WITH source_voyages AS (
     SELECT
-      encounter.*,
-      main_vessel.shipname.value AS main_vessel_shipname,
-      main_vessel.ssvid AS main_vessel_ssvid,
-      encountered_vessel.shipname.value AS encountered_vessel_shipname,
-      encountered_vessel.ssvid AS encountered_vessel_ssvid
+       *
     FROM
-      flattened_encounters AS encounter
-    LEFT JOIN
-      `{{ vessel_info }}` AS main_vessel
-    USING
-      (vessel_id)
-    LEFT JOIN
-      `{{ vessel_info }}` AS encountered_vessel
-    ON
-      encountered_vessel_id = encountered_vessel.vessel_id )
+       `{{ voyages_table }}`
+),
+
+source_encounters AS (
+    SELECT
+    *
+    FROM
+        `{{ encounters_table }}`
+    WHERE start_time BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+),
+
+source_vessel_info AS (
+    SELECT
+      *
+    FROM
+      `{{ vessel_info_table }}`
+),
+
+source_fishing_vessels AS (
+    SELECT
+        'fishing' AS vessel_type,
+        year,
+        ssvid,
+        best_flag
+    FROM
+        `{{ fishing_vessels_table }}`
+),
+
+source_carrier_vessels AS (
+    SELECT
+        'carrier' AS vessel_type,
+        year,
+        mmsi AS ssvid,
+        flag AS best_flag
+    FROM
+        `{{ carrier_vessels_table }}`
+),
+
+source_support_vessels AS (
+    SELECT
+        'support' AS vessel_type,
+         year,
+         mmsi AS ssvid,
+         flag AS best_flag
+    FROM
+        `{{ support_vessels_table }}`
+),
+
+source_mixed_vessels AS (
+    SELECT * FROM source_fishing_vessels
+    UNION ALL
+    SELECT * FROM source_carrier_vessels
+    UNION ALL
+    SELECT * FROM source_support_vessels
+),
+
+source_spatial_measures AS (
+    SELECT
+        *
+    FROM
+        `{{ spatial_measures_table }}`
+),
+
+source_country_codes AS (
+    SELECT
+        *
+    FROM
+       `{{ country_codes_table }}`
+),
+
+source_named_anchorages AS (
+    SELECT
+        *
+    FROM
+        `{{ named_anchorages_table }}`
+),
+
+
+flattened_voyages AS (
+    SELECT
+        trip_id,
+        trip_start,
+        trip_end,
+        trip_start_anchorage_id,
+        trip_end_anchorage_id,
+        vessel_id
+    FROM source_voyages
+),
+
+encounters AS (
+    SELECT
+        FORMAT("encounter|%s|%s|%t|%t", vessel_1_id, vessel_2_id, start_time, end_time) AS preliminary_event_id,
+        *
+    FROM
+        source_encounters
+    WHERE
+        TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
+        AND median_speed_knots < 2
+),
+
+carrier_fishing_encounters AS (
+    SELECT
+        encounters.preliminary_event_id,
+
+        IF (mixed_vessel_1.vessel_type = 'carrier',
+          encounters.vessel_1_id,
+          encounters.vessel_2_id
+        ) AS vessel_id_1,
+
+        IF (mixed_vessel_1.vessel_type = 'carrier',
+          encounters.vessel_2_id,
+          encounters.vessel_1_id
+        ) as vessel_id_2,
+
+        mixed_vessel_1.vessel_type AS vessel_id_1_type,
+        mixed_vessel_2.vessel_type AS vessel_id_2_type,
+    FROM
+        encounters
+          INNER JOIN
+        source_vessel_info AS vessel_info_1
+          ON
+        encounters.vessel_1_id = vessel_info_1.vessel_id
+        AND encounters.start_time between vessel_info_1.first_timestamp and vessel_info_1.last_timestamp
+          INNER JOIN
+        source_vessel_info AS vessel_info_2
+          ON
+        encounters.vessel_2_id = vessel_info_2.vessel_id
+        AND encounters.start_time between vessel_info_1.first_timestamp and vessel_info_1.last_timestamp
+          LEFT JOIN
+        source_mixed_vessels AS mixed_vessel_1
+          ON
+        vessel_info_1.ssvid = mixed_vessel_1.ssvid
+        AND EXTRACT(year FROM encounters.start_time) = mixed_vessel_1.year
+          LEFT JOIN
+        source_mixed_vessels AS mixed_vessel_2
+          ON
+        vessel_info_2.ssvid = mixed_vessel_2.ssvid
+        AND EXTRACT(year FROM encounters.start_time) = mixed_vessel_2.year
+    WHERE
+        (mixed_vessel_1.vessel_type = 'carrier' AND mixed_vessel_2.ssvid IS NOT NULL)
+        OR (mixed_vessel_2.vessel_type = 'carrier' AND mixed_vessel_1.ssvid IS NOT NULL)
+    GROUP BY
+        encounters.preliminary_event_id,
+        encounters.vessel_1_id,
+        encounters.vessel_2_id,
+        mixed_vessel_1.vessel_type,
+        mixed_vessel_2.vessel_type
+),
+
+support_fishing_encounters AS (
+    SELECT
+        encounters.preliminary_event_id,
+
+        IF (mixed_vessel_1.vessel_type = 'support',
+          encounters.vessel_1_id,
+          encounters.vessel_2_id
+        ) AS vessel_id_1,
+
+        IF (mixed_vessel_1.vessel_type = 'support',
+          encounters.vessel_2_id,
+          encounters.vessel_1_id
+        ) as vessel_id_2,
+
+        mixed_vessel_1.vessel_type AS vessel_id_1_type,
+        mixed_vessel_2.vessel_type AS vessel_id_2_type,
+    FROM
+        encounters
+          INNER JOIN
+        source_vessel_info AS vessel_info_1
+          ON
+        encounters.vessel_1_id = vessel_info_1.vessel_id
+          INNER JOIN
+        source_vessel_info AS vessel_info_2
+          ON
+        encounters.vessel_2_id = vessel_info_2.vessel_id
+          LEFT JOIN
+        source_mixed_vessels AS mixed_vessel_1
+          ON
+        vessel_info_1.ssvid = mixed_vessel_1.ssvid
+        AND EXTRACT(year FROM encounters.start_time) = mixed_vessel_1.year
+          LEFT JOIN
+        source_mixed_vessels AS mixed_vessel_2
+          ON
+        vessel_info_2.ssvid = mixed_vessel_2.ssvid
+        AND EXTRACT(year FROM encounters.start_time) = mixed_vessel_2.year
+    WHERE
+        (mixed_vessel_1.vessel_type = 'support' AND mixed_vessel_2.ssvid IS NOT NULL)
+        OR (mixed_vessel_2.vessel_type = 'support' AND mixed_vessel_1.ssvid IS NOT NULL)
+    GROUP BY
+        encounters.preliminary_event_id,
+        encounters.vessel_1_id,
+        encounters.vessel_2_id,
+        mixed_vessel_1.vessel_type,
+        mixed_vessel_2.vessel_type
+),
+
+encounters_merged AS (
+      SELECT  preliminary_event_id, vessel_id_1, vessel_id_2, vessel_id_1_type, vessel_id_2_type FROM carrier_fishing_encounters
+      UNION ALL
+      SELECT  preliminary_event_id, vessel_id_1, vessel_id_2, vessel_id_1_type, vessel_id_2_type FROM support_fishing_encounters
+),
+
+filtered_encounters AS (
+    SELECT
+        encounters.*,
+        vessel_id_1,
+        vessel_id_2,
+        vessel_id_1_type,
+        vessel_id_2_type
+    FROM
+        encounters
+        INNER JOIN encounters_merged USING (preliminary_event_id)
+),
+
+
+all_vessels AS (
+    SELECT
+        vessel_id_1 AS vessel_id,
+        vessel_id_1_type AS vessel_type
+    FROM
+        filtered_encounters
+    UNION ALL
+    SELECT
+        vessel_id_2 AS vessel_id,
+        vessel_id_2_type AS vessel_type
+    FROM
+        filtered_encounters
+),
+
+complete_encounter_event AS (
+    SELECT
+        encounter.*,
+        vessel_info_1.shipname.value AS vessel_1_shipname,
+        vessel_info_1.ssvid AS vessel_1_ssvid,
+        vessel_1_country.iso3 AS vessel_1_flag,
+        vessel_1_trip_start_anchorages.s2id AS vessel_1_trip_start_anchorage_id,
+        vessel_1_trip_start_anchorages.iso3 AS vessel_1_trip_start_iso3,
+        vessel_1_trip_start_anchorages.label AS vessel_1_trip_start_label,
+        vessel_1_trip_end_anchorages.s2id AS vessel_1_trip_end_anchorage_id,
+        vessel_1_trip_end_anchorages.iso3 AS vessel_1_trip_end_iso3,
+        vessel_1_trip_end_anchorages.label AS vessel_1_trip_end_label,
+        vessel_info_2.shipname.value AS vessel_2_shipname,
+        vessel_info_2.ssvid AS vessel_2_ssvid,
+        vessel_2_country.iso3 AS vessel_2_flag,
+        vessel_2_trip_start_anchorages.s2id AS vessel_2_trip_start_anchorage_id,
+        vessel_2_trip_start_anchorages.iso3 AS vessel_2_trip_start_iso3,
+        vessel_2_trip_start_anchorages.label AS vessel_2_trip_start_label,
+        vessel_2_trip_end_anchorages.s2id AS vessel_2_trip_end_anchorage_id,
+        vessel_2_trip_end_anchorages.iso3 AS vessel_2_trip_end_iso3,
+        vessel_2_trip_end_anchorages.label AS vessel_2_trip_end_label,
+        measures.distance_from_shore_m AS distance_from_shore_m,
+        measures.distance_from_port_m AS distance_from_port_m,
+        measures.elevation_m AS elevation_m,
+        measures.regions AS regions
+    FROM
+        filtered_encounters AS encounter
+        INNER JOIN
+        source_spatial_measures AS measures
+          ON
+        format_gridcode(encounter.mean_longitude, encounter.mean_latitude) = measures.gridcode
+        AND measures.distance_from_port_m > 10000
+          INNER JOIN
+        source_vessel_info AS vessel_info_1
+          ON
+        vessel_info_1.vessel_id = encounter.vessel_id_1
+          INNER JOIN
+        source_country_codes AS vessel_1_country
+          ON
+        SUBSTR(vessel_info_1.ssvid, 1, 3) = CAST(vessel_1_country.code AS string)
+          LEFT JOIN
+        flattened_voyages AS vessel_1_voyages
+          ON
+        vessel_info_1.vessel_id = vessel_1_voyages.vessel_id
+        AND vessel_1_voyages.trip_start < encounter.start_time
+        AND vessel_1_voyages.trip_end > encounter.end_time
+          LEFT JOIN
+        source_named_anchorages AS vessel_1_trip_start_anchorages
+          ON
+        vessel_1_voyages.trip_start_anchorage_id = vessel_1_trip_start_anchorages.s2id
+          LEFT JOIN
+        source_named_anchorages AS vessel_1_trip_end_anchorages
+          ON
+        vessel_1_voyages.trip_end_anchorage_id = vessel_1_trip_end_anchorages.s2id
+          INNER JOIN
+        source_vessel_info AS vessel_info_2
+          ON
+        vessel_info_2.vessel_id = encounter.vessel_id_2
+          INNER JOIN
+        source_country_codes AS vessel_2_country
+          ON
+        SUBSTR(vessel_info_2.ssvid, 1, 3) = CAST(vessel_2_country.code AS string)
+          LEFT JOIN
+        flattened_voyages AS vessel_2_voyages
+          ON
+        vessel_info_2.vessel_id = vessel_2_voyages.vessel_id
+        AND vessel_2_voyages.trip_start < encounter.start_time
+        AND vessel_2_voyages.trip_end > encounter.end_time
+          LEFT JOIN
+        source_named_anchorages AS vessel_2_trip_start_anchorages
+          ON
+        vessel_2_voyages.trip_start_anchorage_id = vessel_2_trip_start_anchorages.s2id
+          LEFT JOIN
+        source_named_anchorages AS vessel_2_trip_end_anchorages
+          ON
+        vessel_2_voyages.trip_end_anchorage_id = vessel_2_trip_end_anchorages.s2id
+),
+
+complete_encounter_events_with_ranks AS (
+    SELECT
+        event.*,
+        ROW_NUMBER() OVER (PARTITION BY preliminary_event_id) AS `rank`
+    FROM
+        complete_encounter_event AS event
+),
+
+deduplicated_complete_encounter_events AS (
+    SELECT
+        * EXCEPT(`rank`)
+    FROM
+        complete_encounter_events_with_ranks
+    WHERE
+        `rank` = 1
+),
+
+duplicate_encounters AS (
+    SELECT
+        vessel_id_1 AS vessel_id,
+        vessel_id_2 AS encountered_vessel_id,
+        CONCAT(TO_HEX(MD5(preliminary_event_id)), ".1") AS event_id,
+        *
+    FROM
+        deduplicated_complete_encounter_events
+    UNION ALL
+    SELECT
+        vessel_id_2 AS vessel_id,
+        vessel_id_1 AS encountered_vessel_id,
+        CONCAT(TO_HEX(MD5(preliminary_event_id)), ".2") AS event_id,
+        *
+    FROM
+        deduplicated_complete_encounter_events
+),
+
+results AS (
+    SELECT
+        event_id,
+        'encounter' AS event_type,
+        vessel_id,
+        start_time AS event_start,
+        end_time AS event_end,
+        mean_latitude AS lat_mean,
+        mean_longitude AS lon_mean,
+        mean_latitude AS lat_min,
+        mean_latitude AS lat_max,
+        mean_longitude AS lon_min,
+        mean_longitude AS lon_max,
+        spatial_measures_mean.regions AS regions_mean_position,
+        convert_m_to_km( spatial_measures_mean.distance_from_shore_m ) AS start_distance_from_shore_km,
+        convert_m_to_km( spatial_measures_mean.distance_from_shore_m ) AS end_distance_from_shore_km,
+        convert_m_to_km( spatial_measures_mean.distance_from_port_m ) AS start_distance_from_port_km,
+        convert_m_to_km( spatial_measures_mean.distance_from_port_m ) AS end_distance_from_port_km,
+        TO_JSON_STRING(
+            STRUCT(
+                ROUND(median_distance_km,3) AS median_distance_km,
+                ROUND(median_speed_knots,3) AS median_speed_knots,
+                encountered_vessel_id,
+                ce.elevation_m,
+                ce.distance_from_shore_m,
+                ce.distance_from_port_m,
+                STRUCT(ce.regions.eez,
+                    ce.regions.fao,
+                    ce.regions.rfmo
+                ) AS regions
+            )
+        ) AS event_info,
+        TO_JSON_STRING([
+            STRUCT(
+                vessel_id_1 AS `id`,
+                vessel_id_1_type AS `type`,
+                vessel_1_ssvid AS `ssvid`,
+                vessel_1_shipname AS `name`,
+                vessel_1_flag AS `flag`,
+                STRUCT(
+                    vessel_1_trip_start_anchorage_id AS anchorage_id,
+                    generate_port_id(vessel_1_trip_start_iso3, vessel_1_trip_start_label) AS port_id,
+                    vessel_1_trip_start_iso3 AS iso,
+                    vessel_1_trip_start_label AS label
+                ) AS origin_port,
+                STRUCT(
+                    vessel_1_trip_end_anchorage_id AS anchorage_id,
+                    generate_port_id(vessel_1_trip_end_iso3,vessel_1_trip_end_label) AS port_id,
+                    vessel_1_trip_end_iso3 AS iso,
+                    vessel_1_trip_end_label AS label
+                ) AS destination_port
+            ),
+            STRUCT(
+                vessel_id_2 AS `id`,
+                vessel_id_2_type AS `type`,
+                vessel_2_ssvid AS `ssvid`,
+                vessel_2_shipname AS `name`,
+                vessel_2_flag AS `flag`,
+                STRUCT(
+                    vessel_2_trip_start_anchorage_id AS anchorage_id,
+                    generate_port_id(vessel_2_trip_start_iso3, vessel_2_trip_start_label) AS port_id,
+                    vessel_2_trip_start_iso3 AS iso,
+                    vessel_2_trip_start_label AS label
+                ) AS origin_port,
+                STRUCT(
+                    vessel_2_trip_end_anchorage_id AS anchorage_id,
+                    generate_port_id(vessel_2_trip_end_iso3, vessel_2_trip_end_label) AS port_id,
+                    vessel_2_trip_end_iso3 AS iso,
+                    vessel_2_trip_end_label AS label
+                ) AS destination_port
+            )
+        ]) AS event_vessels,
+    FROM duplicate_encounters ce
+    JOIN
+        source_spatial_measures AS spatial_measures_mean ON format_gridcode(mean_longitude, mean_latitude) = spatial_measures_mean.gridcode
+)
 
 SELECT
-  event_id,
-  'encounter' AS event_type,
-  vessel_id,
-  start_time AS event_start,
-  end_time AS event_end,
-  mean_latitude AS lat_mean,
-  mean_longitude AS lon_mean,
-  mean_latitude AS lat_min,
-  mean_latitude AS lat_max,
-  mean_longitude AS lon_min,
-  mean_longitude AS lon_max,
-  TO_JSON_STRING(
-    STRUCT(
-      ROUND(median_distance_km,3) AS median_distance_km,
-      ROUND(median_speed_knots,3) AS median_speed_knots,
-      encountered_vessel_id
-    )
-  ) AS event_info,
-  TO_JSON_STRING([
-    STRUCT(
-      vessel_id AS `id`,
-      main_vessel_ssvid AS `ssvid`,
-      main_vessel_shipname AS `name`
-    ),
-    STRUCT(
-      encountered_vessel_id AS `id`,
-      encountered_vessel_ssvid AS `ssvid`,
-      encountered_vessel_shipname AS `name`
-    )
-  ]) as event_vessels,
-  ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(mean_longitude AS string), ' ', CAST(mean_latitude AS string), ')')) AS event_geography
+  *
 FROM
-  complete_encounter_event
+  results
