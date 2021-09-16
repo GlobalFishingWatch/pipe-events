@@ -1,5 +1,26 @@
 #standardSQL
+
+-- Include some utility functions
+{% include 'util.sql.j2' %}
+
 WITH
+
+  #
+  # Spatial measures data
+  #
+  source_spatial_measures AS (
+    SELECT *
+    FROM `{{ spatial_measures_table }}`
+  ),
+
+  #
+  # Vessel info data
+  #
+  source_vessel_info AS (
+    SELECT *
+    FROM `{{ vessel_info_table }}`
+  ),
+
   #
   # Good encounter events
   #
@@ -7,7 +28,7 @@ WITH
   SELECT
     *
   FROM
-    `{{ source }}`
+    `{{ encounters_table }}`
   WHERE
     TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
     AND median_speed_knots < 2 ),
@@ -19,8 +40,7 @@ WITH
   SELECT
     vessel_1_id AS vessel_id,
     vessel_2_id AS encountered_vessel_id,
-    CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t",
-        vessel_1_id,vessel_2_id, start_time, end_time))), ".1" ) AS event_id,
+    CONCAT(encounter_id, ".1" ) AS event_id,
     * EXCEPT(vessel_1_id,
       vessel_2_id)
   FROM
@@ -29,8 +49,7 @@ WITH
   SELECT
     vessel_2_id AS vessel_id,
     vessel_1_id AS encountered_vessel_id,
-    CONCAT( TO_HEX(MD5(FORMAT("encounter|%s|%s|%t|%t",
-        vessel_1_id,vessel_2_id, start_time, end_time))), ".2" ) AS event_id,
+    CONCAT(encounter_id, ".2" ) AS event_id,
     * EXCEPT(vessel_1_id,
       vessel_2_id)
   FROM
@@ -49,45 +68,50 @@ WITH
     FROM
       flattened_encounters AS encounter
     LEFT JOIN
-      `{{ vessel_info }}` AS main_vessel
+      source_vessel_info AS main_vessel
     USING
       (vessel_id)
     LEFT JOIN
-      `{{ vessel_info }}` AS encountered_vessel
+      source_vessel_info AS encountered_vessel
     ON
       encountered_vessel_id = encountered_vessel.vessel_id )
 
-SELECT
-  event_id,
-  'encounter' AS event_type,
-  vessel_id,
-  start_time AS event_start,
-  end_time AS event_end,
-  mean_latitude AS lat_mean,
-  mean_longitude AS lon_mean,
-  mean_latitude AS lat_min,
-  mean_latitude AS lat_max,
-  mean_longitude AS lon_min,
-  mean_longitude AS lon_max,
-  TO_JSON_STRING(
-    STRUCT(
-      ROUND(median_distance_km,3) AS median_distance_km,
-      ROUND(median_speed_knots,3) AS median_speed_knots,
-      encountered_vessel_id
-    )
-  ) AS event_info,
-  TO_JSON_STRING([
-    STRUCT(
-      vessel_id AS `id`,
-      main_vessel_ssvid AS `ssvid`,
-      main_vessel_shipname AS `name`
-    ),
-    STRUCT(
-      encountered_vessel_id AS `id`,
-      encountered_vessel_ssvid AS `ssvid`,
-      encountered_vessel_shipname AS `name`
-    )
-  ]) as event_vessels,
-  ST_GEOGFROMTEXT(CONCAT('POINT (', CAST(mean_longitude AS string), ' ', CAST(mean_latitude AS string), ')')) AS event_geography
-FROM
-  complete_encounter_event
+  SELECT
+    event_id,
+    'encounter' AS event_type,
+    vessel_id,
+    NULL AS seg_id,
+    start_time AS event_start,
+    end_time AS event_end,
+    mean_latitude AS lat_mean,
+    mean_longitude AS lon_mean,
+    mean_latitude AS lat_min,
+    mean_latitude AS lat_max,
+    mean_longitude AS lon_min,
+    mean_longitude AS lon_max,
+    spatial_measures_mean.regions AS regions_mean_position,
+    convert_m_to_km( spatial_measures_mean.distance_from_shore_m ) AS start_distance_from_shore_km,
+    convert_m_to_km( spatial_measures_mean.distance_from_shore_m ) AS end_distance_from_shore_km,
+    convert_m_to_km( spatial_measures_mean.distance_from_port_m ) AS start_distance_from_port_km,
+    convert_m_to_km( spatial_measures_mean.distance_from_port_m ) AS end_distance_from_port_km,
+    TO_JSON_STRING(
+      STRUCT(
+        ROUND(median_distance_km,3) AS median_distance_km,
+        ROUND(median_speed_knots,3) AS median_speed_knots,
+        encountered_vessel_id
+     )
+    ) AS event_info,
+    TO_JSON_STRING([
+      STRUCT(
+        vessel_id AS `id`,
+        main_vessel_ssvid AS `ssvid`,
+        main_vessel_shipname AS `name`
+      ),
+      STRUCT(
+        encountered_vessel_id AS `id`,
+        encountered_vessel_ssvid AS `ssvid`,
+        encountered_vessel_shipname AS `name`
+      )
+    ]) as event_vessels
+  FROM complete_encounter_event
+    JOIN source_spatial_measures AS spatial_measures_mean ON format_gridcode(mean_longitude, mean_latitude) = spatial_measures_mean.gridcode
