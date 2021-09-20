@@ -41,7 +41,8 @@ WITH
     vessel_1_id AS vessel_id,
     vessel_2_id AS encountered_vessel_id,
     CONCAT(encounter_id, ".1" ) AS event_id,
-    vessel_1_seg_ids[ORDINAL(1)] AS seg_id,
+    vessel_1_seg_ids as seg_ids,
+    vessel_2_seg_ids as encountered_seg_ids,
     vessel_1_point_count AS vessel_point_count,
     vessel_2_point_count AS encountered_point_count,
     * EXCEPT(vessel_1_id,
@@ -53,7 +54,8 @@ WITH
     vessel_2_id AS vessel_id,
     vessel_1_id AS encountered_vessel_id,
     CONCAT(encounter_id, ".2" ) AS event_id,
-    vessel_2_seg_ids[ORDINAL(1)] AS seg_id,
+    vessel_2_seg_ids as seg_ids,
+    vessel_1_seg_ids as encountered_seg_ids,
     vessel_2_point_count AS vessel_point_count,
     vessel_1_point_count AS encountered_point_count,
     * EXCEPT(vessel_1_id,
@@ -86,7 +88,7 @@ WITH
     event_id,
     'encounter' AS event_type,
     vessel_id,
-    seg_id,
+    NULL AS seg_id,
     start_time AS event_start,
     end_time AS event_end,
     mean_latitude AS lat_mean,
@@ -112,13 +114,15 @@ WITH
         vessel_id AS `id`,
         main_vessel_ssvid AS `ssvid`,
         main_vessel_shipname AS `name`,
-        vessel_point_count AS point_count
+        vessel_point_count AS point_count,
+        seg_ids
       ),
       STRUCT(
         encountered_vessel_id AS `id`,
         encountered_vessel_ssvid AS `ssvid`,
         encountered_vessel_shipname AS `name`,
-        encountered_point_count AS point_count
+        encountered_point_count AS point_count,
+        encountered_seg_ids AS seg_ids
       )
     ]) as event_vessels
   FROM complete_encounter_event
