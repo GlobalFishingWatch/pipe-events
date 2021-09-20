@@ -6,9 +6,11 @@ source ${THIS_SCRIPT_DIR}/pipeline.sh
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
-  SOURCE_TABLE \
-  SEGMENT_INFO \
-  SPATIAL_MEASURES \
+  SOURCE_LOITERING \
+  SOURCE_SEGMENT_INFO \
+  SOURCE_SPATIAL_MEASURES \
+  SOURCE_RESEARCH_SEGS \
+  MINIMUM_DISTANCE_FROM_SHORE_NM \
   DEST_TABLE
 )
 
@@ -43,7 +45,7 @@ fi
 echo "Ensuring events table ${DEST_TABLE} exists"
 TABLE_DESC=(
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${SOURCE_TABLE}"
+  "* Source: ${SOURCE_LOITERING}"
   "* Command:"
   "$(basename $0)"
   "$@"
@@ -83,11 +85,13 @@ INSERT_SQL=${ASSETS}/bigquery/loitering-events.sql.j2
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
-   -D loitering_table="${SOURCE_TABLE}" \
    -D start_date="${START_DATE}" \
    -D end_date="${END_DATE}" \
-   -D segments_info_table="${SEGMENT_INFO}" \
-   -D spatial_measures_table=${SPATIAL_MEASURES} \
+   -D source_loitering="${SOURCE_LOITERING}" \
+   -D source_segment_info="${SOURCE_SEGMENT_INFO}" \
+   -D source_spatial_measures=${SOURCE_SPATIAL_MEASURES} \
+   -D source_research_segs=${SOURCE_RESEARCH_SEGS} \
+   -D minimum_distance_from_shore_nm=${MINIMUM_DISTANCE_FROM_SHORE_NM} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${DEST_TABLE}
