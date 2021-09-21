@@ -9,7 +9,7 @@ WITH
   SELECT
     *
   FROM
-    `{{ loitering_table }}`
+    `{{ source_loitering }}`
   WHERE
     loitering_start_timestamp BETWEEN '{{ start_date }}'
     AND '{{ end_date }}'),
@@ -17,12 +17,40 @@ WITH
   SELECT
     *
   FROM
-    `{{ segments_info_table }}` ),
+    `{{ source_segment_info }}` ),
   source_spatial_measures AS (
   SELECT
     *
   FROM
-    `{{ spatial_measures_table }}` ),
+    `{{ source_spatial_measures }}` ),
+  source_research_segs AS (
+    SELECT
+      *
+    FROM
+      `{{ source_research_segs }}`),
+  -- Build a set of good segments
+  good_segments AS (
+    SELECT
+      seg_id
+    FROM
+      source_research_segs
+    WHERE
+      good_seg
+      AND NOT overlapping_and_short
+  ),
+  -- Restrict the source loitering table to denoised events
+  denoised_loitering AS (
+    SELECT
+      loitering.*
+    FROM
+      source_loitering loitering
+    INNER JOIN 
+      good_segments
+    USING 
+      (seg_id)
+    WHERE
+      avg_distance_from_shore_nm >= {{ minimum_distance_from_shore_nm }}
+  ),
   -- Get base info, populate vessel info, and calculate vessel_id, lat_mean,
   --lot_mean and convert distances to km
   base_loitering_event AS (
@@ -48,7 +76,7 @@ WITH
         si.shipname.value AS `name`,
         seg_id )]) AS event_vessels
   FROM
-    source_loitering AS lo
+    denoised_loitering AS lo
   JOIN
     source_segment_info si
   USING
