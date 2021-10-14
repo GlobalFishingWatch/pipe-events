@@ -22,7 +22,6 @@ WITH
       mmsi AS ssvid,
       'support' AS class
     FROM `{{ support_vessels_byyear_table }}`
-      -- FROM `world-fishing-827.vessel_database.purse_seine_support_vessels_byyear_v20210901`
   ),
 
   source_carriers_vessels AS (
@@ -31,7 +30,6 @@ WITH
         mmsi AS ssvid,
         'carrier' AS class
     FROM `{{ carrier_vessels_byyear_table }}`
---    FROM `vessel_database.carrier_vessels_byyear_v20210901`
   ),
 
   source_fishing_vessels AS (
@@ -40,7 +38,6 @@ WITH
         ssvid,
         'fishing' AS class
     FROM `{{ fishing_vessels_byyear_table }}`
-    -- FROM `world-fishing-827.gfw_research.fishing_vessels_ssvid_v20210913`
   ),
 
   #
@@ -85,7 +82,7 @@ WITH
   SELECT
     *
   FROM
-    `pipe_production_v20201001.encounters`
+    {{ encounters_table }}
   WHERE
     TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
     AND median_speed_knots < 2 ),
