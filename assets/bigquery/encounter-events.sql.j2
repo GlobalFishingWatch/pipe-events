@@ -48,7 +48,15 @@ WITH
     FROM `{{ vessel_info_table }}`
   ),
 
- #
+  #
+  # encounters
+  #
+  source_encounters AS (
+    SELECT *
+    FROM pipe_production_v20201001.encounters
+  ),
+
+  #
   # Unify support, carriers and support vessels in one table
   #
   support_carrier_and_fishing_vessels AS (
@@ -58,7 +66,6 @@ WITH
     UNION ALL
     SELECT * FROM source_support_vessels
   ),
-
   #
   # Populate the basic info for all vessels (including vessels are not support, carrier or fishing)
   #
@@ -67,14 +74,14 @@ WITH
         vessel_id,
         shipname,
         vessel_info.ssvid,
-        IF (class IS NULL, 'other', class) AS class
+        IF (class IS NULL, 'other', class) AS class,
+        year
     FROM source_vessel_info vessel_info
       LEFT JOIN support_carrier_and_fishing_vessels vessels ON (
             vessel_info.ssvid = vessels.ssvid AND
             vessels.year BETWEEN EXTRACT(YEAR FROM vessel_info.first_timestamp) AND EXTRACT(YEAR FROM vessel_info.last_timestamp)
       )
-  ),
-
+ ),
   #
   # Good encounter events
   #
@@ -82,7 +89,7 @@ WITH
   SELECT
     *
   FROM
-    {{ encounters_table }}
+    source_encounters
   WHERE
     TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
     AND median_speed_knots < 2 ),
@@ -115,7 +122,8 @@ WITH
     * EXCEPT(vessel_1_id,
       vessel_2_id)
   FROM
-    encounters ),
+    encounters
+  ),
 
   #
   # Include basic vessel information on the event
@@ -126,19 +134,22 @@ WITH
       main_vessel.shipname.value AS main_vessel_shipname,
       main_vessel.ssvid AS main_vessel_ssvid,
       main_vessel.class AS main_vessel_class,
-      encountered_vessel.shipname.value AS encountered_vessel_shipname,
-      encountered_vessel.ssvid AS encountered_vessel_ssvid,
-      encountered_vessel.class AS encountered_vessel_class,
+      encountered_vessel2.shipname.value AS encountered_vessel_shipname,
+      encountered_vessel2.ssvid AS encountered_vessel_ssvid,
+      encountered_vessel2.class AS encountered_vessel_class,
     FROM
       flattened_encounters AS encounter
     LEFT JOIN
       vessels_with_id AS main_vessel
-    USING
-      (vessel_id)
+      ON
+      encountered_vessel_id = main_vessel.vessel_id
+      AND EXTRACT(YEAR FROM encounter.start_time)= main_vessel.year
     LEFT JOIN
-      vessels_with_id AS encountered_vessel
+      vessels_with_id AS encountered_vessel2
     ON
-      encountered_vessel_id = encountered_vessel.vessel_id )
+      encountered_vessel_id = encountered_vessel2.vessel_id
+      AND EXTRACT(YEAR FROM encounter.start_time)= encountered_vessel2.year
+  )
 
   SELECT
     event_id,
