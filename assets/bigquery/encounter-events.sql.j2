@@ -14,6 +14,33 @@ WITH
   ),
 
   #
+  # Vessels byyear sources
+  #
+  source_support_vessels AS (
+    SELECT
+      year,
+      mmsi AS ssvid,
+      'support' AS class
+    FROM `{{ support_vessels_byyear_table }}`
+  ),
+
+  source_carriers_vessels AS (
+    SELECT
+        year,
+        mmsi AS ssvid,
+        'carrier' AS class
+    FROM `{{ carrier_vessels_byyear_table }}`
+  ),
+
+  source_fishing_vessels AS (
+    SELECT
+        year,
+        ssvid,
+        'fishing' AS class
+    FROM `{{ fishing_vessels_byyear_table }}`
+  ),
+
+  #
   # Vessel info data
   #
   source_vessel_info AS (
@@ -22,13 +49,56 @@ WITH
   ),
 
   #
+  # encounters
+  #
+  source_encounters AS (
+    SELECT *
+    FROM pipe_production_v20201001.encounters
+  ),
+
+  #
+  # Unify support, carriers and support vessels in one table
+  #
+  # Hannah said:
+  # the support vessels were manually checked by TMT, but we likely estimated some as fishing
+  # We could change the fishing vessel subquery to say AND NOT IN support vessel list.
+  # If we concat the ssvid codes and years to avoid losing vessels in others years
+  support_carrier_and_fishing_vessels AS (
+      SELECT * FROM source_carriers_vessels
+      UNION ALL
+      SELECT * FROM source_fishing_vessels fishing_vessel WHERE CONCAT(ssvid, '-', year) NOT IN (
+            SELECT CONCAT(ssvid,'-', year)
+            FROM source_support_vessels support_vessel
+            WHERE support_vessel.ssvid = fishing_vessel.ssvid
+                AND support_vessel.year = fishing_vessel.year
+      )
+      UNION ALL
+      SELECT * FROM source_support_vessels
+  ),
+  #
+  # Populate the basic info for all vessels (including vessels are not support, carrier or fishing)
+  #
+  vessels_with_id AS (
+    SELECT
+        vessel_id,
+        shipname,
+        vessel_info.ssvid,
+        IF (class IS NULL, 'other', class) AS class,
+        year
+    FROM source_vessel_info vessel_info
+      LEFT JOIN support_carrier_and_fishing_vessels vessels ON (
+            vessel_info.ssvid = vessels.ssvid AND
+            vessels.year BETWEEN EXTRACT(YEAR FROM vessel_info.first_timestamp) AND EXTRACT(YEAR FROM vessel_info.last_timestamp)
+      )
+ ),
+  #
   # Good encounter events
   #
   encounters AS (
   SELECT
     *
   FROM
-    `{{ encounters_table }}`
+    source_encounters
   WHERE
     TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
     AND median_speed_knots < 2 ),
@@ -61,7 +131,8 @@ WITH
     * EXCEPT(vessel_1_id,
       vessel_2_id)
   FROM
-    encounters ),
+    encounters
+  ),
 
   #
   # Include basic vessel information on the event
@@ -71,18 +142,23 @@ WITH
       encounter.*,
       main_vessel.shipname.value AS main_vessel_shipname,
       main_vessel.ssvid AS main_vessel_ssvid,
-      encountered_vessel.shipname.value AS encountered_vessel_shipname,
-      encountered_vessel.ssvid AS encountered_vessel_ssvid
+      main_vessel.class AS main_vessel_class,
+      encountered_vessel2.shipname.value AS encountered_vessel_shipname,
+      encountered_vessel2.ssvid AS encountered_vessel_ssvid,
+      encountered_vessel2.class AS encountered_vessel_class,
     FROM
       flattened_encounters AS encounter
     LEFT JOIN
-      source_vessel_info AS main_vessel
-    USING
-      (vessel_id)
+      vessels_with_id AS main_vessel
+      ON
+      encountered_vessel_id = main_vessel.vessel_id
+      AND EXTRACT(YEAR FROM encounter.start_time)= main_vessel.year
     LEFT JOIN
-      source_vessel_info AS encountered_vessel
+      vessels_with_id AS encountered_vessel2
     ON
-      encountered_vessel_id = encountered_vessel.vessel_id )
+      encountered_vessel_id = encountered_vessel2.vessel_id
+      AND EXTRACT(YEAR FROM encounter.start_time)= encountered_vessel2.year
+  )
 
   SELECT
     event_id,
@@ -106,7 +182,8 @@ WITH
       STRUCT(
         ROUND(median_distance_km,3) AS median_distance_km,
         ROUND(median_speed_knots,3) AS median_speed_knots,
-        encountered_vessel_id
+        encountered_vessel_id,
+        CONCAT(main_vessel_class, '-', encountered_vessel_class) AS vessel_classes
      )
     ) AS event_info,
     TO_JSON_STRING([
