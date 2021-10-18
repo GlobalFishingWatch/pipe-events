@@ -59,12 +59,21 @@ WITH
   #
   # Unify support, carriers and support vessels in one table
   #
+  # Hannah said:
+  # the support vessels were manually checked by TMT, but we likely estimated some as fishing
+  # We could change the fishing vessel subquery to say AND NOT IN support vessel list.
+  # If we concat the ssvid codes and years to avoid losing vessels in others years
   support_carrier_and_fishing_vessels AS (
-    SELECT * FROM source_carriers_vessels
-    UNION ALL
-    SELECT * FROM source_fishing_vessels
-    UNION ALL
-    SELECT * FROM source_support_vessels
+      SELECT * FROM source_carriers_vessels
+      UNION ALL
+      SELECT * FROM source_fishing_vessels fishing_vessel WHERE CONCAT(ssvid, '-', year) NOT IN (
+            SELECT CONCAT(ssvid,'-', year)
+            FROM source_support_vessels support_vessel
+            WHERE support_vessel.ssvid = fishing_vessel.ssvid
+                AND support_vessel.year = fishing_vessel.year
+      )
+      UNION ALL
+      SELECT * FROM source_support_vessels
   ),
   #
   # Populate the basic info for all vessels (including vessels are not support, carrier or fishing)
