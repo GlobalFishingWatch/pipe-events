@@ -152,12 +152,12 @@ WITH
       vessels_with_id AS main_vessel
       ON
       encountered_vessel_id = main_vessel.vessel_id
-      AND EXTRACT(YEAR FROM encounter.start_time)= main_vessel.year
-    LEFT JOIN
+      AND (EXTRACT(YEAR FROM encounter.start_time)= main_vessel.year OR main_vessel.year IS NULL)
+    LEFT JOIN    LEFT JOIN
       vessels_with_id AS encountered_vessel2
     ON
       encountered_vessel_id = encountered_vessel2.vessel_id
-      AND EXTRACT(YEAR FROM encounter.start_time)= encountered_vessel2.year
+      AND (EXTRACT(YEAR FROM encounter.start_time)= encountered_vessel2.year OR encountered_vessel2.year IS NULL)
   )
 
   SELECT
