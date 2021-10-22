@@ -64,33 +64,63 @@ WITH
   # We could change the fishing vessel subquery to say AND NOT IN support vessel list.
   # If we concat the ssvid codes and years to avoid losing vessels in others years
   support_carrier_and_fishing_vessels AS (
-      SELECT * FROM source_carriers_vessels
-      UNION ALL
-      SELECT * FROM source_fishing_vessels fishing_vessel WHERE CONCAT(ssvid, '-', year) NOT IN (
-            SELECT CONCAT(ssvid,'-', year)
-            FROM source_support_vessels support_vessel
-            WHERE support_vessel.ssvid = fishing_vessel.ssvid
-                AND support_vessel.year = fishing_vessel.year
-      )
-      UNION ALL
-      SELECT * FROM source_support_vessels
+        SELECT * FROM source_carriers_vessels
+        UNION ALL
+        SELECT *
+        FROM source_fishing_vessels fishing_vessel
+        WHERE CONCAT(ssvid, '-', year) NOT IN (
+                SELECT CONCAT(ssvid,'-', year)
+                FROM source_support_vessels support_vessel
+                WHERE support_vessel.ssvid = fishing_vessel.ssvid
+                    AND support_vessel.year = fishing_vessel.year
+            )
+            AND CONCAT(ssvid, '-', year) NOT IN (
+                SELECT CONCAT(ssvid,'-', year)
+                FROM source_carriers_vessels carrer_vessel
+                WHERE carrer_vessel.ssvid = fishing_vessel.ssvid
+                    AND carrer_vessel.year = fishing_vessel.year
+            )
+        UNION ALL
+        SELECT * FROM source_support_vessels
   ),
-  #
+
+  support_carrier_and_fishing_vessels_deduplicated AS (
+      SELECT DISTINCT ssvid, year, class
+      FROM support_carrier_and_fishing_vessels
+  ),
+
+   #
   # Populate the basic info for all vessels (including vessels are not support, carrier or fishing)
   #
-  vessels_with_id AS (
+  support_carrier_and_fishing_with_id AS (
     SELECT
-        vessel_id,
-        shipname,
+        vessel_info.vessel_id,
+        vessel_info.shipname,
         vessel_info.ssvid,
-        IF (class IS NULL, 'other', class) AS class,
-        year
+        `world-fishing-827.udfs.mmsi_to_iso3`(vessel_info.ssvid) AS flag,
+        vessels.year,
+        class
     FROM source_vessel_info vessel_info
-      LEFT JOIN support_carrier_and_fishing_vessels vessels ON (
+     JOIN support_carrier_and_fishing_vessels_deduplicated vessels ON (
             vessel_info.ssvid = vessels.ssvid AND
-            vessels.year BETWEEN EXTRACT(YEAR FROM vessel_info.first_timestamp) AND EXTRACT(YEAR FROM vessel_info.last_timestamp)
+            (vessels.year BETWEEN EXTRACT(YEAR FROM vessel_info.first_timestamp) AND EXTRACT(YEAR FROM vessel_info.last_timestamp))
       )
- ),
+  ),
+
+  all_vessels_with_id AS (
+      SELECT * FROM support_carrier_and_fishing_with_id
+      UNION ALL
+      SELECT
+        vessel_info.vessel_id,
+        vessel_info.shipname,
+        vessel_info.ssvid,
+        `world-fishing-827.udfs.mmsi_to_iso3`(vessel_info.ssvid) AS flag,
+        null AS year,
+        'other' AS class
+      FROM source_vessel_info vessel_info WHERE vessel_id NOT IN (SELECT vessel_id FROM support_carrier_and_fishing_with_id)
+  ),
+
+
   #
   # Good encounter events
   #
@@ -98,11 +128,10 @@ WITH
   SELECT
     *
   FROM
-    source_encounters
+    pipe_production_v20201001.encounters
   WHERE
     TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
     AND median_speed_knots < 2 ),
-
   #
   # Duplicate encounters so that we have an event for each vessel
   #
@@ -131,8 +160,7 @@ WITH
     * EXCEPT(vessel_1_id,
       vessel_2_id)
   FROM
-    encounters
-  ),
+    encounters ),
 
   #
   # Include basic vessel information on the event
@@ -143,22 +171,25 @@ WITH
       main_vessel.shipname.value AS main_vessel_shipname,
       main_vessel.ssvid AS main_vessel_ssvid,
       main_vessel.class AS main_vessel_class,
+      main_vessel.flag AS main_vessel_flag,
       encountered_vessel2.shipname.value AS encountered_vessel_shipname,
       encountered_vessel2.ssvid AS encountered_vessel_ssvid,
       encountered_vessel2.class AS encountered_vessel_class,
+      encountered_vessel2.flag AS encountered_vessel_flag
     FROM
       flattened_encounters AS encounter
     LEFT JOIN
-      vessels_with_id AS main_vessel
+      all_vessels_with_id AS main_vessel
       ON
-      encountered_vessel_id = main_vessel.vessel_id
+      encounter.vessel_id = main_vessel.vessel_id
       AND (EXTRACT(YEAR FROM encounter.start_time)= main_vessel.year OR main_vessel.year IS NULL)
     LEFT JOIN
-      vessels_with_id AS encountered_vessel2
+      all_vessels_with_id AS encountered_vessel2
     ON
       encountered_vessel_id = encountered_vessel2.vessel_id
       AND (EXTRACT(YEAR FROM encounter.start_time)= encountered_vessel2.year OR encountered_vessel2.year IS NULL)
   )
+
 
   SELECT
     event_id,
@@ -192,6 +223,8 @@ WITH
         main_vessel_ssvid AS `ssvid`,
         main_vessel_shipname AS `name`,
         vessel_point_count AS point_count,
+        main_vessel_class AS `type`,
+        main_vessel_flag AS `flag`,
         seg_ids
       ),
       STRUCT(
@@ -199,6 +232,8 @@ WITH
         encountered_vessel_ssvid AS `ssvid`,
         encountered_vessel_shipname AS `name`,
         encountered_point_count AS point_count,
+        encountered_vessel_class as `type`,
+        encountered_vessel_flag AS `flag`,
         encountered_seg_ids AS seg_ids
       )
     ]) as event_vessels
