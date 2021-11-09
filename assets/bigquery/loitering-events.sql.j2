@@ -198,11 +198,15 @@ WITH
             vessel.class as vessel_class
             )
         ) AS event_info,
-        TO_JSON_STRING([STRUCT( vessel_id AS `id`,
-            lo.ssvid AS `ssvid`,
-            si.shipname.value AS `name`,
-            seg_id)]
-        ) AS event_vessels
+        TO_JSON_STRING([
+            STRUCT(
+                vessel_id AS `id`,
+                lo.ssvid AS `ssvid`,
+                si.shipname.value AS `name`,
+                seg_id,
+                vessel.class AS `type`
+            )
+        ]) AS event_vessels
     FROM denoised_loitering AS lo JOIN source_segment_info si USING (seg_id)
         JOIN all_vessels_with_id_deduplicated vessel USING (vessel_id)
   )
