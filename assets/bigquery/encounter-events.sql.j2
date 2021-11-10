@@ -63,7 +63,7 @@ WITH
   # the support vessels were manually checked by TMT, but we likely estimated some as fishing
   # We could change the fishing vessel subquery to say AND NOT IN support vessel list.
   # If we concat the ssvid codes and years to avoid losing vessels in others years
-  support_carrier_and_fishing_vessels AS (cccc
+  support_carrier_and_fishing_vessels AS (
         SELECT * FROM source_carriers_vessels
         UNION ALL
         SELECT *
