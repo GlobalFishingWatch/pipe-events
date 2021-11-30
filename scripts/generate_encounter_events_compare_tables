@@ -47,9 +47,9 @@ end_date_no_hyphens=${END_DATE//-}
 end_date_minus_one_day_no_hyphens=${end_date_minus_one_day//-}
 end_date_minus_two_days_no_hyphens=${end_date_minus_two_days//-}
 
-current_table_name="${DEST_TABLE}_${end_date_no_hyphens}"
-one_day_previous_table_name="${DEST_TABLE}_${end_date_minus_one_day_no_hyphens}"
-two_days_previous_table_name="${DEST_TABLE}_${end_date_minus_two_days_no_hyphens}"
+current_table_name="${DEST_TABLE}_v${end_date_no_hyphens}"
+one_day_previous_table_name="${DEST_TABLE}_v${end_date_minus_one_day_no_hyphens}"
+two_days_previous_table_name="${DEST_TABLE}_v${end_date_minus_two_days_no_hyphens}"
 
 view_name="${DEST_TABLE//:/.}"
 
