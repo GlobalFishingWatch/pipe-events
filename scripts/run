@@ -4,11 +4,16 @@ THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 
 display_usage() {
 	echo "Available Commands"
-	echo "  generate_encounter_events          publish encounter (vessel rendevouz at sea) events"
-	echo "  generate_anchorage_events          publish port (port in and out) events"
-	echo "  generate_fishing_events            publish continuous fishing message events"
-	echo "  generate_port_visits_events        publish port visits events"
-  echo "  publish_postgres                   publish events of a given bigquery table to a postgres database"
+	echo "  generate_encounter_events                       publish encounter (vessel rendevouz at sea) events"
+	echo "  generate_anchorage_events                       publish port (port in and out) events"
+	echo "  generate_fishing_events                         publish continuous fishing message events"
+	echo "  generate_port_visits_events                     publish port visits events"
+	echo "  generate_loitering_events_compare_tables        Publish loitering events (Compare method)"
+	echo "  generate_port_visits_events_compare_tables      Publish port visits events (Compare method)"
+	echo "  generate_fishing_events_compare_tables          Publish fishing events (Compare method)"
+	echo "  generate_encounter_events_compare_tables        Publish encounter events (Compare method)"
+
+  #echo "  publish_postgres                   publish events of a given bigquery table to a postgres database"
 	}
 
 
@@ -39,6 +44,22 @@ case $1 in
 
   generate_port_visits_events)
     ${THIS_SCRIPT_DIR}/generate_port_visits_events "${@:2}"
+    ;;
+
+  generate_loitering_events_compare_tables)
+    ${THIS_SCRIPT_DIR}/generate_loitering_events_compare_tables "${@:2}"
+    ;;
+
+  generate_port_visits_events_compare_tables)
+    ${THIS_SCRIPT_DIR}/generate_port_visits_events_compare_tables "${@:2}"
+    ;;
+
+  generate_fishing_events_compare_tables)
+    ${THIS_SCRIPT_DIR}/generate_fishing_events_compare_tables "${@:2}"
+    ;;
+
+  generate_encounter_events_compare_tables)
+    ${THIS_SCRIPT_DIR}/generate_encounter_events_compare_tables "${@:2}"
     ;;
 
   publish_postgres)
