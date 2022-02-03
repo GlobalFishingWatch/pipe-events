@@ -26,29 +26,30 @@ WITH
 
   source_carriers_vessels AS (
     SELECT
-        year,
-        mmsi AS ssvid,
-        'carrier' AS class
+      year,
+      mmsi AS ssvid,
+      'carrier' AS class
     FROM `{{ carrier_vessels_byyear_table }}`
   ),
 
   source_fishing_vessels AS (
     SELECT
-      ssvid,
       year,
+      ssvid,
       'fishing' AS class
-      FROM `{{ fishing_vessels_byyear_table }}`
+    FROM `{{ fishing_vessels_byyear_table }}`
 
       -- We just need to extend the info from January to June
-      WHERE year < 2022
+    WHERE year < 2022
 
-      UNION ALL
-      SELECT
-        ssvid,
-        year,
-        'fishing' AS class
-      FROM `{{ fishing_vessels_byyear_table }}`
-      WHERE year = 2021
+    UNION ALL
+
+    SELECT
+      year,
+      ssvid,
+      'fishing' AS class
+    FROM `{{ fishing_vessels_byyear_table }}`
+    WHERE year = 2021
   ),
 
   #
