@@ -34,10 +34,21 @@ WITH
 
   source_fishing_vessels AS (
     SELECT
-        year,
+      ssvid,
+      year,
+      'fishing' AS class
+      FROM `{{ fishing_vessels_byyear_table }}`
+
+      -- We just need to extend the info from January to June
+      WHERE year < 2022
+
+      UNION ALL
+      SELECT
         ssvid,
+        year,
         'fishing' AS class
-    FROM `{{ fishing_vessels_byyear_table }}`
+      FROM `{{ fishing_vessels_byyear_table }}`
+      WHERE year = 2021
   ),
 
   #
@@ -89,7 +100,7 @@ WITH
       FROM support_carrier_and_fishing_vessels
   ),
 
-   #
+  #
   # Populate the basic info for all vessels (including vessels are not support, carrier or fishing)
   #
   support_carrier_and_fishing_with_id AS (
