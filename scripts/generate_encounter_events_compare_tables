@@ -8,9 +8,7 @@ ARGS=( \
   DATE_RANGE \
   SOURCE_TABLE \
   SPATIAL_MEASURES_TABLE \
-  SUPPORT_VESSELS_BYYEAR_TABLE \
-  CARRIER_VESSELS_BYYEAR_TABLE \
-  FISHING_VESSELS_BYYEAR_TABLE \
+  ALL_VESSELS_BYYEAR_V_TABLE \
   VESSEL_INFO_TABLE \
   DEST_TABLE \
 )
@@ -121,9 +119,7 @@ echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 jinja2 "${INSERT_SQL}" \
    -D encounters_table=${SOURCE_TABLE//:/.} \
    -D vessel_info_table=${VESSEL_INFO_TABLE//:/.} \
-   -D support_vessels_byyear_table=${SUPPORT_VESSELS_BYYEAR_TABLE//:/.} \
-   -D carrier_vessels_byyear_table=${CARRIER_VESSELS_BYYEAR_TABLE//:/.} \
-   -D fishing_vessels_byyear_table=${FISHING_VESSELS_BYYEAR_TABLE//:/.} \
+   -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V_TABLE//:/.} \
    -D spatial_measures_table=${SPATIAL_MEASURES_TABLE//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \

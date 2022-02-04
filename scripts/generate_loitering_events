@@ -10,9 +10,7 @@ ARGS=( \
   SOURCE_SEGMENT_INFO \
   SOURCE_SPATIAL_MEASURES \
   SOURCE_RESEARCH_SEGS \
-  SOURCE_SUPPORT_VESSELS_BYYEAR \
-  SOURCE_CARRIER_VESSELS_BYYEAR \
-  SOURCE_FISHING_VESSELS_BYYEAR \
+  ALL_VESSELS_BYYEAR_V \
   SOURCE_VESSEL_INFO \
   MINIMUM_DISTANCE_FROM_SHORE_NM \
   DEST_TABLE
@@ -95,9 +93,7 @@ jinja2 "${INSERT_SQL}" \
    -D source_segment_info="${SOURCE_SEGMENT_INFO}" \
    -D source_spatial_measures=${SOURCE_SPATIAL_MEASURES} \
    -D source_research_segs=${SOURCE_RESEARCH_SEGS} \
-   -D source_support_vessels_byyear=${SOURCE_SUPPORT_VESSELS_BYYEAR} \
-   -D source_carrier_vessels_byyear=${SOURCE_CARRIER_VESSELS_BYYEAR} \
-   -D source_fishing_vessels_byyear=${SOURCE_FISHING_VESSELS_BYYEAR} \
+   -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V} \
    -D source_vessel_info=${SOURCE_VESSEL_INFO} \
    -D minimum_distance_from_shore_nm=${MINIMUM_DISTANCE_FROM_SHORE_NM} \
    | bq query --headless --max_rows=0 --allow_large_results \

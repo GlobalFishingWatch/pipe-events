@@ -42,31 +42,10 @@ WITH
   #
   # Vessels byyear sources
   #
-  source_support_vessels AS (
+  source_all_vessels AS (
     SELECT
-      year,
-      mmsi AS ssvid,
-      'support' AS class
-    FROM
-        `{{ source_support_vessels_byyear }}`
-  ),
-
-  source_carriers_vessels AS (
-    SELECT
-        year,
-        mmsi AS ssvid,
-        'carrier' AS class
-    FROM
-        `{{ source_carrier_vessels_byyear }}`
-  ),
-
-  source_fishing_vessels AS (
-    SELECT
-        year,
-        ssvid,
-        'fishing' AS class
-    FROM
-        `{{ source_fishing_vessels_byyear }}`
+      *
+    FROM `{{ all_vessels_byyear_v_table }}`
   ),
 
   source_vessel_info AS (
@@ -75,74 +54,7 @@ WITH
         `{{ source_vessel_info }}`
   ),
 
-  #
-  # Unify support, carriers and support vessels in one table
-  #
-  # Hannah said:
-  # the support vessels were manually checked by TMT, but we likely estimated some as fishing
-  # We could change the fishing vessel subquery to say AND NOT IN support vessel list.
-  # If we concat the ssvid codes and years to avoid losing vessels in others years
 
-  support_carrier_and_fishing_vessels AS (
-        SELECT * FROM source_carriers_vessels
-        UNION ALL
-        SELECT *
-        FROM source_fishing_vessels fishing_vessel
-        WHERE CONCAT(ssvid, '-', year) NOT IN (
-                SELECT CONCAT(ssvid,'-', year)
-                FROM source_support_vessels support_vessel
-                WHERE support_vessel.ssvid = fishing_vessel.ssvid
-                    AND support_vessel.year = fishing_vessel.year
-            )
-            AND CONCAT(ssvid, '-', year) NOT IN (
-                SELECT CONCAT(ssvid,'-', year)
-                FROM source_carriers_vessels carrer_vessel
-                WHERE carrer_vessel.ssvid = fishing_vessel.ssvid
-                    AND carrer_vessel.year = fishing_vessel.year
-            )
-        UNION ALL
-        SELECT * FROM source_support_vessels
-  ),
-
-  #
-  # Populate the basic info for all vessels (including vessels are not support, carrier or fishing)
-  #
-
-  support_carrier_and_fishing_with_id AS (
-    SELECT
-        vessel_info.vessel_id,
-        vessel_info.shipname,
-        vessel_info.ssvid,
-        `world-fishing-827.udfs.mmsi_to_iso3`(vessel_info.ssvid) AS flag,
-        vessels.year,
-        class
-    FROM source_vessel_info vessel_info
-     JOIN support_carrier_and_fishing_vessels vessels ON (
-            vessel_info.ssvid = vessels.ssvid AND
-            (vessels.year BETWEEN EXTRACT(YEAR FROM vessel_info.first_timestamp) AND EXTRACT(YEAR FROM vessel_info.last_timestamp))
-      )
-  ),
-
-  all_vessels_with_id AS (
-      SELECT * FROM support_carrier_and_fishing_with_id
-      UNION ALL
-      SELECT
-        vessel_info.vessel_id,
-        vessel_info.shipname,
-        vessel_info.ssvid,
-        `world-fishing-827.udfs.mmsi_to_iso3`(vessel_info.ssvid) AS flag,
-        null AS year,
-        'other' AS class
-      FROM source_vessel_info vessel_info WHERE vessel_id NOT IN (SELECT vessel_id FROM support_carrier_and_fishing_with_id)
-  ),
-
-  #
-  # We have one row for each vessel/year. We need to deduplicate them
-  #
-  all_vessels_with_id_deduplicated AS (
-      SELECT distinct vessel_id, shipname.value, ssvid, flag, class
-      FROM all_vessels_with_id
-  ),
 
   #
   # Build a set of good segments
@@ -208,7 +120,7 @@ WITH
             )
         ]) AS event_vessels
     FROM denoised_loitering AS lo JOIN source_segment_info si USING (seg_id)
-        JOIN all_vessels_with_id_deduplicated vessel USING (vessel_id)
+        JOIN source_all_vessels vessel USING (vessel_id)
   )
 
 
