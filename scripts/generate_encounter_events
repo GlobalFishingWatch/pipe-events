@@ -7,9 +7,7 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   SOURCE_TABLE \
   SPATIAL_MEASURES_TABLE \
-  SUPPORT_VESSELS_BYYEAR_TABLE \
-  CARRIER_VESSELS_BYYEAR_TABLE \
-  FISHING_VESSELS_BYYEAR_TABLE \
+  ALL_VESSELS_BYYEAR_V_TABLE \
   VESSEL_INFO_TABLE \
   DEST_TABLE \
 )
@@ -18,7 +16,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 SOURCE_TABLE SPATIAL_MEASURES_TABLE SUPPORT_VESSELS_BYYEAR_TABLE CARRIER_VESSELS_BYYEAR_TABLE FISHING_VESSELS_BYYEAR_TABLE VESSEL_INFO_TABLE DEST_TABLE \n"
+  echo -e "\nUsage:\n$0 SOURCE_TABLE SPATIAL_MEASURES_TABLE ALL_VESSELS_BYYEAR_V_TABLE VESSEL_INFO_TABLE DEST_TABLE \n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -37,9 +35,7 @@ done
 echo "Running $0"
 echo "  SOURCE_TABLE: $SOURCE_TABLE"
 echo "  SPATIAL_MEASURES_TABLE: $SPATIAL_MEASURES_TABLE"
-echo "  SUPPORT_VESSELS_BYYEAR_TABLE: $SUPPORT_VESSELS_BYYEAR_TABLE"
-echo "  CARRIER_VESSELS_BYYEAR_TABLE: $CARRIER_VESSELS_BYYEAR_TABLE"
-echo "  FISHING_VESSELS_BYYEAR_TABLE: $FISHING_VESSELS_BYYEAR_TABLE"
+echo "  ALL_VESSELS_BYYEAR_V_TABLE: $ALL_VESSELS_BYYEAR_V_TABLE"
 echo "  VESSEL_INFO_TABLE: $VESSEL_INFO_TABLE"
 echo "  DEST_TABLE: $DEST_TABLE"
 ################################################################################
@@ -73,9 +69,7 @@ SQL=${ASSETS}/bigquery/encounter-events.sql.j2
 jinja2 ${SQL} \
   -D encounters_table=${SOURCE_TABLE//:/.} \
   -D vessel_info_table=${VESSEL_INFO_TABLE//:/.} \
-  -D support_vessels_byyear_table=${SUPPORT_VESSELS_BYYEAR_TABLE//:/.} \
-  -D carrier_vessels_byyear_table=${CARRIER_VESSELS_BYYEAR_TABLE//:/.} \
-  -D fishing_vessels_byyear_table=${FISHING_VESSELS_BYYEAR_TABLE//:/.} \
+  -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V_TABLE//:/.} \
   -D spatial_measures_table=${SPATIAL_MEASURES_TABLE//:/.} \
   | bq query --max_rows=0 --allow_large_results --replace --destination_table ${DEST_TABLE}
 
