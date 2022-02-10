@@ -74,7 +74,8 @@ WITH
   #
   denoised_loitering AS (
     SELECT
-      loitering.*
+      loitering.*,
+      EXTRACT(year from loitering_start_timestamp) as year
     FROM
       source_loitering loitering
     INNER JOIN
@@ -120,7 +121,7 @@ WITH
             )
         ]) AS event_vessels
     FROM denoised_loitering AS lo JOIN source_segment_info si USING (seg_id)
-        JOIN source_all_vessels vessel USING (vessel_id)
+        JOIN source_all_vessels vessel USING (vessel_id, year)
   )
 
 
