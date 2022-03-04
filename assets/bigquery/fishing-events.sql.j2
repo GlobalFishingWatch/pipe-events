@@ -34,6 +34,8 @@ WITH
       *
     FROM
       `{{ fishing_vessels }}`
+    WHERE
+      shiptype = 'fishing'
   ),
   source_spatial_measures AS (
     SELECT
