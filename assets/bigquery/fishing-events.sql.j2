@@ -119,7 +119,7 @@ WITH
   FROM(
     SELECT
      message_vessel_id.*,
-     vesselinfo.best_vessel_class AS best_best_vessel_class,
+     vesselinfo.geartype AS best_best_vessel_class,
      vesselinfo.ssvid AS main_vessel_ssvid,
      main_vessel_shipname
     FROM
