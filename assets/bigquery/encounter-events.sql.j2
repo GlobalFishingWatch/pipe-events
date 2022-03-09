@@ -85,13 +85,13 @@ WITH
   complete_encounter_event AS (
     SELECT
       encounter.*,
-      main_vessel.shipname.value AS main_vessel_shipname,
+      main_vessel.shipname AS main_vessel_shipname,
       main_vessel.ssvid AS main_vessel_ssvid,
-      main_vessel.class AS main_vessel_class,
+      main_vessel.shiptype AS main_vessel_class,
       main_vessel.flag AS main_vessel_flag,
-      encountered_vessel2.shipname.value AS encountered_vessel_shipname,
+      encountered_vessel2.shipname AS encountered_vessel_shipname,
       encountered_vessel2.ssvid AS encountered_vessel_ssvid,
-      encountered_vessel2.class AS encountered_vessel_class,
+      encountered_vessel2.shiptype AS encountered_vessel_class,
       encountered_vessel2.flag AS encountered_vessel_flag
     FROM
       flattened_encounters AS encounter
