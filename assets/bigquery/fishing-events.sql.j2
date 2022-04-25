@@ -63,9 +63,9 @@ WITH
   WHERE
     -- specify partition duration (how far back we look in pipe)
     -- still need to confirm duration
-    _partitiontime BETWEEN '{{ start_date }}'
-    AND '{{ end_date }}'
+    _partitiontime BETWEEN '{{ start_date }}' AND '{{ end_date }}'
     --AND ssvid = target_ssvid()
+    AND is_fishing_vessel = true
     AND lat > -90
     AND lat < 90
     AND seg_id IN (
