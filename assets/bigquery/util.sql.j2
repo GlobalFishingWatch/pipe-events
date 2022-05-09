@@ -42,7 +42,7 @@ AS (
 # Returns a String
 
 CREATE TEMPORARY FUNCTION format_gridcode (lon FLOAT64, lat FLOAT64) AS (
-    FORMAT("lon:%+07.2f_lat:%+07.2f", ROUND(lon /0.01)*0.01, ROUND(lat /0.01)*0.01)
+    FORMAT("lon:%+07.2f_lat:%+07.2f", IF(ABS(ROUND(lon /0.01)*0.01) < 0.01, ABS(ROUND(lon /0.01)*0.01), ROUND(lon /0.01)*0.01 ), IF(ABS(ROUND(lat /0.01)*0.01) < 0.01, ABS(ROUND(lat /0.01)*0.01), ROUND(lat /0.01)*0.01 ))
 );
 
 # Convert meters to kilometers
