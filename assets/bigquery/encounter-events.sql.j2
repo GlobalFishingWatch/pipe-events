@@ -38,6 +38,16 @@ WITH
     FROM `{{ encounters_table }}`
   ),
 
+  ## WB: add source vessel database to add authorizations
+  #
+  # vessel database;  update monthly
+  # 
+  source_vessel_database AS (
+    SELECT
+      *
+    FROM `{{ vessel_database_table }}`
+  ),
+
   #
   # Good encounter events
   #
@@ -49,6 +59,8 @@ WITH
   WHERE
     TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
     AND median_speed_knots < 2 ),
+  
+
   #
   # Duplicate encounters so that we have an event for each vessel
   #
@@ -78,17 +90,20 @@ WITH
       vessel_2_id)
   FROM
     encounters ),
-
   #
   # Include basic vessel information on the event
   #
   complete_encounter_event AS (
     SELECT
       encounter.*,
+      ## WB add back main vessel id
+      main_vessel.vessel_id AS main_vessel_id,
       main_vessel.shipname AS main_vessel_shipname,
       main_vessel.ssvid AS main_vessel_ssvid,
       main_vessel.shiptype AS main_vessel_class,
       main_vessel.flag AS main_vessel_flag,
+      ## add back in vessel id
+      ##encountered_vessel2.vessel_id AS encountered_vessel_id,
       encountered_vessel2.shipname AS encountered_vessel_shipname,
       encountered_vessel2.ssvid AS encountered_vessel_ssvid,
       encountered_vessel2.shiptype AS encountered_vessel_class,
@@ -105,54 +120,366 @@ WITH
     ON
       encountered_vessel_id = encountered_vessel2.vessel_id
       AND (EXTRACT(YEAR FROM encounter.start_time)= encountered_vessel2.year OR encountered_vessel2.year IS NULL)
+  ),
+##############
+############### ADD AUTHORIZATION DATA
+##############
+  #
+  ## Normalize the vessel database so that only registry records in the rfmo
+  # -- whitelist and overlapping with the vesel activity are included,
+  # -- extracting only the fields we care about
+  #
+  normalized_vessel_database AS (
+      SELECT
+        identity.ssvid AS ssvid,
+        first_timestamp AS activity_first_timestamp,
+        last_timestamp AS activity_last_timestamp,
+        ARRAY(
+          SELECT STRUCT(
+            extract_rfmo_from_list_uvi(list_uvi) AS registry_rfmo,
+            authorized_from AS registry_authorized_from,
+            authorized_to AS registry_authorized_to
+          )
+          FROM
+            UNNEST(registry)
+          WHERE
+            -- Only registries in the whitelist
+            is_whitelisted_rfmo(extract_rfmo_from_list_uvi(list_uvi))
+            -- We only keep the records where the authorization interval overlaps with the activity interval
+            AND authorized_from < last_timestamp
+            AND authorized_to > first_timestamp
+        ) AS registries
+      FROM
+        source_vessel_database
+      CROSS JOIN UNNEST(activity)
+      WHERE
+        -- To be safe, we only keep matched records
+        matched
+  ),
+  #
+  ## Date vessel registry was last scraped
+  # -- used to identify if vessel without authorization is pending or not
+  #
+  last_scrape AS (
+      SELECT
+        registry_rfmo,
+        MAX(registry_scraped_date) AS last_scrape
+        FROM (
+          SELECT
+        ARRAY(
+          SELECT STRUCT(
+            extract_rfmo_from_list_uvi(list_uvi) AS registry_rfmo,
+            scraped AS registry_scraped_date
+          )
+          FROM
+            UNNEST(registry)
+          WHERE
+            is_whitelisted_rfmo(extract_rfmo_from_list_uvi(list_uvi))
+        ) AS registries
+      FROM
+        source_vessel_database)
+        CROSS JOIN UNNEST (registries)
+        GROUP BY (registry_rfmo)
+  ),
+  
+  #
+  ## attach registry information
+  #
+   encounters_reg AS (
+      SELECT
+      encounters.*,
+      vessel_database_main.registries AS main_vessel_registries,
+      vessel_database_encountered.registries AS encountered_vessel_registries,
+        FROM
+        complete_encounter_event AS encounters
+      LEFT JOIN
+        normalized_vessel_database AS vessel_database_main
+      ON
+        encounters.main_vessel_ssvid = vessel_database_main.ssvid
+        AND encounters.start_time between vessel_database_main.activity_first_timestamp and vessel_database_main.activity_last_timestamp
+      LEFT JOIN
+        normalized_vessel_database AS vessel_database_encountered
+        ON
+        encounters.encountered_vessel_ssvid = vessel_database_encountered.ssvid
+        AND encounters.start_time between vessel_database_encountered.activity_first_timestamp and vessel_database_encountered.activity_last_timestamp
+   ),
+   
+  #
+  ## Calculate the complete list of all vessels involved in the encounters
+  #
+  all_vessels AS (
+      SELECT
+        main_vessel_id AS vessel_id,
+        main_vessel_registries AS registries
+      FROM
+        encounters_reg
+      UNION ALL
+      SELECT
+        encountered_vessel_id AS vessel_id,
+        encountered_vessel_registries AS registries
+      FROM
+        encounters_reg
+  ),
+  #
+  ## Calculate authorization data for each vessel, only getting authorization
+  ## data for the whitelisted RFMO's
+  #
+  authorizations AS (
+      SELECT
+        vessel_id,
+        registry_rfmo,
+        registry_authorized_from,
+        registry_authorized_to
+      FROM
+        all_vessels
+      CROSS JOIN
+        UNNEST(registries) AS registry
+      WHERE
+        registry_authorized_from IS NOT NULL
+        AND registry_authorized_to IS NOT NULL
+      GROUP BY
+        vessel_id,
+        registry_rfmo,
+        registry_authorized_from,
+        registry_authorized_to
+  ),
+  
+  
+  #
+  ## add spatial measures region information
+  #
+  encounters_regions AS (
+    SELECT
+      encounters.*,   
+    ## Add spatial regions information
+      spatial_measures_mean.regions AS regions_mean_position,
+      convert_m_to_km( spatial_measures_mean.distance_from_shore_m ) AS start_distance_from_shore_km,
+      convert_m_to_km( spatial_measures_mean.distance_from_shore_m ) AS end_distance_from_shore_km,
+      convert_m_to_km( spatial_measures_mean.distance_from_port_m ) AS start_distance_from_port_km,
+      convert_m_to_km( spatial_measures_mean.distance_from_port_m ) AS end_distance_from_port_km,
+    FROM
+      encounters_reg AS encounters
+    INNER JOIN
+      source_spatial_measures AS spatial_measures_mean
+    ON
+      format_gridcode(mean_longitude, mean_latitude) = spatial_measures_mean.gridcode
+
+   ),
+  
+  #
+  ## Flatten and filter the regions where the encounters happen, so that we end
+  ## up with a table with multiple records per each encounter, one per rfmo
+  ## region where the encounter happened when the region is one of the
+  ## interesting rfmos, including authorization status for each of those
+  ## regions for both vessels involved.
+  ## WB: add attribute for if encounter date is before or after last vessel registry scrape
+  #
+  encounter_regions_with_authorizations AS (
+    SELECT
+    encounters.event_id,
+    rfmo,
+    CASE 
+      WHEN main_vessel_authorization.registry_rfmo IS NOT NULL THEN 'true'
+      WHEN main_vessel_authorization.registry_rfmo IS NULL AND last_scrape.last_scrape IS NULL THEN 'false'
+      ELSE 'pending' END
+       AS main_vessel_is_authorized,
+    CASE 
+      WHEN encountered_vessel_authorization.registry_rfmo IS NOT NULL THEN 'true'
+      WHEN encountered_vessel_authorization.registry_rfmo IS NULL AND last_scrape.last_scrape IS NULL THEN 'false'
+      ELSE 'pending' END
+       AS encountered_vessel_is_authorized,
+    last_scrape.last_scrape IS NOT NULL AS event_after_last_scrape
+      FROM
+        encounters_regions AS encounters
+      CROSS JOIN
+        UNNEST(encounters.regions_mean_position.rfmo) AS rfmo
+      LEFT JOIN
+        authorizations AS main_vessel_authorization
+      ON
+        encounters.main_vessel_id = main_vessel_authorization.vessel_id
+        AND rfmo = main_vessel_authorization.registry_rfmo
+        AND encounters.start_time < main_vessel_authorization.registry_authorized_to
+        AND encounters.end_time > main_vessel_authorization.registry_authorized_from
+      LEFT JOIN
+        authorizations AS encountered_vessel_authorization
+      ON
+        encounters.encountered_vessel_id = encountered_vessel_authorization.vessel_id
+        AND rfmo = encountered_vessel_authorization.registry_rfmo
+        AND encounters.start_time < encountered_vessel_authorization.registry_authorized_to
+        AND encounters.end_time > encountered_vessel_authorization.registry_authorized_from
+      LEFT JOIN
+        last_scrape AS last_scrape
+      ON
+        rfmo = last_scrape.registry_rfmo
+        AND encounters.start_time > last_scrape.last_scrape
+      WHERE
+        is_whitelisted_rfmo(rfmo)
+      GROUP BY
+        encounters.event_id,
+        rfmo,
+        main_vessel_is_authorized,
+        encountered_vessel_is_authorized,
+        event_after_last_scrape
+  ),
+  #
+  ## Calculate the final encounter authorization status. An encounter is only
+  ## authorized if it's authorized for the main vessel (formerly carrier vessel in CVP) in all the rfmos, if it
+  ## happened outside an rfmo or in an rfmo we are not interested about.
+  ## WB: add attribute if encounter occured before or after last registry scrape
+  #
+  encounter_authorizations AS (
+    SELECT
+      encounters.event_id,
+      -- Here we decide if the encounter is authorized or not. The rfmo field
+      -- contains a non-null value if the encounter happened inside one of the
+      -- interesting rfmos:
+      --
+      --  * if all the records for a given event_id have null rfmo then that
+      --  means that it's an encounter happening outside of the interesting
+      --  rfmos, so it's authorized.
+      --
+      --  * If all the records for a given event_id have all fields with non-null
+      --  values, it happened inside one or more rfmos of the interesting rfmos
+      --  and all the involved vessels were authorized.
+      --
+      --  * Any other case means it's an unauthorized encounter
+      (
+        LOGICAL_AND(encounter_authorizations.rfmo IS NULL) OR
+        LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND encounter_authorizations.main_vessel_is_authorized = 'true')
+      ) AS is_authorized,
+      -- We also compute authorization status. We are talking about 3 different
+      -- values here:
+      --
+      --  * An encounter can be authorized on the same conditions as before.
+      --
+      --  * An encounter is unauthorized if the main vessel (formerly carrier vessel in CVP) is not authorized
+      --  in all of the regions it is happening in.
+      --
+      --  * An encounter can be partially authorized if the main vessel is authorized
+      --  in some of the regions it is happening in but not all of them
+      CASE
+      WHEN (
+        LOGICAL_AND(encounter_authorizations.rfmo IS NULL) OR
+        LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND encounter_authorizations.main_vessel_is_authorized = 'true')
+      ) THEN 'authorized'
+      WHEN (
+        LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND NOT encounter_authorizations.event_after_last_scrape AND NOT encounter_authorizations.main_vessel_is_authorized = 'true')
+      ) THEN 'unauthorized'
+       WHEN (
+        LOGICAL_AND(encounter_authorizations.rfmo IS NOT NULL AND encounter_authorizations.event_after_last_scrape AND NOT encounter_authorizations.main_vessel_is_authorized = 'true')
+      ) THEN 'pending'
+      ELSE
+      'partial'
+    END AS authorization_status,
+      -- Finally, we need to compute per-region, per-vessel authorization status. For each
+      -- authorization record in this event, we generate a struct containing the
+      -- name of the region and the authorization status for each vessel.
+      ARRAY_AGG(STRUCT(
+        encounter_authorizations.rfmo AS `rfmo`,
+        encounter_authorizations.main_vessel_is_authorized AS `is_authorized`)) AS main_vessel_region_authorizations,
+      ARRAY_AGG(STRUCT(
+        encounter_authorizations.rfmo AS `rfmo`,
+        encounter_authorizations. encountered_vessel_is_authorized AS `is_authorized`)) AS encountered_vessel_region_authorizations
+    FROM
+      complete_encounter_event AS encounters
+    LEFT JOIN
+      encounter_regions_with_authorizations AS encounter_authorizations
+    USING
+      (event_id)
+    GROUP BY
+      event_id,
+      event_after_last_scrape
+  ),
+  
+##############
+############### JOIN AUTHORIZATION DATA WITH ENCOUNTERS
+##############
+  #
+  ## Join the original encounters each with their authorization status.
+  #
+  complete_encounter_with_authorizations AS (
+    SELECT
+      encounter.*,
+      authorization.is_authorized,
+      authorization.authorization_status,
+      authorization.main_vessel_region_authorizations,
+      authorization.encountered_vessel_region_authorizations,
+      ## add regions informaiton
+      regions.regions_mean_position,
+        regions.start_distance_from_shore_km,
+        regions.end_distance_from_shore_km,
+        regions.start_distance_from_port_km,
+        regions.end_distance_from_port_km,
+    FROM
+      complete_encounter_event AS encounter
+    INNER JOIN
+      encounter_authorizations AS authorization
+    USING
+      (event_id)
+    ## WB: join regions information; previously done in last step of v1 encs query 1 code
+    INNER JOIN
+      encounters_regions AS regions
+    USING
+      (event_id)
   )
-
-
-  SELECT
-    event_id,
-    'encounter' AS event_type,
-    vessel_id,
---    NULL AS seg_id,
-    start_time AS event_start,
-    end_time AS event_end,
-    mean_latitude AS lat_mean,
-    mean_longitude AS lon_mean,
-    mean_latitude AS lat_min,
-    mean_latitude AS lat_max,
-    mean_longitude AS lon_min,
-    mean_longitude AS lon_max,
-    spatial_measures_mean.regions AS regions_mean_position,
-    convert_m_to_km( spatial_measures_mean.distance_from_shore_m ) AS start_distance_from_shore_km,
-    convert_m_to_km( spatial_measures_mean.distance_from_shore_m ) AS end_distance_from_shore_km,
-    convert_m_to_km( spatial_measures_mean.distance_from_port_m ) AS start_distance_from_port_km,
-    convert_m_to_km( spatial_measures_mean.distance_from_port_m ) AS end_distance_from_port_km,
-    TO_JSON_STRING(
-      STRUCT(
-        ROUND(median_distance_km,3) AS median_distance_km,
-        ROUND(median_speed_knots,3) AS median_speed_knots,
-        encountered_vessel_id,
-        CONCAT(main_vessel_class, '-', encountered_vessel_class) AS vessel_classes
-     )
-    ) AS event_info,
-    TO_JSON_STRING([
-      STRUCT(
-        vessel_id AS `id`,
-        main_vessel_ssvid AS `ssvid`,
-        main_vessel_shipname AS `name`,
-        vessel_point_count AS point_count,
-        main_vessel_class AS `type`,
-        main_vessel_flag AS `flag`,
-        seg_ids
-      ),
-      STRUCT(
-        encountered_vessel_id AS `id`,
-        encountered_vessel_ssvid AS `ssvid`,
-        encountered_vessel_shipname AS `name`,
-        encountered_point_count AS point_count,
-        encountered_vessel_class as `type`,
-        encountered_vessel_flag AS `flag`,
-        encountered_seg_ids AS seg_ids
-      )
-    ]) as event_vessels
-  FROM complete_encounter_event
-    JOIN source_spatial_measures AS spatial_measures_mean ON format_gridcode(mean_longitude, mean_latitude) = spatial_measures_mean.gridcode
+   
+    SELECT
+        event_id,
+        'encounter' AS event_type,
+        vessel_id,
+        --    NULL AS seg_id,
+        start_time AS event_start,
+        end_time AS event_end,
+        mean_latitude AS lat_mean,
+        mean_longitude AS lon_mean,
+        mean_latitude AS lat_min,
+        mean_latitude AS lat_max,
+        mean_longitude AS lon_min,
+        mean_longitude AS lon_max,
+        regions_mean_position,
+        start_distance_from_shore_km,
+        end_distance_from_shore_km,
+        start_distance_from_port_km,
+        end_distance_from_port_km,
+        
+        TO_JSON_STRING(
+          STRUCT(
+            ROUND(median_distance_km,3) AS median_distance_km,
+            ROUND(median_speed_knots,3) AS median_speed_knots,
+            encountered_vessel_id,
+            CONCAT(main_vessel_class, '-', encountered_vessel_class) AS vessel_classes,
+        ## add authorization information
+            is_authorized,
+            authorization_status
+            )
+            ) AS event_info,
+    
+        TO_JSON_STRING([
+          STRUCT(
+            vessel_id AS `id`,
+            main_vessel_ssvid AS `ssvid`,
+            main_vessel_shipname AS `name`,
+            vessel_point_count AS point_count,
+            main_vessel_class AS `type`,
+            main_vessel_flag AS `flag`,
+            seg_ids,
+        ## add authorization information
+            main_vessel_region_authorizations AS authorizations
+            ),
+          STRUCT(
+            encountered_vessel_id AS `id`,
+            encountered_vessel_ssvid AS `ssvid`,
+            encountered_vessel_shipname AS `name`,
+            encountered_point_count AS point_count,
+            encountered_vessel_class as `type`,
+            encountered_vessel_flag AS `flag`,
+            encountered_seg_ids AS seg_ids,
+        ## add authorization information 
+            encountered_vessel_region_authorizations AS authorizations
+            )
+            ]) as event_vessels
+            
+    FROM complete_encounter_with_authorizations
+    
+    
+  
