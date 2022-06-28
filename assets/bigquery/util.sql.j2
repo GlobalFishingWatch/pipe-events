@@ -59,3 +59,15 @@ CREATE TEMPORARY FUNCTION convert_nm_to_km (nm FLOAT64) as (nm * 1.852);
 CREATE TEMPORARY FUNCTION
   generate_port_id (iso3 STRING,
     label STRING) AS ( LOWER(CONCAT(iso3,"-",REGEXP_REPLACE(NORMALIZE(label),' ',''))) );
+
+-- Returns true an rfmo is whitelisted so that authorizations should be
+-- computed for it
+    CREATE TEMPORARY FUNCTION is_whitelisted_rfmo(rfmo STRING) AS ( rfmo IN (
+          "ICCAT",
+          "IOTC",
+          "WCPFC",
+          "IATTC",
+          "CCSBT",
+          "SPRFMO",
+          "NPFC" )
+     );
