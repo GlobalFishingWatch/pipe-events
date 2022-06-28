@@ -5,6 +5,7 @@ THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 source ${THIS_SCRIPT_DIR}/pipeline.sh
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
+  DATE_RANGE \
   SOURCE_TABLE \
   SPATIAL_MEASURES_TABLE \
   ALL_VESSELS_BYYEAR_V_TABLE \
