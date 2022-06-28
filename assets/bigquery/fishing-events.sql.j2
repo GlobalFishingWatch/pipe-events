@@ -142,6 +142,7 @@ WITH
      message_vessel_id.*,
      vesselinfo.geartype AS best_best_vessel_class,
      vesselinfo.ssvid AS main_vessel_ssvid,
+     vesselinfo.flag as main_vessel_flag,
      main_vessel_shipname
     FROM
      message_vessel_id
@@ -283,6 +284,7 @@ WITH
     seg_id,
     vessel_id,
     main_vessel_shipname,
+    main_vessel_flag,
     best_best_vessel_class,
     ST_CENTROID(ST_UNION_AGG(point)) AS centroid,
     -- compute centoid of all the lat/lon pairs in the event
@@ -321,6 +323,7 @@ WITH
     seg_id,
     vessel_id,
     main_vessel_shipname,
+    main_vessel_flag,
     best_best_vessel_class,
     event_start
   -- exclude events too short or with too high an avg vessel speed
@@ -698,6 +701,7 @@ WITH
         vessel_id AS `id`,
         ssvid AS `ssvid`,
         main_vessel_shipname AS `name`,
+        main_vessel_flag as `flag`,
         seg_id,
         -- add authorization information
         vessel_region_authorizations AS authorizations
