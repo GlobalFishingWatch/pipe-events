@@ -12,8 +12,11 @@ ARGS=( \
   SOURCE_VI_SSVID_BY_YEAR \
   SOURCE_FISHING_VESSELS \
   SOURCE_SPATIAL_MEASURES \
+  VESSEL_IDENTITY_CORE \
+  VESSEL_IDENTITY_AUTHORIZATION \
   DEST_TABLE
 )
+
 
 ################################################################################
 # Validate and extract arguments
@@ -127,6 +130,8 @@ jinja2 "${INSERT_SQL}" \
    -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
    -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
    -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
+   -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${current_table_name}

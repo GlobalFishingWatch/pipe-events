@@ -5,11 +5,12 @@ THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
 source ${THIS_SCRIPT_DIR}/pipeline.sh
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
-  DATE_RANGE \
   SOURCE_TABLE \
   SPATIAL_MEASURES_TABLE \
   ALL_VESSELS_BYYEAR_V_TABLE \
   VESSEL_INFO_TABLE \
+  VESSEL_IDENTITY_CORE \
+  VESSEL_IDENTITY_AUTHORIZATION \
   DEST_TABLE \
 )
 
@@ -121,6 +122,8 @@ jinja2 "${INSERT_SQL}" \
    -D vessel_info_table=${VESSEL_INFO_TABLE//:/.} \
    -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V_TABLE//:/.} \
    -D spatial_measures_table=${SPATIAL_MEASURES_TABLE//:/.} \
+   -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${current_table_name}
