@@ -11,6 +11,25 @@
 -- messages with score=null are ignored
 WITH
   -- Source tables
+  #
+  # vessel identity tables; update monthly
+  # we use Jaeyoons new vessel identity tables
+  # unlike in the CVP which still uses vessel database
+  # 
+  vessel_identity_core AS (
+    SELECT
+      *
+    FROM `{{vessel_identity_core}}`
+  ),
+
+  #
+  # vessel authorization 
+  #
+  vessel_identity_authorization AS (
+    SELECT
+      *
+    FROM `{{vessel_identity_authorization}}`
+  ),
   source_segs AS (
     SELECT
       *

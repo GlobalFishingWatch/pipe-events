@@ -12,6 +12,8 @@ ARGS=( \
   SOURCE_VI_SSVID_BY_YEAR \
   SOURCE_FISHING_VESSELS \
   SOURCE_SPATIAL_MEASURES \
+  VESSEL_IDENTITY_CORE \
+  VESSEL_IDENTITY_AUTHORIZATION \
   DEST_TABLE
 )
 
@@ -64,6 +66,18 @@ if [ "$?" -ne 0 ]; then
 fi
 echo "  Events table exists"
 
+echo "Running $0"
+echo "  SOURCE_MESSAGES: $SOURCE_MESSAGES"
+echo "  SOURCE_SEGMENT_VESSEL: $SOURCE_SEGMENT_VESSEL"
+echo "  SOURCE_SEGMENT_VESSEL: $SOURCE_SEGMENT_VESSEL"
+echo "  SOURCE_SEGS: $SOURCE_SEGS"
+echo "  SOURCE_VI_SSVID_BY_YEAR: $SOURCE_VI_SSVID_BY_YEAR"
+echo "  SOURCE_FISHING_VESSELS: $SOURCE_FISHING_VESSELS"
+echo "  SOURCE_SPATIAL_MEASURES: $SOURCE_SPATIAL_MEASURES"
+echo "  VESSEL_IDENTITY_CORE: $VESSEL_IDENTITY_CORE"
+echo "  VESSEL_IDENTITY_AUTHORIZATION: $VESSEL_IDENTITY_AUTHORIZATION"
+echo "  DEST_TABLE: $DEST_TABLE"
+
 ################################################################################
 # Delete existing records
 ################################################################################
@@ -94,6 +108,8 @@ jinja2 "${INSERT_SQL}" \
    -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
    -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
    -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
+   -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${DEST_TABLE}
