@@ -31,11 +31,12 @@ RUN \
 # Setup a volume for configuration and auth data
 VOLUME ["/root/.config"]
 
+COPY requirements.txt requirements.txt
 # Setup local application dependencies
+RUN pip install -r requirements.txt
 COPY . /opt/project
 
 # install
-RUN pip install -r requirements.txt
 RUN pip install -e .
 
 # Setup the entrypoint for quickly executing the pipelines
