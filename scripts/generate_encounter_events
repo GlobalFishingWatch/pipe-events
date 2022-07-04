@@ -54,7 +54,7 @@ TABLE_DESC=(
   "$@"
 )
 TABLE_DESC=$( IFS=$'\n'; echo "${TABLE_DESC[*]}" )
-SCHEMA=${ASSETS}/bigquery/events.schema.json
+SCHEMA=${ASSETS}/bigquery/events-new-regions.schema.json
 bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \

@@ -42,6 +42,8 @@ if [[ -z $END_DATE ]]; then
   END_DATE=${START_DATE}
 fi
 
+current_table_name_fishing_events="${DEST_TABLE}_temp"
+
 ################################################################################
 # Force that the destination table exists
 ################################################################################
@@ -54,7 +56,7 @@ TABLE_DESC=(
   "$@"
 )
 TABLE_DESC=$( IFS=$'\n'; echo "${TABLE_DESC[*]}" )
-SCHEMA=${ASSETS}/bigquery/events.schema.json
+SCHEMA=${ASSETS}/bigquery/events-new-regions.schema.json
 bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
@@ -97,7 +99,7 @@ fi
 # Inserting new records
 ################################################################################
 INSERT_SQL=${ASSETS}/bigquery/fishing-events.sql.j2
-echo "Inserting new records for ${START_DATE} to ${END_DATE}."
+echo "Creating temporal table with fishing-events ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
    -D messages="${SOURCE_MESSAGES}" \
@@ -111,11 +113,47 @@ jinja2 "${INSERT_SQL}" \
    -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
+     --replace \
+     --destination_table ${current_table_name_fishing_events}
+
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to insert records for table ${current_table_name_fishing_events} from ${START_DATE} to ${END_DATE}"
+  exit 1
+fi
+
+INSERT_SQL=${ASSETS}/bigquery/fishing-events-authoriations.sql.j2
+echo "Inserting new records for ${START_DATE} to ${END_DATE}"
+
+jinja2 "${INSERT_SQL}" \
+   -D messages="${SOURCE_MESSAGES}" \
+   -D start_date="${START_DATE}" \
+   -D end_date="${END_DATE}" \
+   -D segs="${SOURCE_SEGS}" \
+   -D segment_vessel=${SOURCE_SEGMENT_VESSEL} \
+   -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
+   -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
+   -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
+   -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
+   -D source_fishing_events=${current_table_name_fishing_events//:/.} \
+   | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${DEST_TABLE}
 
 if [ "$?" -ne 0 ]; then
   echo "  Unable to insert records for table ${DEST_TABLE} from ${START_DATE} to ${END_DATE}"
+  echo "Removing temporal table [${current_table_name_fishing_events}]"
+  bq rm -f -t "${current_table_name_fishing_events}" 
+  exit 1
+fi
+
+################################################################################
+# Remove temporal table
+################################################################################
+echo "Removing temporal table [${current_table_name_fishing_events}]"
+bq rm -f -t "${current_table_name_fishing_events}" 
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to remove temporal table ${current_table_name_fishing_events}"
   exit 1
 fi
 

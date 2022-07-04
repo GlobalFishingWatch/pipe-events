@@ -71,3 +71,15 @@ CREATE TEMPORARY FUNCTION
           "SPRFMO",
           "NPFC" )
      );
+
+CREATE TEMP FUNCTION s2_level() AS (10);
+CREATE TEMP FUNCTION parse_regions_to_struct(regions_str STRING)
+  RETURNS STRUCT<eez ARRAY<STRING>, mpa ARRAY<STRING>, rfmo ARRAY<STRING>> 
+  LANGUAGE js AS 
+"""
+    const regions = JSON.parse(regions_str)
+    this.eez = regions.eez || [];
+    this.mpa = regions.mpa || [];
+    this.rfmo = regions.rfmo || [];
+    return this;
+""";
