@@ -3,21 +3,19 @@
 # Include some utility functions
 {% include 'util.sql.j2' %}
 
-#
-# Port visits Events
-#
 
-with regions as (
+#
+# Spatial measures data
+#
+spatial_measures_source as (
   SELECT
     *,
   FROM `{{ spatial_measures_table }}`
 ),
-gridded_regions as(
-  select
-    * except(s2_cells),
-  from regions
-  cross join unnest (s2_cells) as s2_cell
-),
+
+#
+# Port visits Events
+#
 port_visits_source AS (
   SELECT
     *
@@ -40,8 +38,15 @@ named_anchorages_source AS (
   FROM `{{ named_anchorages_table }}`
 ),
 
---# Get base info, calculate mean position and aggregate segment ids.
 
+gridded_regions as(
+  select
+    * except(s2_cells),
+  from spatial_measures_source
+  cross join unnest (s2_cells) as s2_cell
+),
+
+--# Get base info, calculate mean position and aggregate segment ids.
 mean_positions AS (
   SELECT visit_id, AVG(vessel_lat) as lat_mean, AVG(vessel_lon) AS lon_mean,  ARRAY_AGG(DISTINCT seg_id) AS seg_ids
   FROM port_visits_source,

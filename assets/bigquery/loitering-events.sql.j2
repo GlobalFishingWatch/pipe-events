@@ -25,16 +25,13 @@ WITH
         `{{ source_segment_info }}`
   ),
 
-  regions as (
+  #
+  # Spatial measures data
+  #
+  spatial_measures_source as (
     SELECT
       *,
     FROM `{{ source_spatial_measures }}`
-  ),
-  gridded_regions as(
-    select
-      * except(s2_cells),
-    from regions
-    cross join unnest (s2_cells) as s2_cell
   ),
 
   source_research_segs AS (
@@ -61,6 +58,12 @@ WITH
   ),
 
 
+  gridded_regions as(
+    select
+      * except(s2_cells),
+    from spatial_measures_source
+    cross join unnest (s2_cells) as s2_cell
+  ),
 
   #
   # Build a set of good segments

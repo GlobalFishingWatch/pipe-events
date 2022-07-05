@@ -54,15 +54,16 @@ WITH
   #
   # Spatial measures data
   #
-  regions as (
+  spatial_measures_source as (
     SELECT
       *,
     FROM `{{ spatial_measures_table }}`
   ),
+
   gridded_regions as(
     select
       * except(s2_cells),
-    from regions
+    from spatial_measures_source
     cross join unnest (s2_cells) as s2_cell
   ),
 

@@ -31,27 +31,36 @@ WITH
     FROM `{{vessel_identity_authorization}}`
   ),
 
-  gridded_regions as (
+  #
+  # Spatial measures data
+  #
+  spatial_measures_source as (
     SELECT
-      * except(s2_cells),
+      *,
     FROM `{{ spatial_measures_table }}`
-    cross join unnest (s2_cells) as s2_cell
   ),
 
   --
   -- remove events that are too short
   --
   complete_fishing_event AS (
-  SELECT
-    *
-  FROM
-    {{source_fishing_events}}
- ),
+    SELECT
+      *
+    FROM
+      {{source_fishing_events}}
+  ),
 
 
 ##############
 ############### ADD AUTHORIZATION DATA TO FISHING EVENTS
 ##############
+
+  gridded_regions as(
+    select
+      * except(s2_cells),
+    from spatial_measures_source
+    cross join unnest (s2_cells) as s2_cell
+  ),
 
   #
   # core vessel identity
