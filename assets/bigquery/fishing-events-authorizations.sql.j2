@@ -214,7 +214,7 @@ WITH
       spatial_measures_mean.regions AS regions_mean_position
   	FROM
       complete_fishing_event AS fe
-  	INNER JOIN
+  	LEFT JOIN
       event_with_region AS spatial_measures_mean 
     on (spatial_measures_mean.event_id = fe.event_id)
    ),

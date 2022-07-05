@@ -326,7 +326,7 @@ WITH
       spatial_measures_mean.regions AS regions_mean_position
     FROM
       complete_encounter_event AS encounters
-    JOIN event_with_region spatial_measures_mean using (event_id)
+    LEFT JOIN event_with_region spatial_measures_mean using (event_id)
    ),
   
 
