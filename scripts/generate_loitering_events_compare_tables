@@ -9,6 +9,7 @@ ARGS=( \
   SOURCE_LOITERING \
   SOURCE_SEGMENT_INFO \
   SOURCE_SPATIAL_MEASURES \
+  REGIONS_TABLE \
   SOURCE_RESEARCH_SEGS \
   ALL_VESSELS_BYYEAR_V \
   SOURCE_VESSEL_INFO \
@@ -125,6 +126,7 @@ jinja2 "${INSERT_SQL}" \
    -D source_loitering="${SOURCE_LOITERING}" \
    -D source_segment_info="${SOURCE_SEGMENT_INFO}" \
    -D source_spatial_measures=${SOURCE_SPATIAL_MEASURES} \
+   -D source_regions_table=${REGIONS_TABLE//:/.} \
    -D source_research_segs=${SOURCE_RESEARCH_SEGS} \
    -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V} \
    -D source_vessel_info=${SOURCE_VESSEL_INFO} \

@@ -12,6 +12,7 @@ ARGS=( \
   SOURCE_VI_SSVID_BY_YEAR \
   SOURCE_FISHING_VESSELS \
   SOURCE_SPATIAL_MEASURES \
+  REGIONS_TABLE \
   VESSEL_IDENTITY_CORE \
   VESSEL_IDENTITY_AUTHORIZATION \
   DEST_TABLE
@@ -76,6 +77,7 @@ echo "  SOURCE_SEGS: $SOURCE_SEGS"
 echo "  SOURCE_VI_SSVID_BY_YEAR: $SOURCE_VI_SSVID_BY_YEAR"
 echo "  SOURCE_FISHING_VESSELS: $SOURCE_FISHING_VESSELS"
 echo "  SOURCE_SPATIAL_MEASURES: $SOURCE_SPATIAL_MEASURES"
+echo "  REGIONS_TABLE: $REGIONS_TABLE"
 echo "  VESSEL_IDENTITY_CORE: $VESSEL_IDENTITY_CORE"
 echo "  VESSEL_IDENTITY_AUTHORIZATION: $VESSEL_IDENTITY_AUTHORIZATION"
 echo "  DEST_TABLE: $DEST_TABLE"
@@ -111,6 +113,7 @@ jinja2 "${INSERT_SQL}" \
    -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
    -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
    -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --replace \
@@ -135,6 +138,7 @@ jinja2 "${INSERT_SQL}" \
    -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
    -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
    -D source_fishing_events=${current_table_name_fishing_events//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
