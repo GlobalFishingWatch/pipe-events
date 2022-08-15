@@ -12,6 +12,7 @@ ARGS=( \
   SOURCE_VI_SSVID_BY_YEAR \
   SOURCE_FISHING_VESSELS \
   SOURCE_SPATIAL_MEASURES \
+  REGIONS_TABLE \
   DEST_TABLE
 )
 
@@ -94,6 +95,7 @@ jinja2 "${INSERT_SQL}" \
    -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
    -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
    -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${DEST_TABLE}

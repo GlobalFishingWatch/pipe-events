@@ -8,6 +8,7 @@ ARGS=( \
   DATE_RANGE \
   SOURCE_TABLE \
   SPATIAL_MEASURES_TABLE \
+  REGIONS_TABLE \
   ALL_VESSELS_BYYEAR_V_TABLE \
   VESSEL_INFO_TABLE \
   DEST_TABLE \
@@ -121,6 +122,7 @@ jinja2 "${INSERT_SQL}" \
    -D vessel_info_table=${VESSEL_INFO_TABLE//:/.} \
    -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V_TABLE//:/.} \
    -D spatial_measures_table=${SPATIAL_MEASURES_TABLE//:/.} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${current_table_name}

@@ -12,6 +12,7 @@ ARGS=( \
   SOURCE_VI_SSVID_BY_YEAR \
   SOURCE_FISHING_VESSELS \
   SOURCE_SPATIAL_MEASURES \
+  REGIONS_TABLE \
   DEST_TABLE
 )
 
@@ -127,6 +128,7 @@ jinja2 "${INSERT_SQL}" \
    -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
    -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
    -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${current_table_name}
@@ -141,11 +143,11 @@ fi
 # Create new view
 ################################################################################
 echo "Creating view [${view_name}]"
-echo "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"published_events_loitering\") AS SELECT * FROM ${current_table_name//:/.}"
+echo "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"proto_events_fishing\") AS SELECT * FROM ${current_table_name//:/.}"
 
 bq query \
   --use_legacy_sql=false \
-  "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"published_events_loitering\") AS SELECT * FROM ${current_table_name//:/.}"
+  "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"proto_events_fishing\") AS SELECT * FROM ${current_table_name//:/.}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create view ${view_name}"
   exit 1
