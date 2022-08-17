@@ -13,14 +13,6 @@ WITH spatial_measures_source AS (
     FROM
       `{{ spatial_measures_table }}`
 ),
-#
-# Regions data
-#
-regions_source as (
-  SELECT
-    *,
-  FROM `{{ regions_table }}`
-),
 
 port_visits_source AS (
   SELECT
@@ -42,13 +34,6 @@ named_anchorages_source AS (
   SELECT
     *
   FROM `{{ named_anchorages_table }}`
-),
-
-gridded_regions as(
-  select
-    * except(s2_cells),
-  from regions_source
-  cross join unnest (s2_cells) as s2_cell
 ),
 
 --# Get base info, calculate mean position and aggregate segment ids.
@@ -114,7 +99,7 @@ intermadiate_anchorage AS (
 #
 # Finally, enhance the event with info related to regions and distances.
 #
-total_events as (SELECT
+complete_events as (SELECT
   TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', vessel_id, start_timestamp, end_timestamp))) AS event_id,
   'port_visit' AS event_type,
   vessel_id,
@@ -187,35 +172,12 @@ FROM port_visits_source
   JOIN spatial_measures_source AS spatial_measures_start ON format_gridcode(start_lon,start_lat) = spatial_measures_start.gridcode
   JOIN spatial_measures_source AS spatial_measures_end ON format_gridcode(end_lon, end_lat) = spatial_measures_end.gridcode
 ),
-create_event_region_matches as (
-    SELECT events.event_id, id, layer,
-    FROM
-      total_events AS events
-    JOIN gridded_regions r 
-    ON events.s2_cell = r.s2_cell
-    WHERE ST_INTERSECTS(events.geo, r.geo)
-  ),
-  event_by_layer_by_id as (
-    select 
-      event_id, layer, id
-    from create_event_region_matches
-    group by 1, 2, 3
-  ),
-  events_by_layer as(
-    select
-      event_id, CONCAT('"', layer, '":' ,TO_JSON_STRING(array_agg(id))) as json_fragment
-    from event_by_layer_by_id
-    group by event_id, layer
-  ),
-  event_with_region as (
-    select
-      event_id, 
-      parse_regions_to_struct(CONCAT( "{", STRING_AGG(json_fragment, ","), "}")) as regions
-    from events_by_layer
-    group by 1
-  )
+{% with complete_events_table="complete_events", regions_table=regions_table %}
+    {% include 'regions-subquery.sql.j2' %}
+{% endwith %}
 
-select total_events.* except (s2_cell, geo),
+
+select complete_events.* except (s2_cell, geo),
 spatial_measures_mean.regions AS regions_mean_position
-from total_events
+from complete_events
 left JOIN event_with_region spatial_measures_mean using (event_id)
