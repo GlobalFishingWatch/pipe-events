@@ -94,12 +94,12 @@ intermadiate_anchorage AS (
         named_anchorages_source.lon AS lon,
     FROM port_visits_by_event_type
         JOIN named_anchorages_source ON (port_visits_by_event_type.anchorage_id = named_anchorages_source.s2id)
-)
+),
 
 #
 # Finally, enhance the event with info related to regions and distances.
 #
-SELECT
+complete_events as (SELECT
   TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', vessel_id, start_timestamp, end_timestamp))) AS event_id,
   'port_visit' AS event_type,
   vessel_id,
@@ -112,7 +112,8 @@ SELECT
   end_lat AS lat_max,
   start_lon AS lon_min,
   end_lon AS lon_max,
-  sm.regions AS regions_mean_position,
+  ST_GEOGPOINT(lon_mean, lat_mean) as geo,
+  S2_CELLIDFROMPOINT(ST_GEOGPOINT(lon_mean, lat_mean), s2_level()) as s2_cell,
   convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
   convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
   convert_m_to_km( spatial_measures_start.distance_from_port_m ) AS start_distance_from_port_km,
@@ -170,4 +171,13 @@ FROM port_visits_source
   LEFT JOIN intermadiate_anchorage ON (port_visits_source.visit_id = intermadiate_anchorage.visit_id)
   JOIN spatial_measures_source AS spatial_measures_start ON format_gridcode(start_lon,start_lat) = spatial_measures_start.gridcode
   JOIN spatial_measures_source AS spatial_measures_end ON format_gridcode(end_lon, end_lat) = spatial_measures_end.gridcode
-  JOIN spatial_measures_source AS spatial_measures_mean ON format_gridcode(intermadiate_anchorage.lon, intermadiate_anchorage.lat) = spatial_measures_mean.gridcode
+),
+{% with complete_events_table="complete_events", regions_table=regions_table %}
+    {% include 'regions-subquery.sql.j2' %}
+{% endwith %}
+
+
+select complete_events.* except (s2_cell, geo),
+spatial_measures_mean.regions AS regions_mean_position
+from complete_events
+left JOIN event_with_region spatial_measures_mean using (event_id)

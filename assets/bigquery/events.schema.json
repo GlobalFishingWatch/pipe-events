@@ -76,20 +76,9 @@
     "type": "RECORD",
     "mode": "NULLABLE",
     "fields": [
-      { "name": "mregion", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "arg", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "eez", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "mparu", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "vme", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "kkp", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "ocean", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "hsp", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "other", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "fao", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "mpant", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "ames", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "rfmo", "type": "STRING",  "mode": "REPEATED" },
-      { "name": "major_fao", "type": "STRING",  "mode": "REPEATED" }
+      { "name": "eez", "type": "STRING", "mode": "REPEATED" },
+      { "name": "mpa", "type": "STRING", "mode": "REPEATED" },
+      { "name": "rfmo", "type": "STRING", "mode": "REPEATED" }
     ],
     "description": "The regions where the event happened. Calculated using the mean position."
   },
