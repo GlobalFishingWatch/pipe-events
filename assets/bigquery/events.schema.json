@@ -78,7 +78,10 @@
     "fields": [
       { "name": "eez", "type": "STRING", "mode": "REPEATED" },
       { "name": "mpa", "type": "STRING", "mode": "REPEATED" },
-      { "name": "rfmo", "type": "STRING", "mode": "REPEATED" }
+      { "name": "rfmo", "type": "STRING", "mode": "REPEATED" },
+      { "name": "fao", "type": "STRING", "mode": "REPEATED" },
+      { "name": "major_fao", "type": "STRING", "mode": "REPEATED" },
+      { "name": "eez12nm", "type": "STRING", "mode": "REPEATED" }
     ],
     "description": "The regions where the event happened. Calculated using the mean position."
   },
