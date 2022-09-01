@@ -530,8 +530,8 @@ WITH
   complete_encounter_with_authorizations AS (
     SELECT
       encounter.*,
-      -- joint authorization status 
-      authorization.joint_authorization,
+      ## NEW change field name from joint_authorization to potential_risk
+      authorization.potential_risk,
       -- authorization for main vessel and encountered vessel
       authorization.main_vessel_authorization_status,
       authorization.encountered_vessel_authorization_status,
