@@ -249,6 +249,8 @@ WITH
     SELECT
     fe.event_id,
     rfmo,
+    ## NEW add field for if event occurs in eez
+    eez IS NOT NULL as eez_event,
     CASE 
       WHEN vessel_authorization.registry_rfmo IS NOT NULL THEN 'true'
       WHEN vessel_authorization.registry_rfmo IS NULL AND fe.event_start <= last_scrape.last_scrape THEN 'false'
@@ -259,6 +261,9 @@ WITH
         fe_regions AS fe
       CROSS JOIN
         UNNEST(fe.regions_mean_position.rfmo) AS rfmo
+      ## NEW add eez informaiton
+      LEFT JOIN
+        UNNEST(fe.regions_mean_position.eez) AS eez
       LEFT JOIN
         authorizations AS vessel_authorization
       ON
@@ -275,26 +280,28 @@ WITH
       GROUP BY
         fe.event_id,
         rfmo,
+        ## NEW add field for if event occurs in eez
+        eez_event,
         vessel_is_authorized,
         event_after_last_scrape
   ),
-
   #
   # Calculate the final fishing event authorization status. 
   # Indicate if fishing event occured before or after last registry scrape
   #
   fe_authorizations AS (
   -- Add authorization status as boolean value for insurance prototype
-      -- * If vessel is authorized or partially authorized
-      -- then the fishing event is authroized
+      -- * If vessel is unauthorized and not in an EEZ
+      -- then the fishing event is flagged as a risk
       --
-      -- * Any other case means it's an unauthorized fishing event
+      -- * Any other case means it's potentially authorized
       --
       -- NOTE: this subquery logic is different from CVP. 
       --
       SELECT 
       *,
-      vessel_authorization_status = 'authorized' OR vessel_authorization_status = 'partial' AS is_authorized
+      ## NEW Update howo this field is calculated and change field name from is_authorized to potential_risk
+      (vessel_authorization_status = 'unauthorized' AND NOT eez_event) AS potential_risk
       FROM (
     SELECT
       fe.event_id,
@@ -322,6 +329,8 @@ WITH
       ELSE
       'partial'
     END AS vessel_authorization_status,
+    ## NEW add field for if event occured in EEZ
+    fe_authorizations.eez_event,
       -- Finally, we need to compute per-region authorization status. For each
       -- authorization record in this event, we generate a struct containing the
       -- name of the region and the authorization status for the vessel.
@@ -336,6 +345,7 @@ WITH
       (event_id)
     GROUP BY
       event_id,
+      eez_event,
       event_after_last_scrape
   )),
   
@@ -352,7 +362,7 @@ WITH
   complete_fe_with_authorizations AS (
     SELECT
       fe.*,
-      authorization.is_authorized,
+      authorization.potential_risk,
       authorization.vessel_authorization_status,
       authorization.vessel_region_authorizations,
       regions.regions_mean_position
@@ -401,7 +411,7 @@ WITH
         convert_m_to_km(event_distance_m) AS distance_km,
         avg_speed_knots,
         -- add authorization information
-        is_authorized,
+        potential_risk,
         vessel_authorization_status
       )) AS event_info,
       TO_JSON_STRING([STRUCT(
