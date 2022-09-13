@@ -355,7 +355,7 @@ WITH
        AS encountered_vessel_is_authorized,
     -- Add field for if both vessels are authorized to same RFMO
     main_vessel_authorization.registry_rfmo IS NOT NULL AND encountered_vessel_authorization.registry_rfmo IS NOT NULL AS both_vessels_authorized,
-    encounters.start_time > last_scrape.last_scrape AS event_after_last_scrape
+    encounters.start_time >= last_scrape.last_scrape AS event_after_last_scrape
       FROM
         encounters_regions AS encounters
       CROSS JOIN

@@ -236,7 +236,7 @@ WITH
       WHEN vessel_authorization.registry_rfmo IS NULL AND fe.event_start <= last_scrape.last_scrape THEN 'false'
       ELSE 'pending' END
        AS vessel_is_authorized,
-    fe.event_start > last_scrape.last_scrape AS event_after_last_scrape
+    fe.event_start >= last_scrape.last_scrape AS event_after_last_scrape
       FROM
         fe_regions AS fe
       CROSS JOIN
