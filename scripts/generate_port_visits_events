@@ -8,6 +8,7 @@ ARGS=( \
   DATE_RANGE \
   PORT_VISITS_TABLE \
   VESSEL_INFO_TABLE \
+  ALL_VESSELS_BYYEAR_V \
   SPATIAL_MEASURES_TABLE \
   REGIONS_TABLE \
   NAMED_ANCHORAGES_TABLE \
@@ -18,7 +19,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] PORT_VISITS_TABLE VESSEL_INFO_TABLE SPATIAL_MEASURES NAMED_ANCHORAGES_TABLE DEST_TABLE\n"
+  echo -e "\nUsage:\n$0 YYYY-MM-DD[,YYYY-MM-DD] PORT_VISITS_TABLE VESSEL_INFO_TABLE ALL_VESSELS_BYYEAR_V SPATIAL_MEASURES NAMED_ANCHORAGES_TABLE DEST_TABLE\n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -43,6 +44,7 @@ echo "Running $0"
 echo "  DATE_RANGE: $DATE_RANGE"
 echo "  PORT_VISITS_TABLE: $PORT_VISITS_TABLE"
 echo "  VESSEL_INFO_TABLE: $VESSEL_INFO_TABLE"
+echo "  ALL_VESSELS_BYYEAR_V: $ALL_VESSELS_BYYEAR_V"
 echo "  SPATIAL_MEASURES: $SPATIAL_MEASURES_TABLE"
 echo "  NAMED_ANCHORAGES_TABLE: $NAMED_ANCHORAGES_TABLE"
 echo "  DEST_TABLE: $DEST_TABLE"
@@ -96,6 +98,7 @@ jinja2 "${INSERT_SQL}" \
    -D dest="${DEST_TABLE//:/.}" \
    -D port_visits_table="${PORT_VISITS_TABLE}" \
    -D vessel_info_table="${VESSEL_INFO_TABLE}" \
+   -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V} \
    -D spatial_measures_table=${SPATIAL_MEASURES_TABLE} \
    -D regions_table=${REGIONS_TABLE//:/.} \
    -D named_anchorages_table=${NAMED_ANCHORAGES_TABLE} \

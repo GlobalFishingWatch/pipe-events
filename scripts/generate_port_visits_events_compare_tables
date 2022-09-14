@@ -8,6 +8,7 @@ ARGS=( \
   DATE_RANGE \
   PORT_VISITS_TABLE \
   VESSEL_INFO_TABLE \
+  ALL_VESSELS_BYYEAR_V \
   SPATIAL_MEASURES_TABLE \
   REGIONS_TABLE \
   NAMED_ANCHORAGES_TABLE \
@@ -122,6 +123,7 @@ jinja2 "${INSERT_SQL}" \
    -D dest="${DEST_TABLE//:/.}" \
    -D port_visits_table="${PORT_VISITS_TABLE}" \
    -D vessel_info_table="${VESSEL_INFO_TABLE}" \
+   -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V} \
    -D spatial_measures_table=${SPATIAL_MEASURES_TABLE} \
    -D regions_table=${REGIONS_TABLE//:/.} \
    -D named_anchorages_table=${NAMED_ANCHORAGES_TABLE} \
