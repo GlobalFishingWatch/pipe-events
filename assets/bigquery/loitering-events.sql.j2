@@ -116,7 +116,8 @@ WITH
                 vessel_id AS `id`,
                 lo.ssvid AS `ssvid`,
                 si.shipname.value AS `name`,
-                seg_id,
+                [seg_id] as seg_ids,
+                vessel.flag as `flag`,
                 vessel.class AS `type`
             )
         ]) AS event_vessels

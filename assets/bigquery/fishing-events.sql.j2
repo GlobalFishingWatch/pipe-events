@@ -122,7 +122,9 @@ WITH
     SELECT
      message_vessel_id.*,
      vesselinfo.geartype AS best_best_vessel_class,
+     vesselinfo.shiptype as main_vessel_type,
      vesselinfo.ssvid AS main_vessel_ssvid,
+     vesselinfo.flag AS main_vessel_flag,
      main_vessel_shipname
     FROM
      message_vessel_id
@@ -252,6 +254,8 @@ WITH
     seg_id,
     vessel_id,
     main_vessel_shipname,
+    main_vessel_flag,
+    main_vessel_type,
     best_best_vessel_class,
     ST_CENTROID(ST_UNION_AGG(point)) AS centroid,
     -- compute centoid of all the lat/lon pairs in the event
@@ -291,6 +295,8 @@ WITH
     vessel_id,
     main_vessel_shipname,
     best_best_vessel_class,
+    main_vessel_flag,
+    main_vessel_type,
     event_start
   -- exclude events too short or with too high an avg vessel speed
   HAVING
@@ -394,7 +400,9 @@ WITH
         vessel_id AS `id`,
         ssvid AS `ssvid`,
         main_vessel_shipname AS `name`,
-        seg_id
+        main_vessel_flag AS `flag`,
+        main_vessel_type AS `type`,
+        [seg_id] as seg_ids
       )]) as event_vessels
     FROM fishing_events_with_regions cfe
       JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(lon_min,lat_min) = spatial_measures_start.gridcode

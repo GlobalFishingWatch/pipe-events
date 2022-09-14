@@ -24,16 +24,28 @@ port_visits_source AS (
     AND start_timestamp BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 ),
 
+named_anchorages_source AS (
+  SELECT
+    *
+  FROM `{{ named_anchorages_table }}`
+),
+
+
 vessel_info_source AS (
   SELECT
     *
   FROM `{{ vessel_info_table }}`
 ),
 
-named_anchorages_source AS (
+
+#
+# Vessels byyear sources
+#
+source_all_vessels AS (
   SELECT
-    *
-  FROM `{{ named_anchorages_table }}`
+    *,
+    shiptype as class
+  FROM `{{ all_vessels_byyear_table }}`
 ),
 
 --# Get base info, calculate mean position and aggregate segment ids.
@@ -100,9 +112,9 @@ intermadiate_anchorage AS (
 # Finally, enhance the event with info related to regions and distances.
 #
 complete_events as (SELECT
-  TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', vessel_id, start_timestamp, end_timestamp))) AS event_id,
+  TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', port_visits_source.vessel_id, start_timestamp, end_timestamp))) AS event_id,
   'port_visit' AS event_type,
-  vessel_id,
+  port_visits_source.vessel_id,
   cast(NULL AS string) AS seg_id,
   start_timestamp AS event_start,
   end_timestamp AS event_end,
@@ -158,14 +170,16 @@ complete_events as (SELECT
         seg_ids
   )) as event_info,
   TO_JSON_STRING([STRUCT(
-        vessel_id AS `id`,
-        vi.ssvid AS `ssvid`,
-        vi.shipname.value AS `name`
+        port_visits_source.vessel_id AS `id`,
+        vessel.ssvid AS `ssvid`,
+        vessel.shipname AS `name`,
+        vessel.shiptype as `type`,
+        vessel.flag as `flag`
   )]) as event_vessels
 FROM port_visits_source
+  JOIN source_all_vessels vessel on vessel.vessel_id = port_visits_source.vessel_id and vessel.year= EXTRACT(year from start_timestamp)
   JOIN mean_positions USING (visit_id)
   JOIN spatial_measures_source sm ON format_gridcode(lon_mean, lat_mean) = sm.gridcode
-  JOIN vessel_info_source vi USING (vessel_id)
   JOIN named_anchorages_source AS start_anchorage ON (start_anchorage_id = start_anchorage.s2id)
   JOIN named_anchorages_source AS end_anchorage ON (end_anchorage_id = end_anchorage.s2id)
   LEFT JOIN intermadiate_anchorage ON (port_visits_source.visit_id = intermadiate_anchorage.visit_id)
