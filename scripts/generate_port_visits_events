@@ -98,7 +98,7 @@ jinja2 "${INSERT_SQL}" \
    -D dest="${DEST_TABLE//:/.}" \
    -D port_visits_table="${PORT_VISITS_TABLE}" \
    -D vessel_info_table="${VESSEL_INFO_TABLE}" \
-   -D all_vessels_byyear_TABLE_table=${ALL_VESSELS_BYYEAR_TABLE} \
+   -D all_vessels_byyear_table=${ALL_VESSELS_BYYEAR_TABLE} \
    -D spatial_measures_table=${SPATIAL_MEASURES_TABLE} \
    -D regions_table=${REGIONS_TABLE//:/.} \
    -D named_anchorages_table=${NAMED_ANCHORAGES_TABLE} \
