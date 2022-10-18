@@ -128,7 +128,7 @@ jinja2 "${INSERT_SQL}" \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    -D regions_table=${REGIONS_TABLE//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
-     --append_table \
+     --replace \
      --destination_table ${current_table_name}
 
 if [ "$?" -ne 0 ]; then
