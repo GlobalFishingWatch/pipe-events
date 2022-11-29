@@ -78,6 +78,9 @@
     "fields": [
       { "name": "eez", "type": "STRING", "mode": "REPEATED" },
       { "name": "mpa", "type": "STRING", "mode": "REPEATED" },
+      { "name": "mpa_no_take", "type": "STRING", "mode": "REPEATED" },
+      { "name": "mpa_no_take_partial", "type": "STRING", "mode": "REPEATED" },
+      { "name": "high_seas", "type": "STRING", "mode": "REPEATED" },
       { "name": "rfmo", "type": "STRING", "mode": "REPEATED" },
       { "name": "fao", "type": "STRING", "mode": "REPEATED" },
       { "name": "major_fao", "type": "STRING", "mode": "REPEATED" },
