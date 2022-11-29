@@ -74,15 +74,18 @@ CREATE TEMPORARY FUNCTION
 
 CREATE TEMP FUNCTION s2_level() AS (10);
 CREATE TEMP FUNCTION parse_regions_to_struct(regions_str STRING)
-  RETURNS STRUCT<eez ARRAY<STRING>, mpa ARRAY<STRING>, rfmo ARRAY<STRING>, fao ARRAY<STRING>,major_fao ARRAY<STRING>, eez12nm ARRAY<STRING>> 
+  RETURNS STRUCT<eez ARRAY<STRING>, mpa ARRAY<STRING>, rfmo ARRAY<STRING>, fao ARRAY<STRING>,major_fao ARRAY<STRING>, eez12nm ARRAY<STRING>, high_seas ARRAY<STRING>, mpa_no_take_partial ARRAY<STRING>, mpa_no_take ARRAY<STRING>> 
   LANGUAGE js AS 
 """
     const regions = JSON.parse(regions_str)
     this.eez = regions.eez || [];
     this.mpa = regions.mpa || [];
+    this.mpa_no_take = regions.mpa_no_take || [];
+    this.mpa_no_take_partial = regions.mpa_no_take_partial || [];
     this.rfmo = regions.rfmo || [];
     this.fao = regions.fao || [];
     this.major_fao = regions.major_fao || [];
     this.eez12nm = regions.eez12nm || [];
+    this.high_seas = regions.high_seas || [];
     return this;
 """;
