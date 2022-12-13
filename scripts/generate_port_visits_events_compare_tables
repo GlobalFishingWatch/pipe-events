@@ -77,6 +77,7 @@ bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
   --time_partitioning_field=event_start \
+  --time_partitioning_type=MONTH \
   "${current_table_name}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create table ${current_table_name}"
@@ -90,6 +91,7 @@ bq mk --force \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
   --time_partitioning_field=event_start \
+  --time_partitioning_type=MONTH \
   "${one_day_previous_table_name}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create table ${one_day_previous_table_name}"
