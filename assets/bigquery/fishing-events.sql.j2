@@ -263,6 +263,7 @@ WITH
     main_vessel_flag,
     best_best_vessel_class,
     ST_CENTROID(ST_UNION_AGG(point)) AS centroid,
+    ARRAY_AGG(struct(point as point, S2_CELLIDFROMPOINT(point, s2_level()) as s2_cell)) as geo_info,
     -- compute centoid of all the lat/lon pairs in the event
     event_start,
     MAX(timestamp) AS event_end,
@@ -344,9 +345,7 @@ WITH
   complete_fishing_event AS (
   SELECT
     *,
-    TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'fishing', vessel_id, event_start, event_end))) AS event_id,
-    ST_GEOGPOINT(lon_mean, lat_mean) as geo,
-    S2_CELLIDFROMPOINT(ST_GEOGPOINT(lon_mean, lat_mean), s2_level()) as s2_cell
+    TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'fishing', vessel_id, event_start, event_end))) AS event_id
   FROM
     fishing_event_dateline
   WHERE
