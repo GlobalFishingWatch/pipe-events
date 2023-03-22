@@ -202,7 +202,7 @@ WITH
   create_event_region_matches as (
     SELECT event.event_id, id, layer,
     FROM
-      complete_fishing_event AS event, unnest(events.geo_info) geo_info
+      complete_fishing_event AS event, unnest(event.geo_info) geo_info
     JOIN gridded_regions r 
     ON  r.s2_cell = geo_info.s2_cell
     WHERE ST_WITHIN(geo_info.point, r.geo)
