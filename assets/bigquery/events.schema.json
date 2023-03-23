@@ -37,13 +37,13 @@
   },
   {
     "name": "lat_mean",
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "type": "FLOAT",
     "description": "Mean latitude where the event ocurred. When an event occurs over a region (for example, encounters) this is the mean latitude over all the individual points involved."
   },
   {
     "name": "lon_mean",
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "type": "FLOAT",
     "description": "Mean longitude where the event ocurred. When an event occurs over a region (for example, encounters) this is the mean longitude over all the individual points involved."
   },

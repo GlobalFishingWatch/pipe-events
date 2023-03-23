@@ -104,17 +104,17 @@ echo "  Events table exists"
 ################################################################################
 # Delete existing records
 ################################################################################
-# DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
-# echo "Deleting existing records for ${START_DATE} to ${END_DATE}"
-# jinja2 ${DELETE_SQL} \
-#   -D table=${current_table_name//:/.} \
-#   -D start_date=${START_DATE} \
-#   -D end_date=${END_DATE} \
-#   | bq query --max_rows=0
-# if [ "$?" -ne 0 ]; then
-#   echo "  Unable to delete records for table ${current_table_name} from ${START_DATE} to ${END_DATE}"
-#   exit 1
-# fi
+DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
+echo "Deleting existing records for ${START_DATE} to ${END_DATE}"
+jinja2 ${DELETE_SQL} \
+  -D table=${current_table_name//:/.} \
+  -D start_date=${START_DATE} \
+  -D end_date=${END_DATE} \
+  | bq query --max_rows=0
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to delete records for table ${current_table_name} from ${START_DATE} to ${END_DATE}"
+  exit 1
+fi
 
 ################################################################################
 # Inserting new records

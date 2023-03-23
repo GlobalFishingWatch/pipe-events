@@ -3,17 +3,28 @@
 # Include some utility functions
 {% include 'util.sql.j2' %}
 
+
+#
+# Spatial measures data
+#
+with spatial_measures_source as (
+  SELECT
+    *,
+  FROM `{{ spatial_measures_table }}`
+),
+
+#
+# Regions data
+#
+regions_source as (
+  SELECT
+    *,
+  FROM `{{ regions_table }}`
+),
+
 #
 # Port visits Events
 #
-
-WITH spatial_measures_source AS (
-    SELECT
-      *
-    FROM
-      `{{ spatial_measures_table }}`
-),
-
 port_visits_source AS (
   SELECT
     *
@@ -24,6 +35,12 @@ port_visits_source AS (
     AND start_timestamp BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 ),
 
+vessel_info_source AS (
+  SELECT
+    *
+  FROM `{{ vessel_info_table }}`
+),
+
 named_anchorages_source AS (
   SELECT
     *
@@ -31,25 +48,14 @@ named_anchorages_source AS (
 ),
 
 
-vessel_info_source AS (
-  SELECT
-    *
-  FROM `{{ vessel_info_table }}`
-),
-
-
-#
-# Vessels byyear sources
-#
-source_all_vessels AS (
-  SELECT
-    *,
-    shiptype as class
-  FROM `{{ all_vessels_byyear_table }}`
+gridded_regions as(
+  select
+    * except(s2_cells),
+  from regions_source
+  cross join unnest (s2_cells) as s2_cell
 ),
 
 --# Get base info, calculate mean position and aggregate segment ids.
-
 mean_positions AS (
   SELECT visit_id, AVG(vessel_lat) as lat_mean, AVG(vessel_lon) AS lon_mean,  ARRAY_AGG(DISTINCT seg_id) AS seg_ids
   FROM port_visits_source,
@@ -111,10 +117,10 @@ intermadiate_anchorage AS (
 #
 # Finally, enhance the event with info related to regions and distances.
 #
-complete_events as (SELECT
-  TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', port_visits_source.vessel_id, start_timestamp, end_timestamp))) AS event_id,
+total_events as (SELECT
+  TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', vessel_id, start_timestamp, end_timestamp))) AS event_id,
   'port_visit' AS event_type,
-  port_visits_source.vessel_id,
+  vessel_id,
   cast(NULL AS string) AS seg_id,
   start_timestamp AS event_start,
   end_timestamp AS event_end,
@@ -124,7 +130,7 @@ complete_events as (SELECT
   end_lat AS lat_max,
   start_lon AS lon_min,
   end_lon AS lon_max,
-  ST_GEOGPOINT(lon_mean, lat_mean) as geo,
+	ST_GEOGPOINT(lon_mean, lat_mean) as geo,
   S2_CELLIDFROMPOINT(ST_GEOGPOINT(lon_mean, lat_mean), s2_level()) as s2_cell,
   convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
   convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
@@ -170,28 +176,50 @@ complete_events as (SELECT
         seg_ids
   )) as event_info,
   TO_JSON_STRING([STRUCT(
-        port_visits_source.vessel_id AS `id`,
-        vessel.ssvid AS `ssvid`,
-        vessel.shipname AS `name`,
-        vessel.shiptype as `type`,
-        vessel.flag as `flag`
+        vessel_id AS `id`,
+        vi.ssvid AS `ssvid`,
+        vi.shipname.value AS `name`
   )]) as event_vessels
 FROM port_visits_source
-  JOIN source_all_vessels vessel on vessel.vessel_id = port_visits_source.vessel_id and vessel.year= EXTRACT(year from start_timestamp)
   JOIN mean_positions USING (visit_id)
-  JOIN spatial_measures_source sm ON format_gridcode(lon_mean, lat_mean) = sm.gridcode
+  JOIN vessel_info_source vi USING (vessel_id)
   JOIN named_anchorages_source AS start_anchorage ON (start_anchorage_id = start_anchorage.s2id)
   JOIN named_anchorages_source AS end_anchorage ON (end_anchorage_id = end_anchorage.s2id)
   LEFT JOIN intermadiate_anchorage ON (port_visits_source.visit_id = intermadiate_anchorage.visit_id)
   JOIN spatial_measures_source AS spatial_measures_start ON format_gridcode(start_lon,start_lat) = spatial_measures_start.gridcode
   JOIN spatial_measures_source AS spatial_measures_end ON format_gridcode(end_lon, end_lat) = spatial_measures_end.gridcode
 ),
-{% with complete_events_table="complete_events", regions_table=regions_table %}
-    {% include 'regions-subquery.sql.j2' %}
-{% endwith %}
 
+create_event_region_matches as (
+    SELECT events.event_id, id, layer,
+    FROM
+      total_events AS events
+    JOIN gridded_regions r 
+    ON events.s2_cell = r.s2_cell
+    WHERE ST_INTERSECTS(events.geo, r.geo)
+  ),
+  event_by_layer_by_id as (
+    select 
+      event_id, layer, id
+    from create_event_region_matches
+    group by 1, 2, 3
+  ),
+  events_by_layer as(
+    select
+      event_id, CONCAT('"', layer, '":' ,TO_JSON_STRING(array_agg(id))) as json_frament
+    from event_by_layer_by_id
+    group by event_id, layer
+  ),
+  event_with_region as (
+    select
+      event_id, 
+      parse_regions_to_struct(CONCAT( "{", STRING_AGG(json_frament, ","), "}")) as regions
+    from events_by_layer
+    group by 1
+  )
 
-select complete_events.* except (s2_cell, geo),
+select total_events.* except (s2_cell, geo),
 spatial_measures_mean.regions AS regions_mean_position
-from complete_events
+from total_events
 left JOIN event_with_region spatial_measures_mean using (event_id)
+
