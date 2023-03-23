@@ -10,6 +10,8 @@ ARGS=( \
   REGIONS_TABLE \
   ALL_VESSELS_BYYEAR_V_TABLE \
   VESSEL_INFO_TABLE \
+  VESSEL_IDENTITY_CORE \
+  VESSEL_IDENTITY_AUTHORIZATION \
   DEST_TABLE \
 )
 
@@ -17,7 +19,7 @@ ARGS=( \
 # Validate and extract arguments
 ################################################################################
 display_usage() {
-  echo -e "\nUsage:\n$0 SOURCE_TABLE SPATIAL_MEASURES_TABLE ALL_VESSELS_BYYEAR_V_TABLE VESSEL_INFO_TABLE DEST_TABLE \n"
+  echo -e "\nUsage:\n$0 SOURCE_TABLE SPATIAL_MEASURES_TABLE REGIONS_TABLE ALL_VESSELS_BYYEAR_V_TABLE VESSEL_INFO_TABLE VESSEL_IDENTITY_CORE VESSEL_IDENTITY_AUTHORIZATION DEST_TABLE \n"
 }
 
 if [[ $# -ne ${#ARGS[@]} ]]
@@ -39,6 +41,8 @@ echo "  SPATIAL_MEASURES_TABLE: $SPATIAL_MEASURES_TABLE"
 echo "  REGIONS_TABLE: $REGIONS_TABLE"
 echo "  ALL_VESSELS_BYYEAR_V_TABLE: $ALL_VESSELS_BYYEAR_V_TABLE"
 echo "  VESSEL_INFO_TABLE: $VESSEL_INFO_TABLE"
+echo "  VESSEL_IDENTITY_CORE: $VESSEL_IDENTITY_CORE"
+echo "  VESSEL_IDENTITY_AUTHORIZATION: $VESSEL_IDENTITY_AUTHORIZATION"
 echo "  DEST_TABLE: $DEST_TABLE"
 ################################################################################
 # Force that the destination table exists
@@ -75,6 +79,8 @@ jinja2 ${SQL} \
   -D vessel_info_table=${VESSEL_INFO_TABLE//:/.} \
   -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V_TABLE//:/.} \
   -D spatial_measures_table=${SPATIAL_MEASURES_TABLE//:/.} \
+  -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+  -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
   -D regions_table=${REGIONS_TABLE//:/.} \
   | bq query --max_rows=0 --allow_large_results --replace --destination_table ${DEST_TABLE}
 

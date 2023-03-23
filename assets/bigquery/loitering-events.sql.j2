@@ -25,11 +25,21 @@ WITH
         `{{ source_segment_info }}`
   ),
 
-  source_spatial_measures AS (
+  #
+  # Spatial measures data
+  #
+  source_spatial_measures as (
     SELECT
-        *
-    FROM
-        `{{ source_spatial_measures }}`
+      *,
+    FROM `{{ source_spatial_measures }}`
+  ),
+  #
+  # Regions data
+  #
+  regions_source as (
+    SELECT
+      *,
+    FROM `{{ source_regions_table }}`
   ),
 
   source_research_segs AS (
@@ -54,7 +64,14 @@ WITH
     FROM
         `{{ source_vessel_info }}`
   ),
-  
+
+
+  gridded_regions as(
+    select
+      * except(s2_cells),
+    from regions_source
+    cross join unnest (s2_cells) as s2_cell
+  ),
 
   #
   # Build a set of good segments
@@ -116,8 +133,7 @@ WITH
                 vessel_id AS `id`,
                 lo.ssvid AS `ssvid`,
                 si.shipname.value AS `name`,
-                [seg_id] as seg_ids,
-                vessel.flag as `flag`,
+                seg_id,
                 vessel.class AS `type`
             )
         ]) AS event_vessels
@@ -129,7 +145,7 @@ WITH
 #
 # Finally, enhance the event with info related to regions and distances.
 #
-complete_events as (SELECT
+total_events as (SELECT
   event_id,
   event_type,
   vessel_id,
@@ -142,14 +158,14 @@ complete_events as (SELECT
   lon_min,
   lat_max,
   lon_max,
+  event_info,
+  event_vessels,
+  ST_GEOGPOINT(lon_mean, lat_mean) as geo,
+  S2_CELLIDFROMPOINT(ST_GEOGPOINT(lon_mean, lat_mean), s2_level()) as s2_cell,
   convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
   convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
   convert_m_to_km( spatial_measures_start.distance_from_port_m ) AS start_distance_from_port_km,
   convert_m_to_km( spatial_measures_end.distance_from_port_m ) AS end_distance_from_port_km,
-  ST_GEOGPOINT(lon_mean, lat_mean) as geo,
-  S2_CELLIDFROMPOINT(ST_GEOGPOINT(lon_mean, lat_mean), s2_level()) as s2_cell,
-  event_info,
-  event_vessels
 FROM
   base_loitering_event
 JOIN
@@ -161,14 +177,38 @@ JOIN
   source_spatial_measures AS spatial_measures_end
 ON
   format_gridcode(lon_max,
-    lat_max) = spatial_measures_end.gridcode),
+    lat_max) = spatial_measures_end.gridcode
+  ),
 
+create_event_region_matches as (
+    SELECT events.event_id, id, layer,
+    FROM
+      total_events AS events
+    JOIN gridded_regions r 
+    ON events.s2_cell = r.s2_cell
+    WHERE ST_INTERSECTS(events.geo, r.geo)
+  ),
+  event_by_layer_by_id as (
+    select 
+      event_id, layer, id
+    from create_event_region_matches
+    group by 1, 2, 3
+  ),
+  events_by_layer as(
+    select
+      event_id, CONCAT('"', layer, '":' ,TO_JSON_STRING(array_agg(id))) as json_frament
+    from event_by_layer_by_id
+    group by event_id, layer
+  ),
+  event_with_region as (
+    select
+      event_id, 
+      parse_regions_to_struct(CONCAT( "{", STRING_AGG(json_frament, ","), "}")) as regions
+    from events_by_layer
+    group by 1
+  )
 
-{% with complete_events_table="complete_events", regions_table=source_regions_table %}
-    {% include 'regions-subquery.sql.j2' %}
-{% endwith %}
-
-select complete_events.* except (s2_cell, geo),
+select total_events.* except (s2_cell, geo),
 spatial_measures_mean.regions AS regions_mean_position
-from complete_events
+from total_events
 left JOIN event_with_region spatial_measures_mean using (event_id)

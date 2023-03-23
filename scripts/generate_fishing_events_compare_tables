@@ -13,6 +13,8 @@ ARGS=( \
   SOURCE_FISHING_VESSELS \
   SOURCE_SPATIAL_MEASURES \
   REGIONS_TABLE \
+  VESSEL_IDENTITY_CORE \
+  VESSEL_IDENTITY_AUTHORIZATION \
   DEST_TABLE
 )
 
@@ -51,12 +53,14 @@ end_date_minus_two_days_no_hyphens=${end_date_minus_two_days//-}
 current_table_name="${DEST_TABLE}_v${end_date_no_hyphens}"
 one_day_previous_table_name="${DEST_TABLE}_v${end_date_minus_one_day_no_hyphens}"
 two_days_previous_table_name="${DEST_TABLE}_v${end_date_minus_two_days_no_hyphens}"
+current_table_name_fishing_events="${DEST_TABLE}_temp_v${end_date_no_hyphens}"
 
 view_name="${DEST_TABLE//:/.}"
 
 echo "Current table=${current_table_name}"
 echo "One day previous table=${one_day_previous_table_name}"
 echo "Two days previous table=${two_days_previous_table_name}"
+echo "Temporal table with fishing events=${current_table_name_fishing_events}"
 
 
 ################################################################################
@@ -103,22 +107,47 @@ echo "  Events table exists"
 ################################################################################
 # Delete existing records
 ################################################################################
-# DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
-# echo "Deleting existing records for ${START_DATE} to ${END_DATE}"
-# jinja2 ${DELETE_SQL} \
-#   -D table=${current_table_name//:/.} \
-#   -D start_date=${START_DATE} \
-#   -D end_date=${END_DATE} \
-#   | bq query --max_rows=0
-# if [ "$?" -ne 0 ]; then
-#   echo "  Unable to delete records for table ${current_table_name} from ${START_DATE} to ${END_DATE}"
-#   exit 1
-# fi
+DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
+echo "Deleting existing records for ${START_DATE} to ${END_DATE}"
+jinja2 ${DELETE_SQL} \
+  -D table=${current_table_name//:/.} \
+  -D start_date=${START_DATE} \
+  -D end_date=${END_DATE} \
+  | bq query --max_rows=0
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to delete records for table ${current_table_name} from ${START_DATE} to ${END_DATE}"
+  exit 1
+fi
 
 ################################################################################
 # Inserting new records
 ################################################################################
 INSERT_SQL=${ASSETS}/bigquery/fishing-events.sql.j2
+echo "Creating temporal table with fishing-events ${START_DATE} to ${END_DATE}"
+
+jinja2 "${INSERT_SQL}" \
+   -D messages="${SOURCE_MESSAGES}" \
+   -D start_date="${START_DATE}" \
+   -D end_date="${END_DATE}" \
+   -D segs="${SOURCE_SEGS}" \
+   -D segment_vessel=${SOURCE_SEGMENT_VESSEL} \
+   -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
+   -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
+   -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
+   -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
+   | bq query --headless --max_rows=0 --allow_large_results \
+     --replace \
+     --destination_table ${current_table_name_fishing_events}
+
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to insert records for table ${current_table_name_fishing_events} from ${START_DATE} to ${END_DATE}"
+  exit 1
+fi
+bq update --expiration 3600 ${current_table_name_fishing_events}
+
+INSERT_SQL=${ASSETS}/bigquery/fishing-events-authorizations.sql.j2
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
@@ -131,12 +160,17 @@ jinja2 "${INSERT_SQL}" \
    -D fishing_vessels=${SOURCE_FISHING_VESSELS} \
    -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
    -D regions_table=${REGIONS_TABLE//:/.} \
+   -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
+   -D source_fishing_events=${current_table_name_fishing_events//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --replace \
      --destination_table ${current_table_name}
 
 if [ "$?" -ne 0 ]; then
   echo "  Unable to insert records for table ${current_table_name} from ${START_DATE} to ${END_DATE}"
+  echo "Removing temporal table [${current_table_name_fishing_events}]"
+  bq rm -f -t "${current_table_name_fishing_events}"
   exit 1
 fi
 
@@ -162,7 +196,18 @@ fi
 echo "Removing two days before table [${two_days_previous_table_name}]"
 bq rm -f -t "${two_days_previous_table_name}"
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to remove temporal table ${two_days_previous_table_name}"
+  echo "  Unable to remove two days before table ${two_days_previous_table_name}"
+  exit 1
+fi
+
+
+################################################################################
+# Remove temporal table
+################################################################################
+echo "Removing temporal table [${current_table_name_fishing_events}]"
+bq rm -f -t "${current_table_name_fishing_events}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to remove temporal table ${current_table_name_fishing_events}"
   exit 1
 fi
 

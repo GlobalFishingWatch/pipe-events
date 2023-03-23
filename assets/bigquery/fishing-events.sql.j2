@@ -37,14 +37,7 @@ WITH
     WHERE
       shiptype = 'fishing'
   ),
-  source_spatial_measures AS (
-    SELECT
-      *
-    FROM
-      `{{ spatial_measures_table }}`
-  ),
-  
-
+ 
   source_messages AS (
   SELECT
     ssvid,
@@ -112,8 +105,10 @@ WITH
  FROM source_vi_ssvid_by_year
  ),
 
--- change nnet score for squid jiggers to be 'night_loitering' field
--- by attaching best best vessel type for vessels using ssvid
+  --
+  -- change nnet score for squid jiggers to be 'night_loitering' field
+  -- by attaching best best vessel type for vessels using ssvid
+  --
   good_message AS (
   SELECT
     * EXCEPT (main_vessel_ssvid, nnet_score, night_loitering),
@@ -122,9 +117,8 @@ WITH
     SELECT
      message_vessel_id.*,
      vesselinfo.geartype AS best_best_vessel_class,
-     vesselinfo.shiptype as main_vessel_type,
      vesselinfo.ssvid AS main_vessel_ssvid,
-     vesselinfo.flag AS main_vessel_flag,
+     vesselinfo.flag as main_vessel_flag,
      main_vessel_shipname
     FROM
      message_vessel_id
@@ -139,8 +133,10 @@ WITH
     )
  ),
 
--- Group messages into events which are consecutive sequences of messages with the same score within the same seg_id
--- First for each message, get the score from the previous message in the segement
+  --
+  -- Group messages into events which are consecutive sequences of messages with the same score within the same seg_id
+  -- First for each message, get the score from the previous message in the segement
+  --
   prev_score_message AS (
   SELECT
     ssvid,
@@ -158,9 +154,11 @@ WITH
   FROM
     good_message),
 
--- Now get the time range from the start of a group to the end of the group
--- Do this by filtering to only the first message in each grouping and making a time range from
--- the first message in one group to the prev_timestamp of first message in the next group
+  --
+  -- Now get the time range from the start of a group to the end of the group
+  -- Do this by filtering to only the first message in each grouping and making a time range from
+  -- the first message in one group to the prev_timestamp of first message in the next group
+  --
   event_range AS (
   SELECT
     ssvid,
@@ -188,8 +186,10 @@ WITH
     (score = prev_score AND hours > 2)
     ),
 
-    -- Filter event ranges to only those with score = 1.0 (fishing)
--- and for each fishing event get the end of the time range of the previous fishing event
+  --
+  -- Filter event ranges to only those with score = 1.0 (fishing)
+  -- and for each fishing event get the end of the time range of the previous fishing event
+  --
   prev_fishing_event_range AS (
   SELECT
     ssvid,
@@ -210,7 +210,9 @@ WITH
   WHERE
     score = 1.0 ),
 
--- Create ranges spanning consecutive events that are separated by a small time interval
+  --
+  -- Create ranges spanning consecutive events that are separated by a small time interval
+  --
   fishing_event_range AS (
   SELECT
     ssvid,
@@ -229,8 +231,10 @@ WITH
     OR distance_to_prev_event_m > 2000)
     ),
 
--- Tag all the messages with the start time of the event range that contains the message
--- limit this to just messages with score = 1.0
+  --
+  -- Tag all the messages with the start time of the event range that contains the message
+  -- limit this to just messages with score = 1.0
+  --
   fishing_event_message AS (
   SELECT
     good_message.*,
@@ -246,8 +250,10 @@ WITH
     AND (event_end IS NULL OR timestamp <= event_end)
     AND score = 1.0 ),
 
--- Now aggregate all the messages that are in the same range into a single event record
--- Filter out short events or events where vessel is moving too fast
+  --
+  -- Now aggregate all the messages that are in the same range into a single event record
+  -- Filter out short events or events where vessel is moving too fast
+  --
   fishing_event AS (
   SELECT
     ssvid,
@@ -255,7 +261,6 @@ WITH
     vessel_id,
     main_vessel_shipname,
     main_vessel_flag,
-    main_vessel_type,
     best_best_vessel_class,
     ST_CENTROID(ST_UNION_AGG(point)) AS centroid,
     -- compute centoid of all the lat/lon pairs in the event
@@ -294,9 +299,8 @@ WITH
     seg_id,
     vessel_id,
     main_vessel_shipname,
-    best_best_vessel_class,
     main_vessel_flag,
-    main_vessel_type,
+    best_best_vessel_class,
     event_start
   -- exclude events too short or with too high an avg vessel speed
   HAVING
@@ -308,6 +312,7 @@ WITH
     AND avg_speed_knots < 10)
     ),
 
+  --
   -- Correct lon_min and lon_max for crossing the dateline (anti-meridian)
   -- And extract lat and lon from the centriod
   --
@@ -333,7 +338,9 @@ WITH
   FROM
     fishing_event ),
 
--- remove events that are too short
+  --
+  -- remove events that are too short
+  --
   complete_fishing_event AS (
   SELECT
     *,
@@ -346,74 +353,7 @@ WITH
     -- squid jigger fishing events must be longer than 50 meters
     best_best_vessel_class = 'squid_jigger' AND event_distance_m > 50
     -- all other fishing events must be longer than 500 meters
-    OR NOT best_best_vessel_class = 'squid_jigger' AND event_distance_m > 500),
+    OR NOT best_best_vessel_class = 'squid_jigger' AND event_distance_m > 500)
 
-  #
-  # Add spatial measures region information
-  #
-  {% with complete_events_table="complete_fishing_event", regions_table=regions_table %}
-    {% include 'regions-subquery.sql.j2' %}
-{% endwith %},
+  select * from complete_fishing_event
 
-  fishing_events_with_regions AS (
-  	SELECT
-      fe.*,   
-      spatial_measures_mean.regions AS regions_mean_position
-  	FROM
-      complete_fishing_event AS fe
-  	LEFT JOIN
-      event_with_region AS spatial_measures_mean 
-    on (spatial_measures_mean.event_id = fe.event_id)
-   ),
-
-   
-
---
--- Finally, generate a unique event id and write out in the normalized event schema
---
-  final_fishing_event AS (
-    SELECT
-      event_id,
-      'fishing' AS event_type,
-      vessel_id,
-      seg_id,
-      event_start,
-      event_end,
-      lat_mean,
-      lon_mean,
-      lat_min,
-      lat_max,
-      lon_min,
-      lon_max,
-      regions_mean_position,
-      convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
-      convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
-      convert_m_to_km( spatial_measures_start.distance_from_port_m ) AS start_distance_from_port_km,
-      convert_m_to_km( spatial_measures_end.distance_from_port_m ) AS end_distance_from_port_km,
-      TO_JSON_STRING(STRUCT(
-        message_count,
-        avg_hours AS avg_duration_hrs,
-        convert_m_to_km(event_distance_m) AS distance_km,
-        avg_speed_knots
-      )) AS event_info,
-      TO_JSON_STRING([STRUCT(
-        vessel_id AS `id`,
-        ssvid AS `ssvid`,
-        main_vessel_shipname AS `name`,
-        main_vessel_flag AS `flag`,
-        main_vessel_type AS `type`,
-        [seg_id] as seg_ids
-      )]) as event_vessels
-    FROM fishing_events_with_regions cfe
-      JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(lon_min,lat_min) = spatial_measures_start.gridcode
-      JOIN source_spatial_measures AS spatial_measures_end ON format_gridcode(lon_max, lat_max) = spatial_measures_end.gridcode
-  )
-
-  --
-  -- Return final fishing events table
-  --
-  SELECT
-    *
-  FROM
-    final_fishing_event
-  WHERE event_start BETWEEN '{{ start_date }}' AND '{{ end_date }}'

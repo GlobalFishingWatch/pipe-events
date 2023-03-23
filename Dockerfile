@@ -30,9 +30,10 @@ RUN \
 
 # Setup a volume for configuration and auth data
 VOLUME ["/root/.config"]
-COPY requirements.txt /opt/project/requirements.txt
-RUN pip install -r requirements.txt
+
+COPY requirements.txt requirements.txt
 # Setup local application dependencies
+RUN pip install -r requirements.txt
 COPY . /opt/project
 
 # install
