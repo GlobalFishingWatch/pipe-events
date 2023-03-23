@@ -122,7 +122,7 @@ fi
 ################################################################################
 # Inserting new records
 ################################################################################
-INSERT_SQL=${ASSETS}/bigquery/fishing-events.sql.j2
+INSERT_SQL=${ASSETS}/bigquery/fishing-events-1.sql.j2
 echo "Creating temporal table with fishing-events ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
@@ -147,7 +147,7 @@ if [ "$?" -ne 0 ]; then
 fi
 bq update --expiration 3600 ${current_table_name_fishing_events}
 
-INSERT_SQL=${ASSETS}/bigquery/fishing-events-authorizations.sql.j2
+INSERT_SQL=${ASSETS}/bigquery/fishing-events-2.sql.j2
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
