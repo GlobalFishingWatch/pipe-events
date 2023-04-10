@@ -134,8 +134,8 @@ WITH
                 lo.ssvid AS `ssvid`,
                 si.shipname.value AS `name`,
                 seg_id,
-                vessel.class AS `type`
-                vessel.flag AS `flag`,
+                vessel.class AS `type`,
+                vessel.flag AS `flag`
             )
         ]) AS event_vessels
     FROM denoised_loitering AS lo JOIN source_segment_info si USING (seg_id)
