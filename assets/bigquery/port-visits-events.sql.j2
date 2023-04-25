@@ -196,7 +196,7 @@ total_events as (SELECT
 FROM port_visits_source
   JOIN source_all_vessels vessel on vessel.vessel_id = port_visits_source.vessel_id and vessel.year= EXTRACT(year from start_timestamp)
   JOIN mean_positions USING (visit_id)
-  JOIN vessel_info_source vi USING (vessel_id)
+  JOIN vessel_info_source vi ON (port_visits_source.vessel_id = vi.vessel_id)
   JOIN named_anchorages_source AS start_anchorage ON (start_anchorage_id = start_anchorage.s2id)
   JOIN named_anchorages_source AS end_anchorage ON (end_anchorage_id = end_anchorage.s2id)
   LEFT JOIN intermadiate_anchorage ON (port_visits_source.visit_id = intermadiate_anchorage.visit_id)
