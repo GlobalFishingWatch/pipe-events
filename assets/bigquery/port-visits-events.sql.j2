@@ -35,11 +35,22 @@ port_visits_source AS (
     AND start_timestamp BETWEEN '{{ start_date }}' AND '{{ end_date }}'
 ),
 
+#
+# Vessels byyear sources
+#
+source_all_vessels AS (
+  SELECT
+    *,
+    shiptype as class
+  FROM `{{ all_vessels_byyear_table }}`
+),
+
 vessel_info_source AS (
   SELECT
     *
   FROM `{{ vessel_info_table }}`
 ),
+
 
 named_anchorages_source AS (
   SELECT
@@ -179,8 +190,11 @@ total_events as (SELECT
         vessel_id AS `id`,
         vi.ssvid AS `ssvid`,
         vi.shipname.value AS `name`
+        vessel.shiptype as `type`,
+        vessel.flag as `flag`
   )]) as event_vessels
 FROM port_visits_source
+  JOIN source_all_vessels vessel on vessel.vessel_id = port_visits_source.vessel_id and vessel.year= EXTRACT(year from start_timestamp)
   JOIN mean_positions USING (visit_id)
   JOIN vessel_info_source vi USING (vessel_id)
   JOIN named_anchorages_source AS start_anchorage ON (start_anchorage_id = start_anchorage.s2id)
