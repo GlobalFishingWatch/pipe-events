@@ -187,7 +187,7 @@ total_events as (SELECT
         seg_ids
   )) as event_info,
   TO_JSON_STRING([STRUCT(
-        vessel_id AS `id`,
+        vi.vessel_id AS `id`,
         vi.ssvid AS `ssvid`,
         vi.shipname.value AS `name`,
         vessel.shiptype as `type`,
