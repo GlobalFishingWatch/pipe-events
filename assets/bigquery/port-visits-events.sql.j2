@@ -129,9 +129,9 @@ intermadiate_anchorage AS (
 # Finally, enhance the event with info related to regions and distances.
 #
 total_events as (SELECT
-  TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', vessel_id, start_timestamp, end_timestamp))) AS event_id,
+  TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', port_visits_source.vessel_id, start_timestamp, end_timestamp))) AS event_id,
   'port_visit' AS event_type,
-  vessel_id,
+  port_visits_source.vessel_id as vessel_id,
   cast(NULL AS string) AS seg_id,
   start_timestamp AS event_start,
   end_timestamp AS event_end,
