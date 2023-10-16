@@ -9,6 +9,7 @@ ARGS=( \
   PORT_VISITS_TABLE \
   VESSEL_INFO_TABLE \
   ALL_VESSELS_BYYEAR_TABLE \
+  ALL_VESSELS_BYYEAR_VERSION \
   SPATIAL_MEASURES_TABLE \
   REGIONS_TABLE \
   NAMED_ANCHORAGES_TABLE \
@@ -119,6 +120,12 @@ echo "  Events table exists"
 # Inserting new records
 ################################################################################
 INSERT_SQL=${ASSETS}/bigquery/port-visits-events.sql.j2
+
+if [ "$ALL_VESSELS_BYYEAR_VERSION" = "v2" ]; then
+    INSERT_SQL=${ASSETS}/bigquery/port-visits-events.v2.sql.j2
+fi
+
+echo "SQl query: ${INSERT_SQL}"
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \

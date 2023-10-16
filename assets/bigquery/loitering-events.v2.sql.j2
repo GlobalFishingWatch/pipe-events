@@ -1,0 +1,214 @@
+#standardSQL
+
+-- Include some utility functions
+{% include 'util.sql.j2' %}
+
+WITH
+
+    #
+    # Source tables
+    #
+
+    source_loitering AS (
+        SELECT
+            *
+        FROM
+            `{{ source_loitering }}`
+    ),
+
+    source_segment_info AS (
+        SELECT
+            *
+        FROM
+            `{{ source_segment_info }}`
+    ),
+
+    #
+    # Spatial measures data
+    #
+    source_spatial_measures as (
+        SELECT
+            *,
+        FROM `{{ source_spatial_measures }}`
+    ),
+
+    #
+    # Regions data
+    #
+    regions_source as (
+        SELECT
+            *,
+        FROM `{{ source_regions_table }}`
+    ),
+
+    source_research_segs AS (
+        SELECT
+            *
+        FROM
+        `{{ source_research_segs }}`
+    ),
+
+    #
+    # Vessels byyear sources
+    #
+    source_all_vessels AS (
+        SELECT
+            *,
+            shiptype as class
+        FROM `{{ all_vessels_byyear_v_table }}`
+    ),
+
+    gridded_regions AS (
+        SELECT
+            * EXCEPT(s2_cells),
+        FROM regions_source
+            CROSS JOIN UNNEST (s2_cells) AS s2_cell
+    ),
+
+    #
+    # Build a set of good segments
+    #
+    good_segments AS (
+        SELECT
+            seg_id
+        FROM
+            source_research_segs
+        WHERE
+            good_seg
+            AND NOT overlapping_and_short
+    ),
+
+    #
+    # Restrict the source loitering table to denoised events
+    #
+    denoised_loitering AS (
+        SELECT
+            loitering.*,
+            EXTRACT(year from loitering_start_timestamp) as year
+        FROM
+            source_loitering loitering
+            INNER JOIN good_segments USING (seg_id)
+        WHERE
+            avg_distance_from_shore_nm >= {{ minimum_distance_from_shore_nm }}
+    ),
+
+    #
+    # Get base info, populate vessel info, and calculate vessel_id, lat_mean,
+    # lot_mean and convert distances to km
+    #
+    base_loitering_event AS (
+        SELECT
+            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'loitering', vessel_id, loitering_start_timestamp, loitering_end_timestamp))) AS event_id,
+            'loitering' AS event_type,
+            vessel_id,
+            seg_id,
+            loitering_start_timestamp AS event_start,
+            loitering_end_timestamp AS event_end,
+            (start_lat + end_lat) / 2 AS lat_mean,
+            (start_lon + end_lon) / 2 AS lon_mean,
+            start_lat AS lat_min,
+            start_lon AS lon_min,
+            end_lat AS lat_max,
+            end_lon AS lon_max,
+            TO_JSON_STRING(
+                STRUCT(
+                    loitering_hours,
+                    convert_nm_to_km(tot_distance_nm) AS total_distance_km,
+                    convert_nm_to_km(avg_distance_from_shore_nm) AS avg_distance_from_shore_km,
+                    avg_speed_knots,
+                    vessel.prod_shiptype as vessel_class
+                )
+            ) AS event_info,
+            TO_JSON_STRING([
+                STRUCT(
+                    vessel_id AS `id`,
+                    lo.ssvid AS `ssvid`,
+                    si.shipname.value AS `name`,
+                    seg_id,
+                    vessel.prod_shiptype AS `type`,
+                    vessel.mmsi_flag AS `flag`
+                )
+            ]) AS event_vessels
+        FROM denoised_loitering AS lo
+            JOIN source_segment_info si USING (seg_id)
+            JOIN source_all_vessels vessel USING (vessel_id, year)
+    ),
+
+
+    #
+    # Finally, enhance the event with info related to regions and distances.
+    #
+    total_events AS (
+        SELECT
+            event_id,
+            event_type,
+            vessel_id,
+            seg_id,
+            event_start,
+            event_end,
+            lat_mean,
+            lon_mean,
+            lat_min,
+            lon_min,
+            lat_max,
+            lon_max,
+            event_info,
+            event_vessels,
+            ST_GEOGPOINT(lon_mean, lat_mean) as geo,
+            S2_CELLIDFROMPOINT(ST_GEOGPOINT(lon_mean, lat_mean), s2_level()) as s2_cell,
+            convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
+            convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
+            convert_m_to_km( spatial_measures_start.distance_from_port_m ) AS start_distance_from_port_km,
+            convert_m_to_km( spatial_measures_end.distance_from_port_m ) AS end_distance_from_port_km,
+        FROM
+            base_loitering_event
+            JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(lon_min, lat_min) = spatial_measures_start.gridcode
+            JOIN source_spatial_measures AS spatial_measures_end ON format_gridcode(lon_max, lat_max) = spatial_measures_end.gridcode
+    ),
+
+    create_event_region_matches AS (
+        SELECT
+            events.event_id,
+            id,
+            layer,
+        FROM
+            total_events AS events
+            JOIN gridded_regions r ON events.s2_cell = r.s2_cell
+        WHERE ST_INTERSECTS(events.geo, r.geo)
+    ),
+
+    event_by_layer_by_id AS (
+        SELECT
+            event_id,
+            layer, id
+        FROM create_event_region_matches
+        GROUP BY
+            1,
+            2,
+            3
+    ),
+
+    events_by_layer AS (
+        SELECT
+            event_id, CONCAT('"', layer, '":' ,TO_JSON_STRING(array_agg(id))) AS json_frament
+        FROM event_by_layer_by_id
+        GROUP BY
+            event_id,
+            layer
+    ),
+
+    event_with_region AS (
+        SELECT
+            event_id,
+            parse_regions_to_struct(CONCAT( "{", STRING_AGG(json_frament, ","), "}")) AS regions
+        FROM events_by_layer
+        GROUP BY
+            1
+    )
+
+    SELECT
+        total_events.* EXCEPT (s2_cell, geo),
+        spatial_measures_mean.regions AS regions_mean_position
+    FROM
+        total_events
+        LEFT JOIN event_with_region spatial_measures_mean USING (event_id)

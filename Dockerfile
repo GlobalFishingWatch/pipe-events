@@ -6,13 +6,17 @@ WORKDIR /opt/project
 
 # Download and install google cloud. See the dockerfile at
 # https://hub.docker.com/r/google/cloud-sdk/~/dockerfile/
-ENV CLOUD_SDK_APT_DEPS="curl gcc python-dev python-setuptools apt-transport-https lsb-release openssh-client git"
-ENV CLOUD_SDK_PIP_DEPS="crcmod"
-ENV CLOUD_SDK_VERSION="335.0.0"
-RUN  \
-  apt-get -y update && \
-  apt-get install -y $CLOUD_SDK_APT_DEPS uuid-runtime && \
-  pip install -U $CLOUD_SDK_PIP_DEPS && \
+ENV CLOUD_SDK_VERSION="438.0.0"
+
+## Install python and its dependencies
+RUN apt-get -qqy update &&  \
+    apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev wget libbz2-dev && \
+    apt-get install -qqy python3 python3-dev curl gcc apt-transport-https lsb-release openssh-client git && \
+    apt-get install -y python3-pip && \
+    pip install -U crcmod --break-system-packages
+
+# Instal gcloud sdk
+RUN \
   export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
   echo "deb https://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" > /etc/apt/sources.list.d/google-cloud-sdk.list && \
   curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
