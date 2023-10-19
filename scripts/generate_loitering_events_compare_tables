@@ -12,6 +12,7 @@ ARGS=( \
   SOURCE_REGIONS_TABLE \
   SOURCE_RESEARCH_SEGS \
   ALL_VESSELS_BYYEAR_V \
+  ALL_VESSELS_BYYEAR_VERSION \
   SOURCE_VESSEL_INFO \
   MINIMUM_DISTANCE_FROM_SHORE_NM \
   DEST_TABLE
@@ -120,6 +121,12 @@ fi
 # Inserting new records
 ################################################################################
 INSERT_SQL=${ASSETS}/bigquery/loitering-events.sql.j2
+
+if [ "$ALL_VESSELS_BYYEAR_VERSION" = "v2" ]; then
+    INSERT_SQL=${ASSETS}/bigquery/loitering-events.v2.sql.j2
+fi
+
+echo "SQl query: ${INSERT_SQL}"
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
