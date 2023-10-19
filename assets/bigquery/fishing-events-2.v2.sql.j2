@@ -288,8 +288,8 @@ WITH
                     AND rfmo = vessel_authorization.registry_rfmo
                     AND fe.event_start < vessel_authorization.registry_authorized_to
                     AND fe.event_end > vessel_authorization.registry_authorized_from
-                        LEFT JOIN last_scrape AS last_scrape ON rfmo = last_scrape.registry_rfmo
                 )
+                LEFT JOIN last_scrape AS last_scrape ON rfmo = last_scrape.registry_rfmo
         WHERE
             is_whitelisted_rfmo(rfmo)
         GROUP BY
@@ -316,7 +316,7 @@ WITH
         SELECT
             *,
             ## NEW Update howo this field is calculated and change field name from is_authorized to potential_risk
-            (vessel_authorization_status = 'unauthorized' AND NOT eez_event) AS potential_risk
+            (vessel_public_authorization_status = 'unauthorized' AND NOT eez_event) AS potential_risk
         FROM (
             SELECT
                 fe.event_id,
@@ -333,15 +333,16 @@ WITH
                 CASE
                     WHEN (
                         LOGICAL_AND(fe_authorizations.rfmo IS NULL) OR
-                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND fe_authorizations.main_vessel_is_authorized = 'true')
+                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND fe_authorizations.vessel_is_authorized = 'true')
                     ) THEN 'publicly_authorized'
                     WHEN (
-                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND NOT fe_authorizations.event_after_last_scrape AND NOT fe_authorizations.main_vessel_is_authorized = 'true')
+                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND NOT fe_authorizations.event_after_last_scrape AND NOT fe_authorizations.vessel_is_authorized = 'true')
                     ) THEN 'not_matching_relevant_public_authorization'
                     WHEN (
-                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND fe_authorizations.event_after_last_scrape AND NOT fe_authorizations.main_vessel_is_authorized = 'true')
+                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND fe_authorizations.event_after_last_scrape AND NOT fe_authorizations.vessel_is_authorized = 'true')
                     ) THEN 'pending_info'
-                    ELSE 'partially_matched'
+                    ELSE
+                    'partially_matched'
                 END AS vessel_public_authorization_status,
                 ## NEW add field for if event occured in EEZ
                 fe_authorizations.eez_event,
@@ -428,10 +429,10 @@ WITH
             TO_JSON_STRING([
                 STRUCT(
                     vessel_id AS `id`,
-                    ssvid AS `ssvid`,
+                    cfe.ssvid AS `ssvid`,
                     vessel.shipname AS `name`,
                     vessel.mmsi_flag as `flag`,
-                    vessel.prod_shiptye AS `type`,
+                    vessel.prod_shiptype AS `type`,
                     seg_id,
                     -- add authorization information
                     vessel_region_authorizations AS public_authorizations

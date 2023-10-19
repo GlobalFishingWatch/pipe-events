@@ -53,8 +53,7 @@ WITH
     #
     source_all_vessels AS (
         SELECT
-            *,
-            shiptype as class
+            *
         FROM `{{ all_vessels_byyear_v_table }}`
     ),
 

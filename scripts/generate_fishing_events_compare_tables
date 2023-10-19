@@ -157,7 +157,7 @@ bq update --expiration 3600 ${current_table_name_fishing_events}
 INSERT_SQL=${ASSETS}/bigquery/fishing-events-2.sql.j2
 
 if [ "$ALL_VESSELS_BYYEAR_VERSION" = "v2" ]; then
-    INSERT_SQL=${ASSETS}/bigquery/fishing-events-2v2.sql.j2
+    INSERT_SQL=${ASSETS}/bigquery/fishing-events-2.v2.sql.j2
 fi
 
 echo "SQl query: ${INSERT_SQL}"
