@@ -19,15 +19,7 @@ package = __import__('pipe_events')
 
 
 DEPENDENCIES = [
-    "pytest",
-    "nose",
-    "ujson==1.35",
-    "pytz",
-    "udatetime",
-    "newlinejson",
-    "pipe-tools==3.1.1",
     "jinja2-cli",
-    "statistics"
 ]
 
 with codecs.open('README.md', encoding='utf-8') as f:
