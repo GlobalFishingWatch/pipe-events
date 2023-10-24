@@ -99,14 +99,15 @@ WITH
             IF (best_best_vessel_class = "squid_jigger", night_loitering, nnet_score) AS score
         FROM(
                 SELECT
-                    message_vessel_id.*,
+                    message_vessel_id.* EXCEPT (vessel_id),
+                    vesselinfo.vessel_id,
                     vesselinfo.prod_geartype AS best_best_vessel_class,
                     vesselinfo.ssvid AS main_vessel_ssvid,
                     vesselinfo.mmsi_flag as main_vessel_flag,
                     vesselinfo.shipname AS main_vessel_shipname
                 FROM
                     message_vessel_id
-                    LEFT JOIN source_fishing_vessels AS vesselinfo USING (ssvid, year)
+                    LEFT JOIN source_fishing_vessels AS vesselinfo USING (vessel_id, year)
             )
     ),
 
