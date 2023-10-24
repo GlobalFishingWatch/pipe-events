@@ -400,7 +400,7 @@ WITH
         SELECT
             event_id,
             'fishing' AS event_type,
-            vessel_id,
+            cfe.vessel_id,
             seg_id,
             event_start,
             event_end,
@@ -428,7 +428,7 @@ WITH
             ) AS event_info,
             TO_JSON_STRING([
                 STRUCT(
-                    vessel_id AS `id`,
+                    cfe.vessel_id AS `id`,
                     cfe.ssvid AS `ssvid`,
                     vessel.shipname AS `name`,
                     vessel.mmsi_flag as `flag`,
