@@ -55,7 +55,7 @@ WITH
           -- still need to confirm duration
           _PARTITIONTIME BETWEEN '{{ start_date }}' AND '{{ end_date }}'
           --AND ssvid = target_ssvid()
-          AND is_fishing_vessel = true
+          AND (is_fishing_vessel = true OR ssvid IN (select ssvid FROM source_fishing_vessels))
           AND lat > -90
           AND lat < 90
           AND seg_id IN (
