@@ -352,7 +352,7 @@ WITH
                 ARRAY_AGG(
                     STRUCT(
                         fe_authorizations.rfmo AS `rfmo`,
-                        fe_authorizations.vessel_is_authorized AS `public_authorizations`
+                        fe_authorizations.vessel_is_authorized AS `has_publicly_listed_authorization`
                     )
                 ) AS vessel_region_authorizations,
             FROM
