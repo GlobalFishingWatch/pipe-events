@@ -490,13 +490,13 @@ WITH
                 -- name of the region and the authorization status for each vessel.
                 ARRAY_AGG(STRUCT(
                     encounter_authorizations.rfmo AS `rfmo`,
-                    encounter_authorizations.main_vessel_is_authorized AS `hasPubliclyListedAuthorization`)) AS main_vessel_region_authorizations,
+                    encounter_authorizations.main_vessel_is_authorized AS `has_publicly_listed_authorization`)) AS main_vessel_region_authorizations,
                 ARRAY_AGG(STRUCT(
                     encounter_authorizations.rfmo AS `rfmo`,
-                    encounter_authorizations. encountered_vessel_is_authorized AS `hasPubliclyListedAuthorization`)) AS encountered_vessel_region_authorizations,
+                    encounter_authorizations. encountered_vessel_is_authorized AS `has_publicly_listed_authorization`)) AS encountered_vessel_region_authorizations,
                 ARRAY_AGG(STRUCT(
                     encounter_authorizations.rfmo AS `rfmo`,
-                    encounter_authorizations.both_vessels_authorized AS `hasPubliclyListedAuthorization`)) AS joint_vessel_region_authorizations
+                    encounter_authorizations.both_vessels_authorized AS `has_publicly_listed_authorization`)) AS joint_vessel_region_authorizations
             FROM
                 complete_encounter_event AS encounters
                     LEFT JOIN encounter_regions_with_authorizations AS encounter_authorizations USING (event_id)
