@@ -32,6 +32,22 @@ WITH
         WHERE
             potential_fishing OR on_fishing_list_sr
     ),
+
+    source_research_messages AS (
+        SELECT *
+        FROM `{{ messages }}`
+        -- specify partition duration (how far back we look in pipe)
+        -- still need to confirm duration
+        WHERE _PARTITIONTIME >= '{start_date}' AND _PARTITIONTIME < '{end_date}'
+
+        UNION ALL
+
+        SELECT *
+        FROM `{{ messages }}_2012`
+        -- specify partition duration (how far back we look in pipe)
+        -- still need to confirm duration
+        WHERE _PARTITIONTIME >= '{start_date}' AND _PARTITIONTIME < '{end_date}'
+    ),
  
     source_messages AS (
         SELECT
@@ -49,11 +65,8 @@ WITH
             nnet_score,
             night_loitering --use in place of nnet_score for squid_jiggers
         FROM
-            `{{ messages }}`
+            source_research_messages
         WHERE
-          -- specify partition duration (how far back we look in pipe)
-          -- still need to confirm duration
-          _PARTITIONTIME BETWEEN '{{ start_date }}' AND '{{ end_date }}'
           --AND ssvid = target_ssvid()
           AND (is_fishing_vessel = true OR ssvid IN (select ssvid FROM source_fishing_vessels))
           AND lat > -90
