@@ -38,7 +38,7 @@ WITH
         FROM `{{ messages }}`
         -- specify partition duration (how far back we look in pipe)
         -- still need to confirm duration
-        WHERE _PARTITIONTIME >= '{start_date}' AND _PARTITIONTIME < '{end_date}'
+        WHERE _PARTITIONTIME >= '{{ start_date }}' AND _PARTITIONTIME < '{{ end_date }}'
 
         UNION ALL
 
@@ -46,7 +46,7 @@ WITH
         FROM `{{ messages }}_2012`
         -- specify partition duration (how far back we look in pipe)
         -- still need to confirm duration
-        WHERE _PARTITIONTIME >= '{start_date}' AND _PARTITIONTIME < '{end_date}'
+        WHERE _PARTITIONTIME >=  '{{ start_date }}' AND _PARTITIONTIME < '{{  end_date }}'
     ),
  
     source_messages AS (
