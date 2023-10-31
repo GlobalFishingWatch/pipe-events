@@ -68,7 +68,7 @@ WITH
             source_research_messages
         WHERE
           --AND ssvid = target_ssvid()
-          AND (is_fishing_vessel = true OR ssvid IN (select ssvid FROM source_fishing_vessels))
+          (is_fishing_vessel = true OR ssvid IN (select ssvid FROM source_fishing_vessels))
           AND lat > -90
           AND lat < 90
           AND seg_id IN (
