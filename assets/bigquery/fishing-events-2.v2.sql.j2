@@ -316,7 +316,7 @@ WITH
         SELECT
             *,
             ## NEW Update howo this field is calculated and change field name from is_authorized to potential_risk
-            (vessel_public_authorization_status = 'unauthorized' AND NOT eez_event) AS potential_risk
+            (vessel_public_authorization_status = 'not_matching_relevant_public_authorization' AND NOT eez_event) AS potential_risk
         FROM (
             SELECT
                 fe.event_id,
