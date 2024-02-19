@@ -10,7 +10,6 @@ ARGS=( \
   SPATIAL_MEASURES_TABLE \
   REGIONS_TABLE \
   ALL_VESSELS_BYYEAR_V_TABLE \
-  ALL_VESSELS_BYYEAR_VERSION \
   VESSEL_INFO_TABLE \
   VESSEL_IDENTITY_CORE \
   VESSEL_IDENTITY_AUTHORIZATION \
@@ -120,10 +119,6 @@ fi
 # Inserting new records
 ################################################################################
 INSERT_SQL=${ASSETS}/bigquery/encounter-events.sql.j2
-
-if [ "$ALL_VESSELS_BYYEAR_VERSION" = "v2" ]; then
-    INSERT_SQL=${ASSETS}/bigquery/encounter-events.v2.sql.j2
-fi
 
 echo "SQl query: ${INSERT_SQL}"
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"

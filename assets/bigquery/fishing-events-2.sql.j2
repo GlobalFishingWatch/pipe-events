@@ -10,433 +10,445 @@
 -- A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
 -- messages with score=null are ignored
 WITH
-  -- Source tables
-  #
-  # vessel identity tables; update monthly
-  # we use Jaeyoons new vessel identity tables
-  # unlike in the CVP which still uses vessel database
-  # 
-  vessel_identity_core AS (
-    SELECT
-      *
-    FROM `{{vessel_identity_core}}`
-  ),
+    -- Source tables
+    #
+    # vessel identity tables; update monthly
+    # we use Jaeyoons new vessel identity tables
+    # unlike in the CVP which still uses vessel database
+    #
+    vessel_identity_core AS (
+        SELECT
+            *
+        FROM `{{vessel_identity_core}}`
+    ),
 
-  #
-  # vessel authorization 
-  #
-  vessel_identity_authorization AS (
-    SELECT
-      *
-    FROM `{{vessel_identity_authorization}}`
-  ),
+    #
+    # vessel authorization
+    #
+    vessel_identity_authorization AS (
+        SELECT
+         *
+        FROM `{{vessel_identity_authorization}}`
+    ),
 
-  #
-  # Spatial measures data
-  #
-  source_spatial_measures as (
-    SELECT
-      *,
-    FROM `{{ spatial_measures_table }}`
-  ),
+    #
+    # Spatial measures data
+    #
+    source_spatial_measures as (
+        SELECT
+            *,
+        FROM `{{ spatial_measures_table }}`
+    ),
 
-  #
-  # Regions data
-  #
-  regions_source as (
-    SELECT
-      *,
-    FROM `{{ regions_table }}`
-  ),
-
-  --
-  -- remove events that are too short
-  --
-  complete_fishing_event AS (
-    SELECT
-      *
-    FROM
-      {{source_fishing_events}}
-  ),
-
-
-##############
-############### ADD AUTHORIZATION DATA TO FISHING EVENTS
-##############
-
-  gridded_regions as(
-    select
-      * except(s2_cells),
-    from regions_source
-    cross join unnest (s2_cells) as s2_cell
-  ),
-
-  #
-  # core vessel identity
-  #
-  vessel_identity_core_to_join AS (
-    SELECT 
-      vessel_record_id,
-      IFNULL (ssvid, 'NULL') AS ssvid,
-      IFNULL (n_shipname, 'NULL') AS n_shipname,
-      IFNULL (n_callsign, 'NULL') AS n_callsign,
-      IFNULL (imo, 'NULL') AS imo,
-      IFNULL (flag, 'NULL') AS flag,
-      first_timestamp,
-      last_timestamp
-    FROM vessel_identity_core
-    -- ## WB: not sure we want to add this restriction yet 
-    -- WHERE is_fishing OR is_carrier
-  ),
-
-  #
-  # vessel authorization
-  #
-  vessel_identity_auth_to_join AS (
-    SELECT 
-      vessel_record_id,
-      IFNULL (ssvid, 'NULL') AS ssvid,
-      IFNULL (n_shipname, 'NULL') AS n_shipname,
-      IFNULL (n_callsign, 'NULL') AS n_callsign,
-      IFNULL (imo, 'NULL') AS imo,
-      IFNULL (flag, 'NULL') AS flag,
-      authorized_from,
-      authorized_to,
-      source_code
-    FROM vessel_identity_authorization
-  ),
-
-  #
-  # vessel authorization joined to core vessel identity
-  # where whitelist rfmo and overlapping with the vessel activity 
-  #
-  vessel_identity_combined AS (
-    SELECT DISTINCT
-      ssvid, 
-      first_timestamp AS activity_first_timestamp,
-      last_timestamp AS activity_last_timestamp,
-      authorized_from AS registry_authorized_from, 
-      authorized_to AS registry_authorized_to,
-      source_code AS registry_rfmo
-    FROM vessel_identity_core_to_join
-    JOIN vessel_identity_auth_to_join 
-    USING (vessel_record_id, ssvid, n_shipname, n_callsign, imo, flag)
-    WHERE 
-      -- Only registries in the whitelist
-      is_whitelisted_rfmo(source_code)
-      -- We only keep the records where the authorization interval overlaps with the activity interval
-      AND authorized_from < last_timestamp
-      AND authorized_to > first_timestamp
-  ),
-
-  #
-  # Date vessel registry was last scraped
-  # used to identify if vessel without authorization is pending or not
-  #
-  last_scrape AS (
-    SELECT 
-      source_code AS registry_rfmo, 
-      MAX (authorized_to) last_scrape, 
-    FROM vessel_identity_authorization
-    WHERE
-      is_whitelisted_rfmo(source_code)
-    GROUP BY 1
-  ),
-
-  #
-  # attach registry information
-  #
-   fishing_event_reg AS (
+    #
+    # Regions data
+    #
+    regions_source as (
       SELECT
-      fe.*,
-      vessel_database.registry_rfmo AS registry_rfmo,
-      vessel_database.registry_authorized_from AS registry_authorized_from,
-      vessel_database.registry_authorized_to AS registry_authorized_to,
+        *,
+      FROM `{{ regions_table }}`
+    ),
+
+    --
+    -- remove events that are too short
+    --
+    complete_fishing_event AS (
+        SELECT
+            *
+        FROM `{{source_fishing_events}}`
+    ),
+
+    source_fishing_vessels AS (
+        SELECT
+            *
         FROM
-        complete_fishing_event AS fe
-      LEFT JOIN
-      vessel_identity_combined AS vessel_database
-      ON
-        fe.ssvid = vessel_database.ssvid
-        AND fe.event_start between vessel_database.activity_first_timestamp and vessel_database.activity_last_timestamp
-       ),
-   
-  #
-  # Calculate the complete list of all vessels involved in the encounters
-  #
-  all_vessels AS (
-      SELECT
-        vessel_id,
-        registry_rfmo,
-        registry_authorized_from,
-        registry_authorized_to,
-      FROM
-        fishing_event_reg
-  ),
+            `{{ all_vessels_byyear }}`
+        WHERE
+            potential_fishing OR on_fishing_list_sr
+    ),
 
-  #
-  # Calculate authorization data for each vessel, only getting authorization
-  # data for the whitelisted RFMOs
-  #
-  authorizations AS (
-      SELECT
-        vessel_id,
-        registry_rfmo,
-        registry_authorized_from,
-        registry_authorized_to
-      FROM
-        all_vessels
-      WHERE
-        registry_authorized_from IS NOT NULL
-        AND registry_authorized_to IS NOT NULL
-      GROUP BY
-        vessel_id,
-        registry_rfmo,
-        registry_authorized_from,
-        registry_authorized_to
-  ), 
-  
-  #
-  # Add spatial measures region information
-  #
-  create_event_region_matches as (
-    SELECT event.event_id, id, layer,
-    FROM
-      complete_fishing_event AS event, unnest(event.geo_info) geo_info
-    JOIN gridded_regions r 
-    ON  r.s2_cell = geo_info.s2_cell
-    WHERE ST_WITHIN(geo_info.point, r.geo)
-  ),
-  event_by_layer_by_id as (
-    select 
-      event_id, layer, id
-    from create_event_region_matches
-    group by 1, 2, 3
-  ),
-  events_by_layer as(
-    select
-      event_id, CONCAT('"', layer, '":' ,TO_JSON_STRING(array_agg(id))) as json_frament
-    from event_by_layer_by_id
-    group by event_id, layer
-  ),
-  event_with_region as (
-    select
-      event_id, 
-      parse_regions_to_struct(CONCAT( "{", STRING_AGG(json_frament, ","), "}")) as regions
-    from events_by_layer
-    group by 1
-  ),
-  fe_regions AS (
-  	SELECT
-      fe.*,   
-      spatial_measures_mean.regions AS regions_mean_position
-  	FROM
-      complete_fishing_event AS fe
-  	LEFT JOIN
-      event_with_region AS spatial_measures_mean 
-    on (spatial_measures_mean.event_id = fe.event_id)
-   ),
-  
 
-  #
-  ## Flatten and filter the regions where the fishing events happen, so that we end
-  ## up with a table with multiple records per each fishing event, one per rfmo
-  ## region where the fishing event happened when the region is one of the
-  ## interesting rfmos, including authorization status for each of those regions
-  ## add attribute for if event date is before or after last vessel registry scrape
-  #
-  fe_regions_with_authorizations AS (
+    ##############
+    ############### ADD AUTHORIZATION DATA TO FISHING EVENTS
+    ##############
+
+    gridded_regions as(
+        SELECT
+            * EXCEPT(s2_cells),
+        FROM regions_source
+            CROSS JOIN UNNEST (s2_cells) AS s2_cell
+    ),
+
+    #
+    # core vessel identity
+    #
+    vessel_identity_core_to_join AS (
+        SELECT
+            vessel_record_id,
+            IFNULL (ssvid, 'NULL') AS ssvid,
+            IFNULL (n_shipname, 'NULL') AS n_shipname,
+            IFNULL (n_callsign, 'NULL') AS n_callsign,
+            IFNULL (imo, 'NULL') AS imo,
+            IFNULL (flag, 'NULL') AS flag,
+            first_timestamp,
+            last_timestamp
+        FROM vessel_identity_core
+        -- ## WB: not sure we want to add this restriction yet
+        -- WHERE is_fishing OR is_carrier
+    ),
+
+    #
+    # vessel authorization
+    #
+    vessel_identity_auth_to_join AS (
+        SELECT
+            vessel_record_id,
+            IFNULL (ssvid, 'NULL') AS ssvid,
+            IFNULL (n_shipname, 'NULL') AS n_shipname,
+            IFNULL (n_callsign, 'NULL') AS n_callsign,
+            IFNULL (imo, 'NULL') AS imo,
+            IFNULL (flag, 'NULL') AS flag,
+            authorized_from,
+            authorized_to,
+            source_code
+        FROM vessel_identity_authorization
+    ),
+
+    #
+    # vessel authorization joined to core vessel identity
+    # where whitelist rfmo and overlapping with the vessel activity
+    #
+    vessel_identity_combined AS (
+        SELECT DISTINCT
+            ssvid,
+            first_timestamp AS activity_first_timestamp,
+            last_timestamp AS activity_last_timestamp,
+            authorized_from AS registry_authorized_from,
+            authorized_to AS registry_authorized_to,
+            source_code AS registry_rfmo
+        FROM vessel_identity_core_to_join
+            JOIN vessel_identity_auth_to_join USING (vessel_record_id, ssvid, n_shipname, n_callsign, imo, flag)
+        WHERE
+            -- Only registries in the whitelist
+            is_whitelisted_rfmo(source_code)
+            -- We only keep the records where the authorization interval overlaps with the activity interval
+            AND authorized_from < last_timestamp
+            AND authorized_to > first_timestamp
+    ),
+
+    #
+    # Date vessel registry was last scraped
+    # used to identify if vessel without authorization is pending or not
+    #
+    last_scrape AS (
+        SELECT
+            source_code AS registry_rfmo,
+            MAX (authorized_to) last_scrape,
+        FROM vessel_identity_authorization
+        WHERE
+            is_whitelisted_rfmo(source_code)
+        GROUP BY
+            1
+    ),
+
+    #
+    # attach registry information
+    #
+    fishing_event_reg AS (
+        SELECT
+            fe.*,
+            vessel_database.registry_rfmo AS registry_rfmo,
+            vessel_database.registry_authorized_from AS registry_authorized_from,
+            vessel_database.registry_authorized_to AS registry_authorized_to,
+        FROM
+            complete_fishing_event AS fe
+            LEFT JOIN vessel_identity_combined AS vessel_database ON (
+                fe.ssvid = vessel_database.ssvid
+                AND fe.event_start between vessel_database.activity_first_timestamp and vessel_database.activity_last_timestamp
+            )
+    ),
+
+    #
+    # Calculate the complete list of all vessels involved in the encounters
+    #
+    all_vessels AS (
+        SELECT
+            vessel_id,
+            registry_rfmo,
+            registry_authorized_from,
+            registry_authorized_to,
+        FROM
+            fishing_event_reg
+    ),
+
+    #
+    # Calculate authorization data for each vessel, only getting authorization
+    # data for the whitelisted RFMOs
+    #
+    authorizations AS (
+        SELECT
+            vessel_id,
+            registry_rfmo,
+            registry_authorized_from,
+            registry_authorized_to
+        FROM
+            all_vessels
+        WHERE
+            registry_authorized_from IS NOT NULL
+            AND registry_authorized_to IS NOT NULL
+        GROUP BY
+            vessel_id,
+            registry_rfmo,
+            registry_authorized_from,
+            registry_authorized_to
+    ),
+
+    #
+    # Add spatial measures region information
+    #
+    create_event_region_matches AS (
+        SELECT
+            event.event_id,
+            id,
+            layer
+        FROM
+            complete_fishing_event AS event,
+            UNNEST(event.geo_info) geo_info
+            JOIN gridded_regions r ON  r.s2_cell = geo_info.s2_cell
+        WHERE ST_WITHIN(geo_info.point, r.geo)
+    ),
+
+    event_by_layer_by_id AS (
+        SELECT
+            event_id, layer, id
+        FROM create_event_region_matches
+        GROUP BY
+            1,
+            2,
+            3
+    ),
+
+    events_by_layer AS (
+        SELECT
+            event_id, CONCAT('"', layer, '":' ,TO_JSON_STRING(array_agg(id))) AS json_frament
+        FROM
+            event_by_layer_by_id
+        GROUP BY
+            event_id,
+            layer
+    ),
+
+    event_with_region AS (
+        SELECT
+            event_id,
+            parse_regions_to_struct(CONCAT( "{", STRING_AGG(json_frament, ","), "}")) as regions
+        FROM events_by_layer
+        GROUP BY
+            1
+    ),
+
+    fe_regions AS (
+        SELECT
+            fe.*,
+            spatial_measures_mean.regions AS regions_mean_position
+        FROM
+            complete_fishing_event AS fe
+                LEFT JOIN event_with_region AS spatial_measures_mean ON (
+                    spatial_measures_mean.event_id = fe.event_id
+                )
+    ),
+
+
+    #
+    ## Flatten and filter the regions where the fishing events happen, so that we end
+    ## up with a table with multiple records per each fishing event, one per rfmo
+    ## region where the fishing event happened when the region is one of the
+    ## interesting rfmos, including authorization status for each of those regions
+    ## add attribute for if event date is before or after last vessel registry scrape
+    #
+    fe_regions_with_authorizations AS (
+        SELECT
+            fe.event_id,
+            rfmo,
+            ## NEW add field for if event occurs in eez
+            eez IS NOT NULL as eez_event,
+            CASE
+            WHEN vessel_authorization.registry_rfmo IS NOT NULL THEN 'true'
+            WHEN vessel_authorization.registry_rfmo IS NULL AND fe.event_start <= last_scrape.last_scrape THEN 'false'
+            ELSE 'pending' END
+            AS vessel_is_authorized,
+            fe.event_start >= last_scrape.last_scrape AS event_after_last_scrape
+        FROM
+            fe_regions AS fe
+                CROSS JOIN UNNEST(fe.regions_mean_position.rfmo) AS rfmo
+                ## NEW add eez informaiton
+                LEFT JOIN UNNEST(fe.regions_mean_position.eez) AS eez
+                LEFT JOIN authorizations AS vessel_authorization ON (
+                    fe.vessel_id = vessel_authorization.vessel_id
+                    AND rfmo = vessel_authorization.registry_rfmo
+                    AND fe.event_start < vessel_authorization.registry_authorized_to
+                    AND fe.event_end > vessel_authorization.registry_authorized_from
+                )
+                LEFT JOIN last_scrape AS last_scrape ON rfmo = last_scrape.registry_rfmo
+        WHERE
+            is_whitelisted_rfmo(rfmo)
+        GROUP BY
+            fe.event_id,
+            rfmo,
+            ## NEW add field for if event occurs in eez
+            eez_event,
+            vessel_is_authorized,
+            event_after_last_scrape
+    ),
+    #
+    # Calculate the final fishing event authorization status.
+    # Indicate if fishing event occured before or after last registry scrape
+    #
+    fe_authorizations AS (
+        -- Add authorization status as boolean value for insurance prototype
+        -- * If vessel is unauthorized and not in an EEZ
+        -- then the fishing event is flagged as a risk
+        --
+        -- * Any other case means it's potentially authorized
+        --
+        -- NOTE: this subquery logic is different from CVP.
+        --
+        SELECT
+            *,
+            ## NEW Update howo this field is calculated and change field name from is_authorized to potential_risk
+            (vessel_public_authorization_status = 'not_matching_relevant_public_authorization' AND NOT eez_event) AS potential_risk
+        FROM (
+            SELECT
+                fe.event_id,
+                -- We also compute authorization status. We are talking about 3 different
+                -- values here:
+                --
+                --  * A fishing event can be authorized on the same conditions as before.
+                --
+                --  * A fishing event is unauthorized if the fishing vessel is not authorized
+                --  in at least one of the regions it is happening in.
+                --
+                --  * A fishing event can be partially authorized if the vessel is authorized
+                --  in some of the regions it is happening in but not all of them
+                CASE
+                    WHEN (
+                        LOGICAL_AND(fe_authorizations.rfmo IS NULL) OR
+                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND fe_authorizations.vessel_is_authorized = 'true')
+                    ) THEN 'publicly_authorized'
+                    WHEN (
+                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND NOT fe_authorizations.event_after_last_scrape AND NOT fe_authorizations.vessel_is_authorized = 'true')
+                    ) THEN 'not_matching_relevant_public_authorization'
+                    WHEN (
+                        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND fe_authorizations.event_after_last_scrape AND NOT fe_authorizations.vessel_is_authorized = 'true')
+                    ) THEN 'pending_info'
+                    ELSE
+                    'partially_matched'
+                END AS vessel_public_authorization_status,
+                ## NEW add field for if event occured in EEZ
+                fe_authorizations.eez_event,
+                -- Finally, we need to compute per-region authorization status. For each
+                -- authorization record in this event, we generate a struct containing the
+                -- name of the region and the authorization status for the vessel.
+                ARRAY_AGG(
+                    STRUCT(
+                        fe_authorizations.rfmo AS `rfmo`,
+                        fe_authorizations.vessel_is_authorized AS `has_publicly_listed_authorization`
+                    )
+                ) AS vessel_region_authorizations,
+            FROM
+                complete_fishing_event AS fe
+                    LEFT JOIN fe_regions_with_authorizations AS fe_authorizations USING (event_id)
+            GROUP BY
+                event_id,
+                eez_event,
+                event_after_last_scrape
+        )
+    ),
+
+
+    ##############
+    ############### JOIN AUTHORIZATION DATA WITH FISHING EVENTS
+    ##############
+
+
+    #
+    # Join the original fishing events with authorization status.
+    # Add region information
+    #
+    complete_fe_with_authorizations AS (
+        SELECT
+            fe.*,
+            authorization.potential_risk,
+            authorization.vessel_public_authorization_status,
+            authorization.vessel_region_authorizations,
+            regions.regions_mean_position
+        FROM
+            complete_fishing_event AS fe
+            INNER JOIN fe_authorizations AS authorization USING (event_id)
+            -- join regions information
+            INNER JOIN fe_regions AS regions USING (event_id)
+    ),
+
+    #
+    ##
+    #
+
+    --
+    -- Finally, generate a unique event id and write out in the normalized event schema
+    --
+    final_fishing_event AS (
+        SELECT
+            event_id,
+            'fishing' AS event_type,
+            cfe.vessel_id,
+            seg_id,
+            event_start,
+            event_end,
+            lat_mean,
+            lon_mean,
+            lat_min,
+            lat_max,
+            lon_min,
+            lon_max,
+            cfe.regions_mean_position AS regions_mean_position,
+            convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
+            convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
+            convert_m_to_km( spatial_measures_start.distance_from_port_m ) AS start_distance_from_port_km,
+            convert_m_to_km( spatial_measures_end.distance_from_port_m ) AS end_distance_from_port_km,
+            TO_JSON_STRING(
+                STRUCT(
+                    message_count,
+                    avg_hours AS avg_duration_hrs,
+                    convert_m_to_km(event_distance_m) AS distance_km,
+                    avg_speed_knots,
+                    -- add authorization information
+                    potential_risk,
+                    vessel_public_authorization_status
+                )
+            ) AS event_info,
+            TO_JSON_STRING([
+                STRUCT(
+                    cfe.vessel_id AS `id`,
+                    cfe.ssvid AS `ssvid`,
+                    vessel.shipname AS `name`,
+                    vessel.mmsi_flag as `flag`,
+                    vessel.prod_shiptype AS `type`,
+                    seg_id,
+                    -- add authorization information
+                    vessel_region_authorizations AS public_authorizations
+                )
+            ]) as event_vessels
+        FROM
+            -- link fishing events with authorizaiton
+            complete_fe_with_authorizations AS cfe
+            JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(lon_min,lat_min) = spatial_measures_start.gridcode
+            JOIN source_spatial_measures AS spatial_measures_end ON format_gridcode(lon_max, lat_max) = spatial_measures_end.gridcode
+            JOIN source_fishing_vessels vessel ON (vessel.vessel_id = cfe.vessel_id and vessel.year = EXTRACT(year FROM event_start))
+    )
+
+    --
+    -- Return final fishing events table
+    --
     SELECT
-    fe.event_id,
-    rfmo,
-    ## NEW add field for if event occurs in eez
-    eez IS NOT NULL as eez_event,
-    CASE 
-      WHEN vessel_authorization.registry_rfmo IS NOT NULL THEN 'true'
-      WHEN vessel_authorization.registry_rfmo IS NULL AND fe.event_start <= last_scrape.last_scrape THEN 'false'
-      ELSE 'pending' END
-       AS vessel_is_authorized,
-    fe.event_start >= last_scrape.last_scrape AS event_after_last_scrape
-      FROM
-        fe_regions AS fe
-      CROSS JOIN
-        UNNEST(fe.regions_mean_position.rfmo) AS rfmo
-      ## NEW add eez informaiton
-      LEFT JOIN
-        UNNEST(fe.regions_mean_position.eez) AS eez
-      LEFT JOIN
-        authorizations AS vessel_authorization
-      ON
-        fe.vessel_id = vessel_authorization.vessel_id
-        AND rfmo = vessel_authorization.registry_rfmo
-        AND fe.event_start < vessel_authorization.registry_authorized_to
-        AND fe.event_end > vessel_authorization.registry_authorized_from
-      LEFT JOIN
-        last_scrape AS last_scrape
-      ON
-        rfmo = last_scrape.registry_rfmo
-      WHERE
-        is_whitelisted_rfmo(rfmo)
-      GROUP BY
-        fe.event_id,
-        rfmo,
-        ## NEW add field for if event occurs in eez
-        eez_event,
-        vessel_is_authorized,
-        event_after_last_scrape
-  ),
-  #
-  # Calculate the final fishing event authorization status. 
-  # Indicate if fishing event occured before or after last registry scrape
-  #
-  fe_authorizations AS (
-  -- Add authorization status as boolean value for insurance prototype
-      -- * If vessel is unauthorized and not in an EEZ
-      -- then the fishing event is flagged as a risk
-      --
-      -- * Any other case means it's potentially authorized
-      --
-      -- NOTE: this subquery logic is different from CVP. 
-      --
-      SELECT 
-      *,
-      ## NEW Update howo this field is calculated and change field name from is_authorized to potential_risk
-      (vessel_authorization_status = 'unauthorized' AND NOT eez_event) AS potential_risk
-      FROM (
-    SELECT
-      fe.event_id,
-      -- We also compute authorization status. We are talking about 3 different
-      -- values here:
-      --
-      --  * A fishing event can be authorized on the same conditions as before.
-      --
-      --  * A fishing event is unauthorized if the fishing vessel is not authorized
-      --  in at least one of the regions it is happening in.
-      --
-      --  * A fishing event can be partially authorized if the vessel is authorized
-      --  in some of the regions it is happening in but not all of them
-      CASE
-      WHEN (
-        LOGICAL_AND(fe_authorizations.rfmo IS NULL) OR
-        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND fe_authorizations.vessel_is_authorized = 'true')
-      ) THEN 'authorized'
-      WHEN (
-        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND NOT fe_authorizations.event_after_last_scrape AND NOT fe_authorizations.vessel_is_authorized = 'true')
-      ) THEN 'unauthorized'
-       WHEN (
-        LOGICAL_AND(fe_authorizations.rfmo IS NOT NULL AND fe_authorizations.event_after_last_scrape AND NOT fe_authorizations.vessel_is_authorized = 'true')
-      ) THEN 'pending'
-      ELSE
-      'partial'
-    END AS vessel_authorization_status,
-    ## NEW add field for if event occured in EEZ
-    fe_authorizations.eez_event,
-      -- Finally, we need to compute per-region authorization status. For each
-      -- authorization record in this event, we generate a struct containing the
-      -- name of the region and the authorization status for the vessel.
-      ARRAY_AGG(STRUCT(
-        fe_authorizations.rfmo AS `rfmo`,
-        fe_authorizations.vessel_is_authorized AS `is_authorized`)) AS vessel_region_authorizations,
-    FROM
-      complete_fishing_event AS fe
-    LEFT JOIN
-      fe_regions_with_authorizations AS fe_authorizations
-    USING
-      (event_id)
-    GROUP BY
-      event_id,
-      eez_event,
-      event_after_last_scrape
-  )),
-  
-
-##############
-############### JOIN AUTHORIZATION DATA WITH FISHING EVENTS
-##############
-
-
-  #
-  # Join the original fishing events with authorization status.
-  # Add region information
-  #
-  complete_fe_with_authorizations AS (
-    SELECT
-      fe.*,
-      authorization.potential_risk,
-      authorization.vessel_authorization_status,
-      authorization.vessel_region_authorizations,
-      regions.regions_mean_position
-    FROM
-      complete_fishing_event AS fe
-    INNER JOIN
-      fe_authorizations AS authorization
-    USING
-      (event_id)
-    -- join regions information
-    INNER JOIN
-      fe_regions AS regions
-    USING
-      (event_id)
-  ),
-
-  #
-  ##
-  #
-
-  --
-  -- Finally, generate a unique event id and write out in the normalized event schema
-  --
-  final_fishing_event AS (
-    SELECT
-      event_id,
-      'fishing' AS event_type,
-      vessel_id,
-      seg_id,
-      event_start,
-      event_end,
-      lat_mean,
-      lon_mean,
-      lat_min,
-      lat_max,
-      lon_min,
-      lon_max,
-      cfe.regions_mean_position AS regions_mean_position,
-      convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
-      convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
-      convert_m_to_km( spatial_measures_start.distance_from_port_m ) AS start_distance_from_port_km,
-      convert_m_to_km( spatial_measures_end.distance_from_port_m ) AS end_distance_from_port_km,
-      TO_JSON_STRING(STRUCT(
-        message_count,
-        avg_hours AS avg_duration_hrs,
-        convert_m_to_km(event_distance_m) AS distance_km,
-        avg_speed_knots,
-        -- add authorization information
-        potential_risk,
-        vessel_authorization_status
-      )) AS event_info,
-      TO_JSON_STRING([STRUCT(
-        vessel_id AS `id`,
-        ssvid AS `ssvid`,
-        main_vessel_shipname AS `name`,
-        main_vessel_flag as `flag`,
-        seg_id,
-        -- add authorization information
-        vessel_region_authorizations AS authorizations
-      )]) as event_vessels
-    FROM 
-    -- link fishing events with authorizaiton
-    complete_fe_with_authorizations AS cfe
-    JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(lon_min,lat_min) = spatial_measures_start.gridcode
-      JOIN source_spatial_measures AS spatial_measures_end ON format_gridcode(lon_max, lat_max) = spatial_measures_end.gridcode
-      
-    
-  )
-
-  --
-  -- Return final fishing events table
-  --
-  SELECT
-    *
-  FROM
-    final_fishing_event
-  WHERE event_start BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+        *
+    FROM final_fishing_event

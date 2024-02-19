@@ -6,15 +6,15 @@ source ${THIS_SCRIPT_DIR}/pipeline.sh
 ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
-  SOURCE_LOITERING \
-  SOURCE_SEGMENT_INFO \
+  SOURCE_MESSAGES \
+  SOURCE_SEGMENT_VESSEL \
+  SOURCE_SEGS \
+  SOURCE_VI_SSVID_BY_YEAR \
+  ALL_VESSELS_BYYEAR_V_TABLE \
   SOURCE_SPATIAL_MEASURES \
-  SOURCE_REGIONS_TABLE \
-  SOURCE_RESEARCH_SEGS \
-  ALL_VESSELS_BYYEAR_V \
-  ALL_VESSELS_BYYEAR_VERSION \
-  SOURCE_VESSEL_INFO \
-  MINIMUM_DISTANCE_FROM_SHORE_NM \
+  REGIONS_TABLE \
+  VESSEL_IDENTITY_CORE \
+  VESSEL_IDENTITY_AUTHORIZATION \
   DEST_TABLE
 )
 
@@ -53,12 +53,14 @@ end_date_minus_two_days_no_hyphens=${end_date_minus_two_days//-}
 current_table_name="${DEST_TABLE}_v${end_date_no_hyphens}"
 one_day_previous_table_name="${DEST_TABLE}_v${end_date_minus_one_day_no_hyphens}"
 two_days_previous_table_name="${DEST_TABLE}_v${end_date_minus_two_days_no_hyphens}"
+current_table_name_fishing_events="${DEST_TABLE}_temp_v${end_date_no_hyphens}"
 
 view_name="${DEST_TABLE//:/.}"
 
 echo "Current table=${current_table_name}"
 echo "One day previous table=${one_day_previous_table_name}"
 echo "Two days previous table=${two_days_previous_table_name}"
+echo "Temporal table with fishing events=${current_table_name_fishing_events}"
 
 
 ################################################################################
@@ -120,32 +122,59 @@ fi
 ################################################################################
 # Inserting new records
 ################################################################################
-INSERT_SQL=${ASSETS}/bigquery/loitering-events.sql.j2
+INSERT_SQL=${ASSETS}/bigquery/fishing-events-1.sql.j2
 
-if [ "$ALL_VESSELS_BYYEAR_VERSION" = "v2" ]; then
-    INSERT_SQL=${ASSETS}/bigquery/loitering-events.v2.sql.j2
+echo "SQl query: ${INSERT_SQL}"
+echo "Creating temporal table with fishing-events ${START_DATE} to ${END_DATE}"
+
+jinja2 "${INSERT_SQL}" \
+   -D messages="${SOURCE_MESSAGES}" \
+   -D start_date="${START_DATE}" \
+   -D end_date="${END_DATE}" \
+   -D segs="${SOURCE_SEGS}" \
+   -D segment_vessel=${SOURCE_SEGMENT_VESSEL} \
+   -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
+   -D all_vessels_byyear=${ALL_VESSELS_BYYEAR_V_TABLE} \
+   -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
+   -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
+   | bq query --headless --max_rows=0 --allow_large_results \
+     --replace \
+     --destination_table ${current_table_name_fishing_events}
+
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to insert records for table ${current_table_name_fishing_events} from ${START_DATE} to ${END_DATE}"
+  exit 1
 fi
+bq update --expiration 3600 ${current_table_name_fishing_events}
+
+INSERT_SQL=${ASSETS}/bigquery/fishing-events-2.sql.j2
 
 echo "SQl query: ${INSERT_SQL}"
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
+   -D messages="${SOURCE_MESSAGES}" \
    -D start_date="${START_DATE}" \
    -D end_date="${END_DATE}" \
-   -D source_loitering="${SOURCE_LOITERING}" \
-   -D source_segment_info="${SOURCE_SEGMENT_INFO}" \
-   -D source_spatial_measures=${SOURCE_SPATIAL_MEASURES} \
-   -D source_regions_table=${SOURCE_REGIONS_TABLE//:/.} \
-   -D source_research_segs=${SOURCE_RESEARCH_SEGS} \
-   -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V} \
-   -D source_vessel_info=${SOURCE_VESSEL_INFO} \
-   -D minimum_distance_from_shore_nm=${MINIMUM_DISTANCE_FROM_SHORE_NM} \
+   -D segs="${SOURCE_SEGS}" \
+   -D segment_vessel=${SOURCE_SEGMENT_VESSEL} \
+   -D vi_ssvid_by_year=${SOURCE_VI_SSVID_BY_YEAR} \
+   -D all_vessels_byyear=${ALL_VESSELS_BYYEAR_V_TABLE} \
+   -D spatial_measures_table=${SOURCE_SPATIAL_MEASURES} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
+   -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
+   -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
+   -D source_fishing_events=${current_table_name_fishing_events//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --replace \
      --destination_table ${current_table_name}
 
 if [ "$?" -ne 0 ]; then
   echo "  Unable to insert records for table ${current_table_name} from ${START_DATE} to ${END_DATE}"
+  echo "Removing temporal table [${current_table_name_fishing_events}]"
+  bq rm -f -t "${current_table_name_fishing_events}"
   exit 1
 fi
 
@@ -154,11 +183,11 @@ fi
 # Create new view
 ################################################################################
 echo "Creating view [${view_name}]"
-echo "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"published_events_loitering\") AS SELECT * FROM ${current_table_name//:/.}"
+echo "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"proto_events_fishing\") AS SELECT * FROM ${current_table_name//:/.}"
 
 bq query \
   --use_legacy_sql=false \
-  "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"published_events_loitering\") AS SELECT * FROM ${current_table_name//:/.}"
+  "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"proto_events_fishing\") AS SELECT * FROM ${current_table_name//:/.}"
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create view ${view_name}"
   exit 1
@@ -171,7 +200,18 @@ fi
 echo "Removing two days before table [${two_days_previous_table_name}]"
 bq rm -f -t "${two_days_previous_table_name}"
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to remove temporal table ${two_days_previous_table_name}"
+  echo "  Unable to remove two days before table ${two_days_previous_table_name}"
+  exit 1
+fi
+
+
+################################################################################
+# Remove temporal table
+################################################################################
+echo "Removing temporal table [${current_table_name_fishing_events}]"
+bq rm -f -t "${current_table_name_fishing_events}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to remove temporal table ${current_table_name_fishing_events}"
   exit 1
 fi
 
