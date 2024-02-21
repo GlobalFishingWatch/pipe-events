@@ -38,7 +38,7 @@ WITH
         FROM `{{ messages }}`
         -- specify partition duration (how far back we look in pipe)
         -- still need to confirm duration
-        WHERE WHERE timestamp >= '{{ start_date }}' AND timestamp < '{{ end_date }}'
+        WHERE timestamp >= '{{ start_date }}' AND timestamp < '{{ end_date }}'
 /*
 
         UNION ALL
