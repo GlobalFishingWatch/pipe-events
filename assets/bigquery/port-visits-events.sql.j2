@@ -32,6 +32,7 @@ WITH
             *
         FROM `{{ port_visits_table }}`
         WHERE confidence >= 2
+          AND start_timestamp >= '{{ start_date }}'
     ),
 
     #
