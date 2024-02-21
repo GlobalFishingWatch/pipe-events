@@ -14,6 +14,7 @@ WITH
             *
         FROM
             `{{ source_loitering }}`
+        WHERE loitering_start_timestamp >= '{{ start_date }}'
     ),
 
     source_segment_info AS (
