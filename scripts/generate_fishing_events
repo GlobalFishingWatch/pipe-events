@@ -15,7 +15,7 @@ ARGS=( \
   REGIONS_TABLE \
   VESSEL_IDENTITY_CORE \
   VESSEL_IDENTITY_AUTHORIZATION \
-  DEST_TABLE
+  DEST_TABLE_NAME
 )
 
 ################################################################################
@@ -44,62 +44,66 @@ if [[ -z $END_DATE ]]; then
 fi
 
 end_date_minus_one_day=$(date --date="${END_DATE} -1 day" +%Y-%m-%d)
-end_date_minus_two_days=$(date --date="${END_DATE} -2 days" +%Y-%m-%d)
 
 end_date_no_hyphens=${END_DATE//-}
 end_date_minus_one_day_no_hyphens=${end_date_minus_one_day//-}
-end_date_minus_two_days_no_hyphens=${end_date_minus_two_days//-}
 
-current_table_name="${DEST_TABLE}_v${end_date_no_hyphens}"
-one_day_previous_table_name="${DEST_TABLE}_v${end_date_minus_one_day_no_hyphens}"
-two_days_previous_table_name="${DEST_TABLE}_v${end_date_minus_two_days_no_hyphens}"
-current_table_name_fishing_events="${DEST_TABLE}_temp_v${end_date_no_hyphens}"
+current_table_name="${DEST_TABLE_NAME}_v${end_date_no_hyphens}"
+one_day_previous_table_name="${DEST_TABLE_NAME}_v${end_date_minus_one_day_no_hyphens}"
+current_table_name_fishing_events="${DEST_TABLE_NAME}_temp_v${end_date_no_hyphens}"
 
-view_name="${DEST_TABLE//:/.}"
+view_name="${DEST_TABLE_NAME}"
 
 echo "Current table=${current_table_name}"
-echo "One day previous table=${one_day_previous_table_name}"
-echo "Two days previous table=${two_days_previous_table_name}"
-echo "Temporal table with fishing events=${current_table_name_fishing_events}"
+echo "Current one_day_previous_table_name=${one_day_previous_table_name}"
 
 
 ################################################################################
 # Force that the destination tables exists
 ################################################################################
 echo "Ensuring events table ${current_table_name} exists"
+
 TABLE_DESC=(
+  'This table was generated using the next query:'
+  'https://github.com/GlobalFishingWatch/pipe-events/blob/release_pipe_3/assets/bigquery/fishing-events-1.sql.j2'
+  'https://github.com/GlobalFishingWatch/pipe-events/blob/release_pipe_3/assets/bigquery/fishing-events-2.sql.j2'
+  ' '
+  ' '
+  'Sources:'
+  '========='
+  "* Script: ${BASH_SOURCE[0]}"
   "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
-  "* Source: ${SOURCE_LOITERING}"
   "* Command:"
   "$(basename $0)"
   "$@"
+  ' '
+  ' '
+  'Maintainers:'
+  '============='
+  'Data: Willa Brooks <willa@globalfishingwatch.org>'
+  'Engineer: Álvaro Perdiz <alvaro@globalfishingwatch.org>'
+  ' '
+  ' '
 )
+
 TABLE_DESC=$( IFS=$'\n'; echo "${TABLE_DESC[*]}" )
 SCHEMA=${ASSETS}/bigquery/events.schema.json
 
 # Current table
 bq mk --force \
+  --label environment:production \
+  --label resource_creator:gcp-composer \
+  --label project:events \
+  --label version:v1 \
+  --label step:generate_events \
+  --label stage:productive \
   --description "${TABLE_DESC}" \
   --schema ${SCHEMA} \
   --time_partitioning_field=event_start \
   --time_partitioning_type=MONTH \
   "${current_table_name}"
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to create table ${DEST_TABLE}"
-  exit 1
-fi
-echo "  Events table exists"
-
-
-# previous table
-bq mk --force \
-  --description "${TABLE_DESC}" \
-  --schema ${SCHEMA} \
-  --time_partitioning_field=event_start \
-  --time_partitioning_type=MONTH \
-  "${one_day_previous_table_name}"
-if [ "$?" -ne 0 ]; then
-  echo "  Unable to create table ${END_DATE_MINUS_ONE_DAY}"
+  echo "  Unable to create table ${DEST_TABLE_NAME}"
   exit 1
 fi
 echo "  Events table exists"
@@ -140,7 +144,7 @@ jinja2 "${INSERT_SQL}" \
    -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
-     --replace \
+     --append_table \
      --destination_table ${current_table_name_fishing_events}
 
 if [ "$?" -ne 0 ]; then
@@ -168,7 +172,7 @@ jinja2 "${INSERT_SQL}" \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    -D source_fishing_events=${current_table_name_fishing_events//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
-     --replace \
+     --append_table \
      --destination_table ${current_table_name}
 
 if [ "$?" -ne 0 ]; then
@@ -178,16 +182,40 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 
+################################################################################
+# Remove temporal table
+################################################################################
+echo "Removing temporal table [${current_table_name_fishing_events}]"
+bq rm -f -t "${current_table_name_fishing_events}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to remove two days before table ${current_table_name_fishing_events}"
+  exit 1
+fi
 
 ################################################################################
 # Create new view
 ################################################################################
 echo "Creating view [${view_name}]"
-echo "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"proto_events_fishing\") AS SELECT * FROM ${current_table_name//:/.}"
+echo "CREATE OR REPLACE VIEW ${view_name} AS SELECT * FROM ${current_table_name//:/.}"
 
 bq query \
   --use_legacy_sql=false \
-  "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"proto_events_fishing\") AS SELECT * FROM ${current_table_name//:/.}"
+  "CREATE OR REPLACE VIEW ${view_name//:/.} AS SELECT * FROM ${current_table_name//:/.}"
+
+bq update \
+  --set_label environment:production \
+  --set_label resource_creator:gcp-composer \
+  --set_label project:events \
+  --set_label version:v1 \
+  --set_label step:generate_events \
+  --set_label stage:productive \
+  --description "${TABLE_DESC}" \
+  ${view_name}
+
+bq update \
+  ${view_name} \
+  ${SCHEMA}
+
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create view ${view_name}"
   exit 1
@@ -195,24 +223,13 @@ fi
 
 
 ################################################################################
-# Remove two days before table
+# Remove prev table
 ################################################################################
-echo "Removing two days before table [${two_days_previous_table_name}]"
-bq rm -f -t "${two_days_previous_table_name}"
+echo "Removing temporal table [${one_day_previous_table_name}]"
+bq rm -f -t "${one_day_previous_table_name}"
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to remove two days before table ${two_days_previous_table_name}"
+  echo "  Unable to remove two days before table ${one_day_previous_table_name}"
   exit 1
 fi
 
-
-################################################################################
-# Remove temporal table
-################################################################################
-echo "Removing temporal table [${current_table_name_fishing_events}]"
-bq rm -f -t "${current_table_name_fishing_events}"
-if [ "$?" -ne 0 ]; then
-  echo "  Unable to remove temporal table ${current_table_name_fishing_events}"
-  exit 1
-fi
-
-echo "${DEST_TABLE} Done."
+echo "${DEST_TABLE_NAME} Done."
