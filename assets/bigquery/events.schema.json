@@ -1,19 +1,19 @@
 [
   {
     "name": "event_id",
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "type": "STRING",
     "description": "Unique identifier."
   },
   {
     "name": "event_type",
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "type": "STRING",
     "description": "Type discriminator, such as fishing, encounter, etc. Different event types have completely different structures in the event_info field."
   },
   {
     "name": "vessel_id",
-    "mode": "REQUIRED",
+    "mode": "NULLABLE",
     "type": "STRING",
     "description": "Id of the main vessel involved in the event. When an event has multiple vessels associated with it (for example, encounters) you will find multiple records, one for each vessel involved."
   },
