@@ -76,15 +76,14 @@ WITH
           )
           AND lat > -90
           AND lat < 90
+          AND clean_segs IS TRUE
           AND seg_id IN (
-            SELECT
-                seg_id
-            FROM
-                source_segs
-            WHERE
-                good_seg
-              AND positions > 10
-              AND NOT overlapping_and_short)
+              SELECT
+                  seg_id
+              FROM
+                  source_segs
+              WHERE positions > 10
+          )
     ),
 
     --
