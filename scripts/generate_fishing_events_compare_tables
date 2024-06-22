@@ -16,6 +16,7 @@ ARGS=( \
   REGIONS_TABLE \
   VESSEL_IDENTITY_CORE \
   VESSEL_IDENTITY_AUTHORIZATION \
+  FISHING_LIST \
   DEST_TABLE
 )
 
@@ -44,23 +45,46 @@ if [[ -z $END_DATE ]]; then
   END_DATE=${START_DATE}
 fi
 
+################################################################################
+# Check fishing list parameter and set correct filters
+################################################################################
+
+# Define FISHING_LIST_ENUMS
+FISHING_LIST_ENUMS=( "restrictive" "less_restrictive" )
+
+# Check if the fishing list is a valid enum
+if [[ ! " ${FISHING_LIST_ENUMS[@]} " =~ " ${FISHING_LIST} " ]]; then
+  echo "Invalid fishing list parameter. Valid values are: ${FISHING_LIST_ENUMS}"
+  exit 1
+fi
+
+# Check if FISHING_LIST is restrictive
+if [[ ${FISHING_LIST} == "less_restrictive" ]]; then
+  FISHING_LIST_FILTERS="potential_fishing OR on_fishing_list_sr"
+fi
+
+if [[ ${FISHING_LIST} == "restrictive" ]]; then
+  FISHING_LIST_FILTERS="prod_shiptype = 'fishing'"
+fi
+
+echo "${FISHING_LIST} fishing list filters: ${FISHING_LIST_FILTERS}"
+
+################################################################################
+
 end_date_minus_one_day=$(date --date="${END_DATE} -1 day" +%Y-%m-%d)
-end_date_minus_two_days=$(date --date="${END_DATE} -2 days" +%Y-%m-%d)
 
 end_date_no_hyphens=${END_DATE//-}
 end_date_minus_one_day_no_hyphens=${end_date_minus_one_day//-}
-end_date_minus_two_days_no_hyphens=${end_date_minus_two_days//-}
 
-current_table_name="${DEST_TABLE}_v${end_date_no_hyphens}"
-one_day_previous_table_name="${DEST_TABLE}_v${end_date_minus_one_day_no_hyphens}"
-two_days_previous_table_name="${DEST_TABLE}_v${end_date_minus_two_days_no_hyphens}"
-current_table_name_fishing_events="${DEST_TABLE}_temp_v${end_date_no_hyphens}"
+current_table_name="${DEST_TABLE_NAME}_v${end_date_no_hyphens}"
+one_day_previous_table_name="${DEST_TABLE_NAME}_v${end_date_minus_one_day_no_hyphens}"
+current_table_name_fishing_events="${DEST_TABLE_NAME}_temp_${FISHING_LIST}_v${end_date_no_hyphens}"
 
-view_name="${DEST_TABLE//:/.}"
+view_name="${DEST_TABLE_NAME}"
+
 
 echo "Current table=${current_table_name}"
-echo "One day previous table=${one_day_previous_table_name}"
-echo "Two days previous table=${two_days_previous_table_name}"
+echo "Current one_day_previous_table_name=${one_day_previous_table_name}"
 echo "Temporal table with fishing events=${current_table_name_fishing_events}"
 
 
@@ -144,6 +168,7 @@ jinja2 "${INSERT_SQL}" \
    -D regions_table=${REGIONS_TABLE//:/.} \
    -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
+   -D fishing_list_filters="${FISHING_LIST_FILTERS}" \
    | bq query --headless --max_rows=0 --allow_large_results \
      --replace \
      --destination_table ${current_table_name_fishing_events}
@@ -175,6 +200,7 @@ jinja2 "${INSERT_SQL}" \
    -D regions_table=${REGIONS_TABLE//:/.} \
    -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
+   -D fishing_list_filters="${FISHING_LIST_FILTERS}" \
    -D source_fishing_events=${current_table_name_fishing_events//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --replace \

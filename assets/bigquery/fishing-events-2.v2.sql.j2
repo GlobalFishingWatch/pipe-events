@@ -64,7 +64,7 @@ WITH
         FROM
             `{{ fishing_vessels }}`
         WHERE
-            potential_fishing OR on_fishing_list_sr
+            {{ fishing_list_filters }}
     ),
 
 
