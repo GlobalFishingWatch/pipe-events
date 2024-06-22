@@ -17,7 +17,7 @@ ARGS=( \
   VESSEL_IDENTITY_CORE \
   VESSEL_IDENTITY_AUTHORIZATION \
   FISHING_LIST \
-  DEST_TABLE
+  DEST_TABLE_NAME
 )
 
 ################################################################################
@@ -110,7 +110,7 @@ bq mk --force \
   --time_partitioning_type=MONTH \
   "${current_table_name}"
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to create table ${DEST_TABLE}"
+  echo "  Unable to create table ${DEST_TABLE_NAME}"
   exit 1
 fi
 echo "  Events table exists"
@@ -250,4 +250,4 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 
-echo "${DEST_TABLE} Done."
+echo "${DEST_TABLE_NAME} Done."
