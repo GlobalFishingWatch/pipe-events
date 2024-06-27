@@ -85,7 +85,6 @@ view_name="${DEST_TABLE_NAME}"
 
 echo "Current table=${current_table_name}"
 echo "Current one_day_previous_table_name=${one_day_previous_table_name}"
-echo "Temporal table with fishing events=${current_table_name_fishing_events}"
 
 
 ################################################################################
@@ -213,32 +212,40 @@ if [ "$?" -ne 0 ]; then
   exit 1
 fi
 
+################################################################################
+# Remove temporal table
+################################################################################
+echo "Removing temporal table [${current_table_name_fishing_events}]"
+bq rm -f -t "${current_table_name_fishing_events}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to remove two days before table ${current_table_name_fishing_events}"
+  exit 1
+fi
 
 ################################################################################
 # Create new view
 ################################################################################
 echo "Creating view [${view_name}]"
-echo "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"proto_events_fishing\") AS SELECT * FROM ${current_table_name//:/.}"
+echo "CREATE OR REPLACE VIEW ${view_name} AS SELECT * FROM ${current_table_name//:/.}"
 
 bq query \
   --use_legacy_sql=false \
-  "CREATE OR REPLACE VIEW ${view_name} OPTIONS(description=\"proto_events_fishing\") AS SELECT * FROM ${current_table_name//:/.}"
+  "CREATE OR REPLACE VIEW ${view_name//:/.} AS SELECT * FROM ${current_table_name//:/.}"
+
+bq update \
+  --set_label environment:production \
+  --set_label resource_creator:gcp-composer \
+  --set_label project:events \
+  --set_label version:v1 \
+  --set_label step:generate_events \
+  --set_label stage:productive \
+  --description "${TABLE_DESC}" \
+  ${view_name}
+
 if [ "$?" -ne 0 ]; then
   echo "  Unable to create view ${view_name}"
   exit 1
 fi
-
-
-################################################################################
-# Remove two days before table
-################################################################################
-echo "Removing two days before table [${two_days_previous_table_name}]"
-bq rm -f -t "${two_days_previous_table_name}"
-if [ "$?" -ne 0 ]; then
-  echo "  Unable to remove two days before table ${two_days_previous_table_name}"
-  exit 1
-fi
-
 
 ################################################################################
 # Remove temporal table
