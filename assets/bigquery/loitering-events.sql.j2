@@ -123,7 +123,7 @@ WITH
                 STRUCT(
                     vessel_id AS `id`,
                     lo.ssvid AS `ssvid`,
-                    si.shipname.value AS `name`,
+                    vessel.shipname AS `name`,
                     seg_id,
                     vessel.prod_shiptype AS `type`,
                     vessel.mmsi_flag AS `flag`
