@@ -18,7 +18,7 @@ WITH backfill_potentially_open_events AS (
 -- get events from the previous day that are not in the potentially open events
 backfill_closed_events AS (
   SELECT backfill.* 
-  FROM `world-fishing-827.scratch_christian_homberg_ttl120d.dev_fishing_events_1229` backfill
+  FROM {{ existing_merged_fishing_events }} backfill
   LEFT JOIN backfill_potentially_open_events
   USING(seg_id, timestamp)
   WHERE backfill_potentially_open_events.seg_id IS NULL
