@@ -15,6 +15,14 @@ WITH backfill_potentially_open_events AS (
   WHERE event_end >= TIMESTAMP_ADD(TIMESTAMP({{ start_date }}), INTERVAL 24 - {{ max_fishing_event_gap }} HOUR)
   QUALIFY event_end = MAX(event_end) OVER (PARTITION BY seg_id)
 ),
+-- get events from the previous day that are not in the potentially open events
+backfill_closed_events AS (
+  SELECT backfill.* 
+  FROM `world-fishing-827.scratch_christian_homberg_ttl120d.dev_fishing_events_1229` backfill
+  LEFT JOIN backfill_potentially_open_events
+  USING(seg_id, timestamp)
+  WHERE backfill_potentially_open_events.seg_id IS NULL
+),
 -- get events from the previous day that might have to be merged to existing merged events
 delta_events AS (
   SELECT * FROM {{ incremental_fishing_events }}
@@ -81,6 +89,8 @@ combined AS (
   SELECT * FROM delta_merged
   UNION ALL
   SELECT * FROM delta_anti_merged
+  UNION ALL
+  SELECT * FROM backfill_closed_events
 )
 
 SELECT * FROM combined
