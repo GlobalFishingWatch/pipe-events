@@ -3,7 +3,79 @@
 -- Include some utility functions
 {% include 'util.sql.j2' %}
 
-WITH 
+WITH source_segs AS (
+        SELECT
+            *
+        FROM
+            `{{ segs }}`
+    ),
+    source_segment_vessel AS (
+        SELECT
+            *
+        FROM
+            `{{ segment_vessel }}`
+    ),
+
+    source_fishing_vessels AS (
+        SELECT
+            *
+        FROM
+            `{{ all_vessels_byyear }}`
+        WHERE
+            {{ fishing_list_filters }}
+    ),
+
+ 
+fishing_events_merged_good_segments AS (
+  SELECT * FROM {{ fishing_events_merged }}
+  WHERE seg_id IN (
+    SELECT
+        seg_id
+    FROM
+        source_segs
+    WHERE
+        good_seg
+      AND positions > 10
+      AND NOT overlapping_and_short
+  )
+),
+
+
+--
+-- Get a vessel_id for each segment
+--
+best_segment_vessel AS (
+    SELECT DISTINCT 
+      seg_id,
+      FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
+    FROM source_segment_vessel
+),
+
+fishing_events_vessel_id AS (
+  SELECT *
+  FROM fishing_events_merged_good_segments fe
+  INNER JOIN best_segment_vessel
+  USING(seg_id)
+),
+
+fishing_events_identity AS (
+  SELECT
+      fishing_events_vessel_id.* EXCEPT (vessel_id),
+      vesselinfo.vessel_id,
+      vesselinfo.prod_geartype AS best_best_vessel_class,
+      vesselinfo.ssvid AS main_vessel_ssvid,
+      vesselinfo.mmsi_flag as main_vessel_flag,
+      vesselinfo.shipname AS main_vessel_shipname
+  FROM
+      fishing_events_vessel_id
+      LEFT JOIN source_fishing_vessels AS vesselinfo USING (vessel_id, year)  
+),
+
+fishing_event_point AS (
+  SELECT *, SAFE.ST_GEOGPOINT(lon, lat) AS point
+  FROM fishing_events_identity
+),
+
     --
     -- Now aggregate all the messages that are in the same range into a single event record
     -- Filter out short events or events where vessel is moving too fast
@@ -48,7 +120,7 @@ WITH
                      ELSE hours END) AS avg_hours,
             STRING_AGG(CONCAT(CAST(lon AS string), ' ', CAST(lat AS string)), ', ' ORDER BY timestamp) AS points_wkt
         FROM
-            fishing_event_message
+            fishing_event_point
         GROUP BY
             ssvid,
             seg_id,
