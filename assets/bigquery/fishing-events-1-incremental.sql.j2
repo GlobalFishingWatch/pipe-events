@@ -1,7 +1,6 @@
 #standardSQL
 
 -- Include some utility functions
-{% include 'util.sql.j2' %}
 
 --
 -- Fishing Events
@@ -13,7 +12,7 @@ WITH
     -- Source tables
     source_research_messages AS (
         SELECT *
-        FROM `{{ messages }}`
+        FROM `{{ messages_table }}`
         -- allow incremental as well as backfill loads
         WHERE DATE(timestamp) BETWEEN '{{ start_date }}' AND '{{ end_date }}'
     ),
@@ -156,4 +155,4 @@ WITH
           AND (event_end IS NULL OR timestamp <= event_end)
           AND score = 1.0 )
 
-select * from fishing_event_message
+select *, DATE(event_end) event_end_date from fishing_event_message
