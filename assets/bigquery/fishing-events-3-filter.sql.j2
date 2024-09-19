@@ -3,31 +3,36 @@
 -- Include some utility functions
 {% include 'util.sql.j2' %}
 
+CREATE OR REPLACE TABLE `{{ filtered_table }}`
+PARTITION BY DATE_TRUNC(event_end_date, MONTH)
+CLUSTER BY event_end_date, seg_id
+AS
+
 WITH source_segs AS (
         SELECT
             *
         FROM
-            `{{ segs }}`
+            `{{ segs_activity_table }}`
     ),
     source_segment_vessel AS (
         SELECT
             *
         FROM
-            `{{ segment_vessel }}`
+            `{{ segment_vessel_table }}`
     ),
 
     source_fishing_vessels AS (
         SELECT
             *
         FROM
-            `{{ all_vessels_byyear }}`
+            `{{ product_vessel_info_summary_table }}`
         WHERE
             {{ fishing_list_filters }}
     ),
 
  
 fishing_events_merged_good_segments AS (
-  SELECT * FROM {{ fishing_events_merged }}
+  SELECT * FROM {{ merged_table }}
   WHERE seg_id IN (
     SELECT
         seg_id
@@ -180,4 +185,4 @@ fishing_event_point AS (
            -- all other fishing events must be longer than 500 meters
            OR NOT best_best_vessel_class = 'squid_jigger' AND event_distance_m > 500)
 
-select * from complete_fishing_event
+select *, DATE(event_end) AS event_end_date from complete_fishing_event
