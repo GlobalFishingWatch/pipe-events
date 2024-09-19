@@ -12,14 +12,16 @@
 -- only get the most recent event by seg_id because previous events have been permanently closed
 WITH backfill_potentially_open_events AS (
   SELECT * FROM {{ existing_merged_fishing_events }}
-  WHERE event_end >= TIMESTAMP_ADD(TIMESTAMP({{ start_date }}), INTERVAL 24 - {{ max_fishing_event_gap }} HOUR)
-  AND event_end_date >= {{ start_date }}
+  WHERE event_end >= TIMESTAMP_ADD(TIMESTAMP('{{ start_date }}'), INTERVAL 24 - {{ max_fishing_event_gap_hours }} HOUR)
+  AND event_end_date >= '{{ start_date }}'
   QUALIFY event_end = MAX(event_end) OVER (PARTITION BY seg_id)
 ),
 -- get events from the previous day that might have to be merged to existing merged events
+-- only get first event by seg_id because subsequent events must not be merged
 delta_events AS (
-  SELECT * FROM {{ incremental_fishing_events }}
-  WHERE event_end >= TIMESTAMP_ADD(TIMESTAMP({{ start_date }}), INTERVAL 24 - {{ max_fishing_event_gap }} HOUR)
+  SELECT * FROM {{ temp_incremental_fishing_events }}
+  WHERE event_end >= TIMESTAMP_ADD(TIMESTAMP('{{ start_date }}'), INTERVAL 24 - {{ max_fishing_event_gap_hours }} HOUR)
+  QUALIFY event_end = MIN(event_end) OVER (PARTITION BY seg_id)
 ),
 open_events_only AS (
   SELECT DISTINCT seg_id, event_start, event_end
@@ -41,9 +43,10 @@ overlapping_events AS (
 -- keep all messages from backfill until and including where we merged the events
 backfill_merged AS (
     SELECT 
-    backfill.* EXCEPT(event_start, event_end), 
+    backfill.* EXCEPT(event_start, event_end, event_end_date), 
     overlapping_events.event_start AS event_start, 
-    overlapping_events.event_end AS event_end
+    overlapping_events.event_end AS event_end,
+    event_end_date
   FROM backfill_potentially_open_events AS backfill 
   INNER JOIN overlapping_events
   ON overlapping_events.seg_id = backfill.seg_id
@@ -53,9 +56,10 @@ backfill_merged AS (
 -- keep all messages from delta after we merged the events
 delta_merged AS (
   SELECT 
-    delta.* EXCEPT(event_start, event_end), 
+    delta.* EXCEPT(event_start, event_end, event_end_date), 
     overlapping_events.event_start AS event_start, 
-    overlapping_events.event_end AS event_end
+    overlapping_events.event_end AS event_end,
+    event_end_date
   FROM delta_events AS delta 
   INNER JOIN overlapping_events
   ON overlapping_events.seg_id = delta.seg_id
