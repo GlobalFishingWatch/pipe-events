@@ -17,19 +17,19 @@ WITH backfill_potentially_open_events AS (
   QUALIFY event_end = MAX(event_end) OVER (PARTITION BY seg_id)
 ),
 -- get events from the previous day that might have to be merged to existing merged events
--- only get first event by seg_id because subsequent events must not be merged
 delta_events AS (
   SELECT * FROM {{ temp_incremental_fishing_events }}
   WHERE event_end >= TIMESTAMP_ADD(TIMESTAMP('{{ start_date }}'), INTERVAL 24 - {{ max_fishing_event_gap_hours }} HOUR)
-  QUALIFY event_end = MIN(event_end) OVER (PARTITION BY seg_id)
 ),
 open_events_only AS (
   SELECT DISTINCT seg_id, event_start, event_end
   FROM backfill_potentially_open_events
 ),
+-- only get first event by seg_id because subsequent events must not be mergedworld-fishing-827.scratch_christian_homberg_ttl120d.temp_dev_incremental_fishing_events_20240920101741
 delta_events_only AS (
   SELECT DISTINCT seg_id, event_start, event_end
   FROM delta_events
+  QUALIFY event_end = MIN(event_end) OVER (PARTITION BY seg_id)
 ),
 overlapping_events AS (
   SELECT open.seg_id seg_id, open.event_start AS event_start, delta.event_end AS event_end, open.event_end AS merge_timestamp
@@ -86,6 +86,15 @@ combined AS (
   SELECT * FROM delta_merged
   UNION ALL
   SELECT * FROM delta_anti_merged
+),
+-- there are two special cases that could happen in rare cases for multi-day events:
+-- if we intend to merge an event to the previous event it could happen that the next day we won't be able to merge to the combined event
+-- this leads to duplication with two different outcomes:
+-- 1. we create an event that overlaps with a previous and next event
+-- 2. we create an event with the same event end as the next event but a different start
+cleanup_overlapping_events AS (
+  SELECT * FROM combined
+  QUALIFY ROW_NUMBER() OVER(PARTITION BY seg_id, event_end ORDER BY event_start) = 1
 )
 
 SELECT * FROM combined
