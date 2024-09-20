@@ -136,15 +136,23 @@ def run_fishing_events_filter_query(fishing_events_filter_query):
     job = client.query(fishing_events_filter_query)
     job.result()
 
-def orchestrate_fishing_events(destination_dataset, start_date, end_date, nnet_score_night_loitering):
+def orchestrate_fishing_events(
+        source_dataset_internal,
+        source_dataset_published,
+        destination_dataset, 
+        start_date, 
+        end_date, 
+        nnet_score_night_loitering,
+        run_alias
+):
 
-    merged_table=f"{destination_dataset}.dev_incremental_fishing_events_merged"
-    filtered_table=f"{destination_dataset}.dev_incremental_fishing_events_filtered"
+    merged_table=f"{destination_dataset}.{run_alias}_incremental_fishing_events_merged"
+    filtered_table=f"{destination_dataset}.{run_alias}_incremental_fishing_events_filtered"
 
     # 1. generate temp table based on research_messges
     # this can be a backfill or a delta load
     fishing_events_incremental_query=get_fishing_events_incremental_query(
-        messages_table='world-fishing-827.pipe_ais_v3_internal.research_messages',
+        messages_table=f'world-fishing-827.{source_dataset_internal}.research_messages',
         start_date=start_date,
         end_date=end_date,
         nnet_score_night_loitering=nnet_score_night_loitering
@@ -154,7 +162,6 @@ def orchestrate_fishing_events(destination_dataset, start_date, end_date, nnet_s
         dataset=destination_dataset,
         fishing_events_incremental_query=fishing_events_incremental_query
     )
-    # incremental_temp_table='world-fishing-827.scratch_christian_homberg_ttl120d.temp_dev_incremental_fishing_events_20240917113142'
 
     # 2. create the schema based on the temp table if it doesn't exist yet
     create_merged_table_schema(incremental_temp_table, merged_table)
@@ -176,9 +183,9 @@ def orchestrate_fishing_events(destination_dataset, start_date, end_date, nnet_s
     fishing_events_filter_query=get_fishing_events_filter_query(
         merged_table=merged_table,
         filtered_table=filtered_table,
-        segs_activity_table='world-fishing-827.pipe_ais_v3_published.segs_activity',
-        segment_vessel_table='world-fishing-827.pipe_ais_v3_internal.segment_vessel',
-        product_vessel_info_summary_table='world-fishing-827.pipe_ais_v3_published.product_vessel_info_summary',
+        segs_activity_table=f'world-fishing-827.{source_dataset_published}.segs_activity',
+        segment_vessel_table=f'world-fishing-827.{source_dataset_internal}.segment_vessel',
+        product_vessel_info_summary_table=f'world-fishing-827.{source_dataset_published}.product_vessel_info_summary',
         fishing_list_filters="prod_shiptype='fishing'"
     )
 
@@ -188,8 +195,11 @@ def orchestrate_fishing_events(destination_dataset, start_date, end_date, nnet_s
 
 
 orchestrate_fishing_events(
+    source_dataset_internal=['pipe_ais_v3_internal', 'pipe_ais_test_202408290000_internal'][0],
+    source_dataset_published=['pipe_ais_v3_published', 'pipe_ais_test_202408290000_published'][0],
     destination_dataset='world-fishing-827.scratch_christian_homberg_ttl120d',
-    start_date='2024-09-11',
-    end_date='2024-09-12',
-    nnet_score_night_loitering=["nnet_score", "night_loitering"][0]
+    start_date='2020-12-30',
+    end_date='2020-12-31',
+    nnet_score_night_loitering=["nnet_score", "night_loitering"][0],
+    run_alias='pipe3_2012_2020_null_fix'
 )
