@@ -25,7 +25,7 @@ open_events_only AS (
   SELECT DISTINCT seg_id, event_start, event_end
   FROM backfill_potentially_open_events
 ),
--- only get first event by seg_id because subsequent events must not be mergedworld-fishing-827.scratch_christian_homberg_ttl120d.temp_dev_incremental_fishing_events_20240920101741
+-- only get first event by seg_id because subsequent events must not be merged
 delta_events_only AS (
   SELECT DISTINCT seg_id, event_start, event_end
   FROM delta_events
