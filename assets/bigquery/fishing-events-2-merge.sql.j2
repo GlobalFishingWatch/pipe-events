@@ -86,15 +86,6 @@ combined AS (
   SELECT * FROM delta_merged
   UNION ALL
   SELECT * FROM delta_anti_merged
-),
--- there are two special cases that could happen in rare cases for multi-day events:
--- if we intend to merge an event to the previous event it could happen that the next day we won't be able to merge to the combined event
--- this leads to duplication with two different outcomes:
--- 1. we create an event that overlaps with a previous and next event
--- 2. we create an event with the same event end as the next event but a different start
-cleanup_overlapping_events AS (
-  SELECT * FROM combined
-  QUALIFY ROW_NUMBER() OVER(PARTITION BY seg_id, event_end ORDER BY event_start) = 1
 )
 
 SELECT * FROM combined

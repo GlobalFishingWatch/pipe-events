@@ -32,8 +32,7 @@ def get_fishing_events_merge_query(temp_table, merged_table, start_date, end_dat
         end_date=end_date,
     )
 
-def run_incremental_fishing_events_query(dataset, fishing_events_incremental_query):
-    temp_table=f"{dataset}.temp_dev_incremental_fishing_events_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+def run_incremental_fishing_events_query(temp_table, fishing_events_incremental_query):
     create_temp_table_query=f"""CREATE TABLE `{temp_table}`
     PARTITION BY DATE_TRUNC(event_end_date, MONTH)
     CLUSTER BY event_end_date, seg_id, timestamp
@@ -117,7 +116,8 @@ def get_fishing_events_filter_query(
         segs_activity_table,
         segment_vessel_table,
         product_vessel_info_summary_table,
-        fishing_list_filters
+        fishing_list_filters,
+        nnet_score_night_loitering
 ):
     env = Environment(loader=FileSystemLoader("."))
 
@@ -127,7 +127,8 @@ def get_fishing_events_filter_query(
         segs_activity_table=segs_activity_table,
         segment_vessel_table=segment_vessel_table,
         product_vessel_info_summary_table=product_vessel_info_summary_table,
-        fishing_list_filters=fishing_list_filters
+        fishing_list_filters=fishing_list_filters,
+        nnet_score_night_loitering=nnet_score_night_loitering
     )
 
 def run_fishing_events_filter_query(fishing_events_filter_query):    
@@ -145,9 +146,16 @@ def orchestrate_fishing_events(
         nnet_score_night_loitering,
         run_alias
 ):
+    if nnet_score_night_loitering=="nnet_score":
+        fishing_night_loitering="fishing"
+    elif nnet_score_night_loitering=="night_loitering":
+        fishing_night_loitering="night_loitering"
+    else:
+        raise ValueError("nnet_score_night_loitering must be either 'nnet_score' or 'night_loitering'")
 
-    merged_table=f"{destination_dataset}.{run_alias}_incremental_fishing_events_merged"
-    filtered_table=f"{destination_dataset}.{run_alias}_incremental_fishing_events_filtered"
+    temp_incremental_table=f"{destination_dataset}.{run_alias}_temp_incremental_{fishing_night_loitering}_events_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+    merged_table=f"{destination_dataset}.{run_alias}_incremental_{fishing_night_loitering}_events_merged"
+    filtered_table=f"{destination_dataset}.{run_alias}_incremental_{fishing_night_loitering}_events_filtered"
 
     # 1. generate temp table based on research_messges
     # this can be a backfill or a delta load
@@ -159,7 +167,7 @@ def orchestrate_fishing_events(
     )
 
     incremental_temp_table=run_incremental_fishing_events_query(
-        dataset=destination_dataset,
+        temp_table=temp_incremental_table,
         fishing_events_incremental_query=fishing_events_incremental_query
     )
 
@@ -186,7 +194,7 @@ def orchestrate_fishing_events(
         segs_activity_table=f'world-fishing-827.{source_dataset_published}.segs_activity',
         segment_vessel_table=f'world-fishing-827.{source_dataset_internal}.segment_vessel',
         product_vessel_info_summary_table=f'world-fishing-827.{source_dataset_published}.product_vessel_info_summary',
-        fishing_list_filters="prod_shiptype='fishing'"
+        nnet_score_night_loitering=nnet_score_night_loitering
     )
 
     run_fishing_events_filter_query(
@@ -194,12 +202,139 @@ def orchestrate_fishing_events(
     )
 
 
-orchestrate_fishing_events(
+def get_fishing_events_authorization_query(
+        vessel_identity_core,
+        vessel_identity_authorization,
+        spatial_measures_table,
+        regions_table,
+        source_fishing_events,
+        source_night_loitering_events,
+        product_vessel_info_summary_table,
+        fishing_list_filters
+):
+    env = Environment(loader=FileSystemLoader("."))
+
+    return env.get_template("fishing-events-4-authorization.sql.j2").render(
+        vessel_identity_core=vessel_identity_core,
+        vessel_identity_authorization=vessel_identity_authorization,
+        spatial_measures_table=spatial_measures_table,
+        regions_table=regions_table,
+        source_fishing_events=source_fishing_events,
+        source_night_loitering_events=source_night_loitering_events,
+        all_vessels_byyear=product_vessel_info_summary_table,
+        fishing_list_filters=fishing_list_filters
+    )
+
+def combine_fishing_night_loitering_events(
+        fishing_events_table,
+        night_loitering_events_table,
+        source_dataset_published,
+        destination_dataset,
+        run_alias
+):
+    # 4. create authorization table
+    fishing_events_authorization_query=get_fishing_events_authorization_query(
+        fishing_events_less_restrictive_table=f"{destination_dataset}.{run_alias}_incremental_events_less_restrictive",
+        vessel_identity_core=f'world-fishing-827.pipe_ais_v3_internal.identity_core',
+        vessel_identity_authorization=f'world-fishing-827.pipe_ais_v3_internal.identity_authorization',
+        spatial_measures_table=f'world-fishing-827.pipe_static.spatial_measures_20201105',
+        regions_table=f'world-fishing-827.pipe_regions_layers.event_regions',
+        source_fishing_events=fishing_events_table,
+        source_night_loitering_events=night_loitering_events_table,
+        product_vessel_info_summary_table=f'world-fishing-827.{source_dataset_published}.product_vessel_info_summary'
+    )
+
+    logging.info(f"Running authorization statement: {fishing_events_authorization_query}")
+
+    job = client.query(fishing_events_authorization_query)
+    job.result()
+
+
+def fishing_night_loitering_events_backfill_incremental_pipeline(
+        source_dataset_internal,
+        source_dataset_published,
+        destination_dataset,
+        start_date_backfill,
+        end_date_backfill,
+        end_date_incremental,
+        nnet_score_night_loitering,
+        run_alias
+):
+    # generate start_date end_date pairs which start at start_date=end_date_backfill and end at end_date=end_date_incremental
+    daily_loads = [
+        (end_date_backfill + datetime.timedelta(days=i), end_date_backfill + datetime.timedelta(days=i+1)) 
+                   for i in range((end_date_incremental - end_date_backfill).days)
+                   ]
+
+    orchestrate_fishing_events(
+        source_dataset_internal=source_dataset_internal,
+        source_dataset_published=source_dataset_published,
+        destination_dataset=destination_dataset,
+        start_date=start_date_backfill.strftime("%Y-%m-%d"),
+        end_date=end_date_backfill.strftime("%Y-%m-%d"),
+        nnet_score_night_loitering=nnet_score_night_loitering,
+        run_alias=run_alias
+    )
+
+    for start_date, end_date in daily_loads:
+        orchestrate_fishing_events(
+            source_dataset_internal=source_dataset_internal,
+            source_dataset_published=source_dataset_published,
+            destination_dataset=destination_dataset,
+            start_date=start_date.strftime("%Y-%m-%d"),
+            end_date=end_date.strftime("%Y-%m-%d"),
+            nnet_score_night_loitering=nnet_score_night_loitering,
+            run_alias=run_alias
+        )
+
+
+def run_entire_fishing_events_backfill_incremental_pipeline(
+        source_dataset_internal,
+        source_dataset_published,
+        destination_dataset,
+        start_date_backfill,
+        end_date_backfill,
+        end_date_incremental,
+        run_alias
+):
+    fishing_night_loitering_events_backfill_incremental_pipeline(
+        source_dataset_internal=source_dataset_internal,
+        source_dataset_published=source_dataset_published,
+        destination_dataset=destination_dataset,
+        start_date_backfill=start_date_backfill,
+        end_date_backfill=end_date_backfill,
+        end_date_incremental=end_date_incremental,
+        nnet_score_night_loitering="nnet_score",
+        run_alias=run_alias
+    )
+
+    fishing_night_loitering_events_backfill_incremental_pipeline(
+        source_dataset_internal=source_dataset_internal,
+        source_dataset_published=source_dataset_published,
+        destination_dataset=destination_dataset,
+        start_date_backfill=start_date_backfill,
+        end_date_backfill=end_date_backfill,
+        end_date_incremental=end_date_incremental,
+        nnet_score_night_loitering="night_loitering",
+        run_alias=run_alias
+    )
+
+    combine_fishing_night_loitering_events(
+        fishing_events_table=f"{destination_dataset}.{run_alias}_incremental_fishing_events_filtered",
+        night_loitering_events_table=f"{destination_dataset}.{run_alias}_incremental_night_loitering_events_filtered",
+        source_dataset_published=source_dataset_published,
+        destination_dataset=destination_dataset,
+        run_alias=run_alias
+    )
+    
+    
+
+run_entire_fishing_events_backfill_incremental_pipeline(
     source_dataset_internal=['pipe_ais_v3_internal', 'pipe_ais_test_202408290000_internal'][0],
     source_dataset_published=['pipe_ais_v3_published', 'pipe_ais_test_202408290000_published'][0],
     destination_dataset='world-fishing-827.scratch_christian_homberg_ttl120d',
-    start_date='2020-12-30',
-    end_date='2020-12-31',
-    nnet_score_night_loitering=["nnet_score", "night_loitering"][0],
-    run_alias='pipe3_2012_2020_null_fix'
+    start_date_backfill=datetime.datetime.strptime("2012-01-01", "%Y-%m-%d"),
+    end_date_backfill=datetime.datetime.strptime("2017-12-27", "%Y-%m-%d"),
+    end_date_incremental=datetime.datetime.strptime("2017-12-31", "%Y-%m-%d"),
+    run_alias='pipe3_2012_2017_fixed_cleanup'
 )
