@@ -37,3 +37,8 @@ Previously, fishing events was split into two steps:
     This step is entirely new. The most similar existing concept in pipe3 to this table is `raw_port_events`. Technically, at this point we only store "potential" events and not all of them will eventually pass all filters.
 
     3. Generate final fishing events which are based on all messages within an event. Apply filters, add `vessel_id` and identity fields, and remove `overlapping_and_short` segments.
+
+
+All 3 steps need to be run twice, once for `nnet_score` and once for `night_loitering`.
+
+2. The former second step of adding authorization and regions information is largely unchanged. However, it now combines `fishing events` and `night loitering events`. Also, a hard coded filter for less retrictive fishing vessels is applied and in the end 
