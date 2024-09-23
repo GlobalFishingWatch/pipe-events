@@ -116,7 +116,6 @@ def get_fishing_events_filter_query(
         segs_activity_table,
         segment_vessel_table,
         product_vessel_info_summary_table,
-        fishing_list_filters,
         nnet_score_night_loitering
 ):
     env = Environment(loader=FileSystemLoader("."))
@@ -127,7 +126,6 @@ def get_fishing_events_filter_query(
         segs_activity_table=segs_activity_table,
         segment_vessel_table=segment_vessel_table,
         product_vessel_info_summary_table=product_vessel_info_summary_table,
-        fishing_list_filters=fishing_list_filters,
         nnet_score_night_loitering=nnet_score_night_loitering
     )
 
@@ -203,26 +201,26 @@ def orchestrate_fishing_events(
 
 
 def get_fishing_events_authorization_query(
+        fishing_events_less_restrictive_table,
         vessel_identity_core,
         vessel_identity_authorization,
         spatial_measures_table,
         regions_table,
         source_fishing_events,
         source_night_loitering_events,
-        product_vessel_info_summary_table,
-        fishing_list_filters
+        product_vessel_info_summary_table
 ):
     env = Environment(loader=FileSystemLoader("."))
 
     return env.get_template("fishing-events-4-authorization.sql.j2").render(
+        fishing_events_less_restrictive_table=fishing_events_less_restrictive_table,
         vessel_identity_core=vessel_identity_core,
         vessel_identity_authorization=vessel_identity_authorization,
         spatial_measures_table=spatial_measures_table,
         regions_table=regions_table,
         source_fishing_events=source_fishing_events,
         source_night_loitering_events=source_night_loitering_events,
-        all_vessels_byyear=product_vessel_info_summary_table,
-        fishing_list_filters=fishing_list_filters
+        all_vessels_byyear=product_vessel_info_summary_table
     )
 
 def combine_fishing_night_loitering_events(
@@ -334,7 +332,17 @@ run_entire_fishing_events_backfill_incremental_pipeline(
     source_dataset_published=['pipe_ais_v3_published', 'pipe_ais_test_202408290000_published'][0],
     destination_dataset='world-fishing-827.scratch_christian_homberg_ttl120d',
     start_date_backfill=datetime.datetime.strptime("2012-01-01", "%Y-%m-%d"),
-    end_date_backfill=datetime.datetime.strptime("2017-12-27", "%Y-%m-%d"),
-    end_date_incremental=datetime.datetime.strptime("2017-12-31", "%Y-%m-%d"),
-    run_alias='pipe3_2012_2017_fixed_cleanup'
+    end_date_backfill=datetime.datetime.strptime("2024-09-17", "%Y-%m-%d"),
+    end_date_incremental=datetime.datetime.strptime("2024-09-20", "%Y-%m-%d"),
+    run_alias='pipe3_latest_20240920'
 )
+
+# run_entire_fishing_events_backfill_incremental_pipeline(
+#     source_dataset_internal=['pipe_ais_v3_internal', 'pipe_ais_test_202408290000_internal'][1],
+#     source_dataset_published=['pipe_ais_v3_published', 'pipe_ais_test_202408290000_published'][1],
+#     destination_dataset='world-fishing-827.scratch_christian_homberg_ttl120d',
+#     start_date_backfill=datetime.datetime.strptime("2020-01-01", "%Y-%m-%d"),
+#     end_date_backfill=datetime.datetime.strptime("2020-12-01", "%Y-%m-%d"),
+#     end_date_incremental=datetime.datetime.strptime("2020-12-31", "%Y-%m-%d"),
+#     run_alias='pipe_ais_test_202012_incremental'
+# )
