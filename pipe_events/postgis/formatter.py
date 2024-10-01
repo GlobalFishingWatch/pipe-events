@@ -6,8 +6,8 @@ import re
 geography_regex = re.compile(r"^.*\((.*)\)$")
 
 csv_file = sys.argv[1]
-multipoint="MULTIPOINT({})"
-point="POINT({} {})"
+multipoint = "MULTIPOINT({})"
+point = "POINT({} {})"
 
 with open(csv_file, "w+", newline='') as f:
     writer = csv.writer(f)
@@ -36,6 +36,6 @@ with open(csv_file, "w+", newline='') as f:
                 normalized_geography,
                 normalized_mean_position
             ])
-        except:
+        except Exception:
             print("Unable to convert record to csv at {}".format(record))
             raise
