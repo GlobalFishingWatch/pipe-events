@@ -21,4 +21,3 @@ setup(
         'google-cloud-bigquery<4',
     ],
 )
-
