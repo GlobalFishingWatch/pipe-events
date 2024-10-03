@@ -1,0 +1,251 @@
+#standardSQL
+
+# Include some utility functions
+{% include 'util.sql.j2' %}
+
+
+WITH
+
+    #
+    # Spatial measures data
+    #
+    spatial_measures_source AS (
+        SELECT
+            *,
+        FROM `{{ spatial_measures_table }}`
+    ),
+
+    #
+    # Regions data
+    #
+     regions_source AS (
+         SELECT
+             *,
+         FROM `{{ regions_table }}`
+     ),
+
+    #
+    # Port visits Events
+    #
+    port_visits_source AS (
+        SELECT
+            *
+        FROM `{{ port_visits_table }}`
+        WHERE confidence >= 2
+          AND end_timestamp <= '{{ end_date }}'
+    ),
+
+    #
+    # Vessels byyear sources
+    #
+    source_all_vessels AS (
+        SELECT
+            *
+        FROM `{{ all_vessels_byyear_table }}`
+    ),
+
+    named_anchorages_source AS (
+        SELECT
+            *
+        FROM `{{ named_anchorages_table }}`
+    ),
+
+
+    gridded_regions AS (
+        SELECT
+            * EXCEPT(s2_cells),
+        FROM
+            regions_source
+            CROSS JOIN UNNEST (s2_cells) AS s2_cell
+     ),
+
+    -- The next 4 queries get the info to generate the format anchorage info. Basicly, is the code created by Hannah ready to join with the final query.
+    port_visits_with_time_diff AS (
+        SELECT
+            *
+        FROM (
+            SELECT
+                *,
+                TIMESTAMP_DIFF(next_event_timestamp,timestamp,SECOND)/3600 AS time_diff_hr
+                FROM (
+                    SELECT
+                        *,
+                        LEAD(event_type, 1) OVER (PARTITION BY visit_id ORDER BY timestamp ASC) AS next_event,
+                        LEAD(timestamp, 1) OVER (PARTITION BY visit_id ORDER BY timestamp ASC) AS next_event_timestamp
+                   FROM
+                       port_visits_source,
+                       UNNEST (events) events
+                   WHERE vessel_id IN (SELECT vessel_id FROM source_all_vessels)
+                )
+        )
+    ),
+
+    port_visits_by_event_type_without_rn_filter AS (
+        SELECT
+            *,
+            ROW_NUMBER() OVER (PARTITION BY visit_id ORDER BY time_diff_hr DESC) rn
+        FROM
+            port_visits_with_time_diff
+        WHERE
+            event_type in ('PORT_STOP_BEGIN','PORT_STOP_END','PORT_GAP_BEGIN','PORT_GAP_END')
+    ),
+
+    port_visits_by_event_type AS (
+        SELECT
+            *
+        FROM
+            port_visits_by_event_type_without_rn_filter
+        WHERE
+            rn = 1
+    ),
+
+    intermadiate_anchorage AS (
+        SELECT
+            visit_id,
+            anchorage_id,
+            iso3,
+            label,
+            label_source,
+            top_destination,
+            distance_from_shore_m,
+            at_dock,
+            named_anchorages_source.lat AS lat,
+            named_anchorages_source.lon AS lon,
+        FROM
+            port_visits_by_event_type
+            JOIN named_anchorages_source ON (port_visits_by_event_type.anchorage_id = named_anchorages_source.s2id)
+     ),
+
+    #
+    # Finally, enhance the event with info related to regions and distances.
+    #
+    total_events as (
+        SELECT
+            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', port_visits_source.vessel_id, start_timestamp, end_timestamp))) AS event_id,
+            'port_visit' AS event_type,
+            port_visits_source.vessel_id as vessel_id,
+            cast(NULL AS string) AS seg_id,
+            start_timestamp AS event_start,
+            end_timestamp AS event_end,
+            intermadiate_anchorage.lat as lat_mean,
+            intermadiate_anchorage.lon as lon_mean,
+            start_lat as lat_min,
+            end_lat AS lat_max,
+            start_lon AS lon_min,
+            end_lon AS lon_max,
+            ST_GEOGPOINT(intermadiate_anchorage.lon, intermadiate_anchorage.lat) as geo,
+            S2_CELLIDFROMPOINT(ST_GEOGPOINT(intermadiate_anchorage.lon, intermadiate_anchorage.lat), s2_level()) as s2_cell,
+            convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
+            convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
+            convert_m_to_km( spatial_measures_start.distance_from_port_m ) AS start_distance_from_port_km,
+            convert_m_to_km( spatial_measures_end.distance_from_port_m ) AS end_distance_from_port_km,
+            TO_JSON_STRING(
+                STRUCT(
+                    duration_hrs,
+                    port_visits_source.visit_id,
+                    confidence,
+                    STRUCT(
+                        start_anchorage_id AS anchorage_id,
+                        generate_port_id(start_anchorage.iso3, start_anchorage.label) AS id,
+                        start_anchorage.iso3 AS flag,
+                        IF (start_anchorage.label_source = 'top_destination', NULL, start_anchorage.label) AS name,
+                        start_anchorage.top_destination AS top_destination,
+                        convert_m_to_km( start_anchorage.distance_from_shore_m ) AS distance_from_shore_km,
+                        start_anchorage.at_dock,
+                        start_anchorage.lat AS lat,
+                        start_anchorage.lon AS lon
+                        ) AS start_anchorage,
+                    STRUCT(
+                        end_anchorage_id AS anchorage_id,
+                        generate_port_id(end_anchorage.iso3, end_anchorage.label) AS id,
+                        end_anchorage.iso3 AS flag,
+                        IF (end_anchorage.label_source = 'top_destination', NULL, end_anchorage.label) AS name,
+                        end_anchorage.top_destination AS top_destination,
+                        convert_m_to_km( end_anchorage.distance_from_shore_m ) AS distance_from_shore_km,
+                        end_anchorage.at_dock,
+                        end_anchorage.lat AS lat,
+                        end_anchorage.lon AS lon
+                        ) AS end_anchorage,
+                    STRUCT(
+                        intermadiate_anchorage.anchorage_id AS anchorage_id,
+                        generate_port_id(intermadiate_anchorage.iso3, intermadiate_anchorage.label) AS id,
+                        intermadiate_anchorage.iso3 AS flag,
+                        IF (intermadiate_anchorage.label_source = 'top_destination', NULL, intermadiate_anchorage.label) AS name,
+                        intermadiate_anchorage.top_destination AS top_destination,
+                        convert_m_to_km( intermadiate_anchorage.distance_from_shore_m ) AS distance_from_shore_km,
+                        intermadiate_anchorage.at_dock,
+                        intermadiate_anchorage.lat AS lat,
+                        intermadiate_anchorage.lon AS lon
+                        ) AS intermediate_anchorage,
+                    seg_ids
+                )
+            ) as event_info,
+            TO_JSON_STRING([
+                STRUCT(
+                    vessel.vessel_id AS `id`,
+                    vessel.ssvid AS `ssvid`,
+                    vessel.shipname AS `name`,
+                    vessel.prod_shiptype as `type`,
+                    vessel.mmsi_flag as `flag`
+                )
+            ]) as event_vessels
+            FROM
+                port_visits_source
+                JOIN source_all_vessels vessel on vessel.vessel_id = port_visits_source.vessel_id and vessel.year= EXTRACT(year from start_timestamp)
+                JOIN named_anchorages_source AS start_anchorage ON (start_anchorage_id = start_anchorage.s2id)
+                JOIN named_anchorages_source AS end_anchorage ON (end_anchorage_id = end_anchorage.s2id)
+                LEFT JOIN intermadiate_anchorage ON (port_visits_source.visit_id = intermadiate_anchorage.visit_id)
+                JOIN spatial_measures_source AS spatial_measures_start ON format_gridcode(start_lon,start_lat) = spatial_measures_start.gridcode
+                JOIN spatial_measures_source AS spatial_measures_end ON format_gridcode(end_lon, end_lat) = spatial_measures_end.gridcode
+    ),
+
+    create_event_region_matches AS (
+        SELECT
+            events.event_id,
+            id,
+            layer,
+        FROM
+            total_events AS events
+            JOIN gridded_regions r ON events.s2_cell = r.s2_cell
+        WHERE
+            ST_INTERSECTS(events.geo, r.geo)
+    ),
+
+    event_by_layer_by_id AS (
+        SELECT
+            event_id,
+            layer,
+            id
+        FROM create_event_region_matches
+        GROUP BY
+            1,
+            2,
+            3
+    ),
+
+    events_by_layer AS (
+        SELECT
+            event_id, CONCAT('"', layer, '":' ,TO_JSON_STRING(array_agg(id))) AS json_frament
+        FROM
+            event_by_layer_by_id
+        GROUP BY
+            event_id,
+            layer
+    ),
+
+    event_with_region AS (
+        SELECT
+            event_id,
+            parse_regions_to_struct(CONCAT( "{", STRING_AGG(json_frament, ","), "}")) AS regions
+        FROM events_by_layer
+        GROUP BY
+            1
+     )
+
+    SELECT
+        total_events.* EXCEPT (s2_cell, geo),
+        spatial_measures_mean.regions AS regions_mean_position
+    FROM
+        total_events
+        LEFT JOIN event_with_region spatial_measures_mean USING (event_id)
+
