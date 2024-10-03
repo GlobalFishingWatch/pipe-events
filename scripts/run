@@ -6,7 +6,7 @@ display_usage() {
 	echo "Available Commands"
 	echo "  generate_loitering_events        Publish loitering events"
 	echo "  generate_port_visits_events      Publish port visits events"
-	echo "  generate_port_visits_events_v2   Publish port visits events v2"
+	echo "  generate_port_visits_events_v2   Publish port visits events v2 (intermediate_anchorage as mean position (affect to position and match with regions))"
 	echo "  generate_fishing_events          Publish fishing events"
 	echo "  generate_encounter_events       Publish encounter events"
 }
