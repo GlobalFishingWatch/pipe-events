@@ -1,0 +1,177 @@
+#!/bin/bash
+source pipe-tools-utils
+
+THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"
+source ${THIS_SCRIPT_DIR}/pipeline.sh
+ASSETS=${THIS_SCRIPT_DIR}/../assets
+ARGS=( \
+  DATE_RANGE \
+  PORT_VISITS_TABLE \
+  VESSEL_INFO_TABLE \
+  ALL_VESSELS_BYYEAR_TABLE \
+  SPATIAL_MEASURES_TABLE \
+  REGIONS_TABLE \
+  NAMED_ANCHORAGES_TABLE \
+  DEST_TABLE_NAME
+)
+
+################################################################################
+# Validate and extract arguments
+################################################################################
+display_usage() {
+  echo -e "\nUsage:\n${0} ${ARGS[*]}\n"
+}
+
+if [[ $# -ne ${#ARGS[@]} ]]
+then
+    display_usage
+    exit 1
+fi
+
+ARG_VALUES=("$@")
+PARAMS=()
+for index in ${!ARGS[*]}; do
+  echo "${ARGS[$index]}=${ARG_VALUES[$index]}"
+  declare "${ARGS[$index]}"="${ARG_VALUES[$index]}"
+done
+
+IFS=, read START_DATE END_DATE <<<"${DATE_RANGE}"
+if [[ -z $END_DATE ]]; then
+  END_DATE=${START_DATE}
+fi
+
+end_date_minus_one_day=$(date --date="${END_DATE} -1 day" +%Y-%m-%d)
+
+end_date_no_hyphens=${END_DATE//-}
+end_date_minus_one_day_no_hyphens=${end_date_minus_one_day//-}
+
+current_table_name="${DEST_TABLE_NAME}_v${end_date_no_hyphens}"
+one_day_previous_table_name="${DEST_TABLE_NAME}_v${end_date_minus_one_day_no_hyphens}"
+
+view_name="${DEST_TABLE_NAME}"
+
+echo "Current table=${current_table_name}"
+echo "Current one_day_previous_table_name=${one_day_previous_table_name}"
+
+
+################################################################################
+# Force that the destination tables exists
+################################################################################
+echo "Ensuring events table ${current_table_name} exists"
+
+TABLE_DESC=(
+  'This table was generated using the next query:'
+  'https://github.com/GlobalFishingWatch/pipe-events/blob/develop/assets/bigquery/port_visits_events_v2.sql.j2'
+  'This version 2 of the query is used to generate the events table for the port visits pipeline using the intermediate_anchorage position as mean position for the event.'
+  ' '
+  ' '
+  'Sources:'
+  '========='
+  "* Script: ${BASH_SOURCE[0]}"
+  "* Pipeline: ${PIPELINE} ${PIPELINE_VERSION}"
+  "* Command:"
+  "$(basename $0)"
+  "$@"
+  ' '
+  ' '
+  'Maintainers:'
+  '============='
+  'Data: Willa Brooks <willa@globalfishingwatch.org>'
+  'Engineer: Álvaro Perdiz <alvaro@globalfishingwatch.org>'
+  'Engineer: Raúl Requero <raul@globalfishingwatch.org>'
+  ' '
+  ' '
+)
+
+TABLE_DESC=$( IFS=$'\n'; echo "${TABLE_DESC[*]}" )
+SCHEMA=${ASSETS}/bigquery/events.schema.json
+
+# Current table
+bq mk --force \
+  --label environment:production \
+  --label resource_creator:gcp-composer \
+  --label project:events \
+  --label version:v1 \
+  --label step:generate_events \
+  --label stage:productive \
+  --description "${TABLE_DESC}" \
+  --schema ${SCHEMA} \
+  --time_partitioning_field=event_start \
+  --time_partitioning_type=MONTH \
+  "${current_table_name}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to create table ${current_table_name}"
+  exit 1
+fi
+echo "  Events table exists"
+
+
+################################################################################
+# Inserting new records
+################################################################################
+INSERT_SQL=${ASSETS}/bigquery/port-visits-events-v2.sql.j2
+
+echo "SQl query: ${INSERT_SQL}"
+echo "Inserting new records for ${START_DATE} to ${END_DATE}"
+
+jinja2 "${INSERT_SQL}" \
+   -D dest="${DEST_TABLE_NAME//:/.}" \
+   -D port_visits_table="${PORT_VISITS_TABLE}" \
+   -D vessel_info_table="${VESSEL_INFO_TABLE}" \
+   -D all_vessels_byyear_table=${ALL_VESSELS_BYYEAR_TABLE} \
+   -D spatial_measures_table=${SPATIAL_MEASURES_TABLE} \
+   -D regions_table=${REGIONS_TABLE//:/.} \
+   -D named_anchorages_table=${NAMED_ANCHORAGES_TABLE} \
+   -D start_date="${START_DATE}" \
+   -D end_date="${END_DATE}" \
+   | bq query --headless --max_rows=0 --allow_large_results \
+     --append_table \
+     --destination_table ${current_table_name}
+
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to insert records for table ${current_table_name} from ${START_DATE} to ${END_DATE}"
+  exit 1
+fi
+
+
+
+################################################################################
+# Create new view
+################################################################################
+echo "Creating view [${view_name}]"
+echo "CREATE OR REPLACE VIEW ${view_name} AS SELECT * FROM ${current_table_name//:/.}"
+
+bq query \
+  --use_legacy_sql=false \
+  "CREATE OR REPLACE VIEW ${view_name//:/.} AS SELECT * FROM ${current_table_name//:/.}"
+
+bq update \
+  --set_label environment:production \
+  --set_label resource_creator:gcp-composer \
+  --set_label project:events \
+  --set_label version:v1 \
+  --set_label step:generate_events \
+  --set_label stage:productive \
+  --description "${TABLE_DESC}" \
+  ${view_name}
+
+bq update \
+  ${view_name} \
+  ${SCHEMA}
+
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to create view ${view_name}"
+  exit 1
+fi
+
+################################################################################
+# Remove prev table
+################################################################################
+echo "Removing temporal table [${one_day_previous_table_name}]"
+bq rm -f -t "${one_day_previous_table_name}"
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to remove two days before table ${one_day_previous_table_name}"
+  exit 1
+fi
+
+echo "${DEST_TABLE_NAME} Done."
