@@ -75,8 +75,8 @@ WITH
     port_visits_with_ranked_events AS (
         SELECT
             source_port_visits.*,
-            e.timestamp AS event_timestamp,
-            e.anchorage_id AS event_anchorage_id,
+            events.timestamp AS event_timestamp,
+            events.anchorage_id AS event_anchorage_id,
             CASE 
                 WHEN event_type = 'PORT_STOP_BEGIN' THEN 1
                 WHEN event_type = 'PORT_STOP_END' THEN 2
@@ -195,6 +195,7 @@ WITH
                 JOIN source_product_vessel_info_summary vessel on vessel.vessel_id = source_port_visits.vessel_id and vessel.year= EXTRACT(year from start_timestamp)
                 JOIN source_named_anchorages AS start_anchorage ON (start_anchorage_id = start_anchorage.s2id)
                 JOIN source_named_anchorages AS end_anchorage ON (end_anchorage_id = end_anchorage.s2id)
+                JOIN mean_positions USING (visit_id)
                 LEFT JOIN intermadiate_anchorage ON (source_port_visits.visit_id = intermadiate_anchorage.visit_id)
                 JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(start_lon,start_lat) = spatial_measures_start.gridcode
                 JOIN source_spatial_measures AS spatial_measures_end ON format_gridcode(end_lon, end_lat) = spatial_measures_end.gridcode
