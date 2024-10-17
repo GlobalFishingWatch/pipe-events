@@ -3,10 +3,6 @@
 -- Include some utility functions
 {% include 'util.sql.j2' %}
 
-CREATE TABLE `{{ fishing_events_less_restrictive_table }}`
-PARTITION BY DATE_TRUNC(event_end_date, MONTH)
-CLUSTER BY event_end_date, seg_id, event_start
-AS
 
 
 --

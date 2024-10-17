@@ -16,7 +16,7 @@ WITH
         -- allow incremental as well as backfill loads
         WHERE DATE(timestamp) BETWEEN '{{ start_date }}' AND '{{ end_date }}'
     ),
- 
+
     source_messages AS (
         SELECT
             ssvid,
@@ -87,7 +87,7 @@ WITH
            -- OR if current position was registered more than 2 hours after previous position
             meters_to_prev > 10000
            OR
-            hours > 2
+           hours > {{ max_fishing_event_gap_hours }}
     ),
 
     --
@@ -112,7 +112,7 @@ WITH
         FROM
             event_range
         WHERE
-                score = 1.0 ),
+            score = 1.0 ),
 
     --
     -- Create ranges spanning consecutive events that are separated by a small time interval
@@ -128,10 +128,10 @@ WITH
             prev_fishing_event_range
         WHERE
             prev_event_end IS NULL
-           -- combine fishing events if fishing events are temporally close enough, as defined in restriction below
-           -- combine fishing events less than 1 hour and 2 km apart
-           -- this line will combine fishing events, even if there are null or non-fishing scores between events
-           OR (TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > 3600
+            -- combine fishing events if fishing events are temporally close enough, as defined in restriction below
+            -- combine fishing events less than 1 hour and 2 km apart
+            -- this line will combine fishing events, even if there are null or non-fishing scores between events
+            OR (TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > 3600
             OR distance_to_prev_event_m > 2000)
     ),
 
@@ -146,13 +146,11 @@ WITH
             MAX(timestamp) OVER (PARTITION BY seg_id, event_start) event_end
         FROM
             source_messages
-                JOIN
-            fishing_event_range
-            USING
-                (seg_id)
+        JOIN
+            fishing_event_range USING (seg_id)
         WHERE
-                timestamp >= event_start
-          AND (event_end IS NULL OR timestamp <= event_end)
-          AND score = 1.0 )
+            timestamp >= event_start
+            AND (event_end IS NULL OR timestamp <= event_end)
+            AND score = 1.0 )
 
 select *, DATE(event_end) event_end_date from fishing_event_message
