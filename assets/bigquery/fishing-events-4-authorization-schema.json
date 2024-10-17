@@ -1,0 +1,182 @@
+[
+    {
+        "name": "event_id",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Unique identifier."
+    },
+    {
+        "name": "event_type",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Type of event."
+    },
+    {
+        "name": "vessel_id",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Source specific vessel id. This is the transponder id, and for AIS this is the MMSI."
+    },
+    {
+        "name": "seg_id",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Id of the segment involved in the event."
+    },
+    {
+        "name": "event_start",
+        "type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": "Start time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+    },
+    {
+        "name": "event_end",
+        "type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": "End time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+    },
+    {
+        "name": "lat_mean",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "The mean latitude."
+    },
+    {
+        "name": "lon_mean",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "The mean longitude."
+    },
+    {
+        "name": "lat_min",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "The min latitude."
+    },
+    {
+        "name": "lat_max",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "The max latitude."
+    },
+    {
+        "name": "lon_min",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "The min longitude."
+    },
+    {
+        "name": "lon_max",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "The max longitude."
+    },
+    {
+        "name": "regions_mean_position",
+        "type": "RECORD",
+        "mode": "NULLABLE",
+        "fields": [
+            {
+                "name": "eez",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "Exclusive Economic Zone."
+            },
+            {
+                "name": "mpa",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "Maritme private area."
+            },
+            {
+                "name": "rfmo",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "Regional fisheries management organisations."
+            },
+            {
+                "name": "fao",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "Food and Agriculture Organization."
+            },
+            {
+                "name": "major_fao",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "Major FAO."
+            },
+            {
+                "name": "eez12nm",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "EEZ 12nm."
+            },
+            {
+                "name": "high_seas",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "High seas."
+            },
+            {
+                "name": "mpa_no_take_partial",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "MPA no take partial."
+            },
+            {
+                "name": "mpa_no_take",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "MPA no take."
+            }
+        ]
+    },
+    {
+        "name": "start_distance_from_shore_km",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "Distance from shore when event started."
+    },
+    {
+        "name": "end_distance_from_shore_km",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "Distance from shore when event ended."
+    },
+    {
+        "name": "start_distance_from_port_km",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "Distance from port when event started."
+    },
+    {
+        "name": "end_distance_from_port_km",
+        "type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": "Distance from port when event ended."
+    },
+    {
+        "name": "event_info",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Info of the event."
+    },
+    {
+        "name": "event_vessels",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "Event vessels."
+    },
+    {
+        "name": "prod_shiptype",
+        "type": "STRING",
+        "mode": "NULLABLE",
+        "description": "type of ship from prod eyes."
+    },
+    {
+        "name": "event_end_date",
+        "type": "DATE",
+        "description": "The end date of the event."
+    }
+]

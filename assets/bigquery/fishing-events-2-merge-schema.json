@@ -1,0 +1,72 @@
+[
+    {
+        "name": "ssvid",
+        "type": "STRING",
+        "description": "Source specific vessel id. This is the transponder id, and for AIS this is the MMSI"
+    },
+    {
+        "name": "seg_id",
+        "type": "STRING",
+        "description": "Id of the segment involved in the event."
+    },
+    {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "description": "The timestamp when the event occurs."
+    },
+    {
+        "name": "year",
+        "type": "INTEGER",
+        "description": "The year of the event."
+    },
+    {
+        "name": "lat",
+        "type": "FLOAT",
+        "description": "The latitude. Always between -90<lat<90."
+    },
+    {
+        "name": "lon",
+        "type": "FLOAT",
+        "description": "The longitude."
+    },
+    {
+        "name": "speed_knots",
+        "type": "FLOAT",
+        "description": "The speed in knots."
+    },
+    {
+        "name": "meters_to_prev",
+        "type": "FLOAT",
+        "description": "The meters to the previous event."
+    },
+    {
+        "name": "implied_speed_knots",
+        "type": "FLOAT",
+        "description": "The implied speed by us in knots."
+    },
+    {
+        "name": "hours",
+        "type": "FLOAT",
+        "description": "The hours between this and the previous event."
+    },
+    {
+        "name": "score",
+        "type": "FLOAT",
+        "description": "The score of interest, it could be the nnet_score for fishing or the night_loitering for squid jiggers."
+    },
+    {
+        "name": "event_start",
+        "type": "TIMESTAMP",
+        "description": "Start time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+    },
+    {
+        "name": "event_end",
+        "type": "TIMESTAMP",
+        "description": "End time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+    },
+    {
+        "name": "event_end_date",
+        "type": "DATE",
+        "description": "The date of the event end date."
+    }
+]
