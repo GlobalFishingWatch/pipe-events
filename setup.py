@@ -20,4 +20,9 @@ setup(
         'jinja2-cli<1',
         'google-cloud-bigquery<4',
     ],
+    entry_points={
+        'console_scripts': [
+            'pipe = pipe_events.cli:main',
+        ]
+    },
 )
