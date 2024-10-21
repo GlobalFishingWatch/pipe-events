@@ -1,0 +1,156 @@
+#standardSQL
+
+-- Include some utility functions
+
+--
+-- Fishing Events
+--
+-- Aggregate position messages that have been annotated with a fishing score into fishing events
+-- A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
+-- messages with score=null are ignored
+WITH
+    -- Source tables
+    source_research_messages AS (
+        SELECT *
+        FROM `{{ messages_table }}`
+        -- allow incremental as well as backfill loads
+        WHERE DATE(timestamp) BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+    ),
+
+    source_messages AS (
+        SELECT
+            ssvid,
+            seg_id,
+            timestamp,
+            EXTRACT(year FROM timestamp) as year,
+            lat,
+            lon,
+            speed_knots, --speed (knots) from AIS message
+            meters_to_prev, --meters to previous position in segment
+            implied_speed_knots, --meters_to_prev / hours
+            hours, --time since the previous position in the segment
+            {{ nnet_score_night_loitering }} score
+        FROM
+            source_research_messages
+        WHERE
+          lat > -90
+          AND lat < 90
+    ),
+
+    --
+    -- Group messages into events which are consecutive sequences of messages with the same score within the same seg_id
+    -- First for each message, get the score from the previous message in the segement
+    --
+    prev_score_message AS (
+        SELECT
+            ssvid,
+            seg_id,
+            timestamp,
+            lat,
+            lon,
+            score,
+            meters_to_prev,
+            implied_speed_knots,
+            hours,
+            LAG(score) OVER (PARTITION BY seg_id ORDER BY timestamp) AS prev_score,
+            LAG(timestamp) OVER (PARTITION BY seg_id ORDER BY timestamp) AS prev_timestamp,
+            LAG(seg_id) OVER (PARTITION BY seg_id ORDER BY TIMESTAMP) AS prev_seg_id
+        FROM
+            source_messages),
+
+    --
+    -- Now get the time range from the start of a group to the end of the group
+    -- Do this by filtering to only the first message in each grouping and making a time range from
+    -- the first message in one group to the prev_timestamp of first message in the next group
+    --
+    event_range AS (
+        SELECT
+            ssvid,
+            seg_id,
+            score,
+            prev_timestamp,
+            meters_to_prev,
+            timestamp AS event_start,
+            LEAD(prev_timestamp) OVER (PARTITION BY seg_id ORDER BY timestamp) as event_end,
+            lat,
+            lon
+        FROM
+            prev_score_message
+        WHERE
+           -- identifies first message in event
+            prev_score IS NULL
+           OR
+                score != prev_score
+           OR
+           -- splits fishing events with consecutive nnet fishing positions of 1 if
+           -- previous ais position is farther than 10,000 meters away from current position
+           -- OR if current position was registered more than 2 hours after previous position
+            meters_to_prev > 10000
+           OR
+           hours > {{ max_fishing_event_gap_hours }}
+    ),
+
+    --
+    -- Filter event ranges to only those with score = 1.0 (fishing)
+    -- and for each fishing event get the end of the time range of the previous fishing event
+    --
+    prev_fishing_event_range AS (
+        SELECT
+            ssvid,
+            seg_id,
+            event_start,
+            event_end,
+            lat,
+            lon,
+            -- calculate time and distance to previous fishing event
+            -- if previous fishing event is within same seg_id
+            st_distance(st_geogpoint(lon,lat),
+                        st_geogpoint(lag(lon, 1) over (partition by seg_id order by event_start),
+                                     lag(lat, 1) over (partition by seg_id order by event_start)) ) as distance_to_prev_event_m,
+            -- intermediate step; prev_event_end gets fixed/completed later in query
+            LAG(event_end) OVER (PARTITION BY seg_id ORDER BY event_start) AS prev_event_end
+        FROM
+            event_range
+        WHERE
+            score = 1.0 ),
+
+    --
+    -- Create ranges spanning consecutive events that are separated by a small time interval
+    --
+    fishing_event_range AS (
+        SELECT
+            ssvid,
+            seg_id,
+            distance_to_prev_event_m,
+            event_start,
+            LEAD(prev_event_end) OVER (PARTITION BY seg_id ORDER BY event_start) AS event_end
+        FROM
+            prev_fishing_event_range
+        WHERE
+            prev_event_end IS NULL
+            -- combine fishing events if fishing events are temporally close enough, as defined in restriction below
+            -- combine fishing events less than 1 hour and 2 km apart
+            -- this line will combine fishing events, even if there are null or non-fishing scores between events
+            OR (TIMESTAMP_DIFF(event_start, prev_event_end, SECOND) > 3600
+            OR distance_to_prev_event_m > 2000)
+    ),
+
+    --
+    -- Tag all the messages with the start time of the event range that contains the message
+    -- limit this to just messages with score = 1.0
+    --
+    fishing_event_message AS (
+        SELECT
+            source_messages.*,
+            fishing_event_range.event_start,
+            MAX(timestamp) OVER (PARTITION BY seg_id, event_start) event_end
+        FROM
+            source_messages
+        JOIN
+            fishing_event_range USING (seg_id)
+        WHERE
+            timestamp >= event_start
+            AND (event_end IS NULL OR timestamp <= event_end)
+            AND score = 1.0 )
+
+select *, DATE(event_end) event_end_date from fishing_event_message

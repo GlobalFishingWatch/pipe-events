@@ -1,0 +1,134 @@
+[
+    {
+        "name": "ssvid",
+        "type": "STRING",
+        "description": "Source specific vessel id. This is the transponder id, and for AIS this is the MMSI"
+    },
+    {
+        "name": "seg_id",
+        "type": "STRING",
+        "description": "Id of the segment involved in the event."
+    },
+    {
+        "name": "vessel_id",
+        "type": "STRING",
+        "description": "Id of the main vessel involved in the event. When an event has multiple vessels associated with it (for example, encounters) you will find multiple records, one for each vessel involved."
+    },
+    {
+        "name": "main_vessel_shipname",
+        "type": "STRING",
+        "description": "The main shipname which represents the vessel."
+    },
+    {
+        "name": "main_vessel_flag",
+        "type": "STRING",
+        "description": "The main flag which represent the vessel."
+    },
+    {
+        "name": "best_best_vessel_class",
+        "type": "STRING",
+        "description": "The best classification of the vessel class."
+    },
+    {
+        "name": "geo_info",
+        "type": "RECORD",
+        "mode": "REPEATED",
+        "fields": [
+            {
+                "name": "point",
+                "type": "GEOGRAPHY",
+                "description": "The point in geography."
+            },
+            {
+                "name": "s2_cell",
+                "type": "INTEGER",
+                "description": "The S2 cell of the geo position."
+            }
+        ]
+    },
+    {
+        "name": "event_start",
+        "type": "TIMESTAMP",
+        "description": "Start time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+    },
+    {
+        "name": "event_end",
+        "type": "TIMESTAMP",
+        "description": "End time of the event. When an event occurs in an instant (such as port in and out), both timestamp_min and timestamp_max are equal to the main timestamp field. Otherwise, timestamp_min and timestamp max define the temporal boundaries of the event."
+    },
+    {
+        "name": "lat_min",
+        "type": "FLOAT",
+        "description": "The min latitude."
+    },
+    {
+        "name": "lat_max",
+        "type": "FLOAT",
+        "description": "The max latitude."
+    },
+    {
+        "name": "message_count",
+        "type": "INTEGER",
+        "description": "The amount of messages."
+    },
+    {
+        "name": "avg_speed_knots",
+        "type": "FLOAT",
+        "description": "The average of speed in knots."
+    },
+    {
+        "name": "avg_implied_speed_knots",
+        "type": "FLOAT",
+        "description": "The average implied speed in knots."
+    },
+    {
+        "name": "avg_meters_to_prev",
+        "type": "FLOAT",
+        "description": "The average amount of meters to the previous event."
+    },
+    {
+        "name": "event_distance_m",
+        "type": "FLOAT",
+        "description": "The event distance in meters."
+    },
+    {
+        "name": "avg_hours",
+        "type": "FLOAT",
+        "description": "The average hours between 2 events."
+    },
+    {
+        "name": "points_wkt",
+        "type": "STRING",
+        "description": "The concatenation of geo ppoints ordered by time."
+    },
+    {
+        "name": "lat_mean",
+        "type": "FLOAT",
+        "description": "The mean latitude."
+    },
+    {
+        "name": "lon_mean",
+        "type": "FLOAT",
+        "description": "The mean longitude."
+    },
+    {
+        "name": "lon_min",
+        "type": "FLOAT",
+        "description": "The min longitude."
+    },
+    {
+        "name": "lon_max",
+        "type": "FLOAT",
+        "description": "The max longitude."
+    },
+    {
+        "name": "event_id",
+        "type": "STRING",
+        "description": "Unique identifier."
+    },
+    {
+        "name": "event_end_date",
+        "type": "DATE",
+        "description": "The end date of the event."
+    }
+]

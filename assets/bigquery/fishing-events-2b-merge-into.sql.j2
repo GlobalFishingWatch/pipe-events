@@ -1,0 +1,40 @@
+MERGE INTO `{{ merged_table }}` AS TARGET
+USING (
+{{ fishing_events_merge_query }}
+) AS staged
+ON target.seg_id = staged.seg_id
+AND target.event_start = staged.event_start
+AND target.timestamp = staged.timestamp
+AND target.event_end_date >= '{{ start_date }}'
+WHEN MATCHED THEN UPDATE
+SET
+  target.ssvid = staged.ssvid,
+  target.seg_id = staged.seg_id,
+  target.timestamp = staged.timestamp,
+  target.year = staged.year,
+  target.lat = staged.lat,
+  target.lon = staged.lon,
+  target.speed_knots = staged.speed_knots,
+  target.meters_to_prev = staged.meters_to_prev,
+  target.implied_speed_knots = staged.implied_speed_knots,
+  target.hours = staged.hours,
+  target.score = staged.score,
+  target.event_start = staged.event_start,
+  target.event_end = staged.event_end,
+  target.event_end_date = staged.event_end_date
+WHEN NOT MATCHED THEN INSERT VALUES (
+  ssvid,
+  seg_id,
+  timestamp,
+  year,
+  lat,
+  lon,
+  speed_knots,
+  meters_to_prev,
+  implied_speed_knots,
+  hours,
+  score,
+  event_start,
+  event_end,
+  event_end_date
+)

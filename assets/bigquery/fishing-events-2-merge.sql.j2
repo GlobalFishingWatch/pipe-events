@@ -1,0 +1,92 @@
+-- merge potentially open events from previous table with newly created events
+-- newly created events overlap with previous table during the last 2 hours of the previous day
+-- this is because events can be merged up to 2 hours after the most recent message
+
+-- both tables are technically not events yet because they don't fit all of the required criteria
+-- (e.g. min 20 minutes duration) but we can only apply a lot of the events heuristics after merging
+-- instead the tables are just a collection of messages with fishing score=1
+
+-- the resulting table is fairly large but this is still cheap because we can apply partition elimination on the source table
+
+-- get potentially open events which must be within the last {max_fishing_event_gap} hours of the previous day
+-- only get the most recent event by seg_id because previous events have been permanently closed
+WITH backfill_potentially_open_events AS (
+  SELECT * FROM {{ existing_merged_fishing_events }}
+  WHERE event_end >= TIMESTAMP_ADD(TIMESTAMP('{{ start_date }}'), INTERVAL 24 - {{ max_fishing_event_gap_hours }} HOUR)
+  AND event_end_date >= '{{ start_date }}'
+  QUALIFY event_end = MAX(event_end) OVER (PARTITION BY seg_id)
+),
+-- get events from the previous day that might have to be merged to existing merged events
+delta_events AS (
+  SELECT * FROM {{ temp_incremental_fishing_events }}
+  WHERE event_end >= TIMESTAMP_ADD(TIMESTAMP('{{ start_date }}'), INTERVAL 24 - {{ max_fishing_event_gap_hours }} HOUR)
+),
+open_events_only AS (
+  SELECT DISTINCT seg_id, event_start, event_end
+  FROM backfill_potentially_open_events
+),
+-- only get first event by seg_id because subsequent events must not be merged
+delta_events_only AS (
+  SELECT DISTINCT seg_id, event_start, event_end
+  FROM delta_events
+  QUALIFY event_end = MIN(event_end) OVER (PARTITION BY seg_id)
+),
+overlapping_events AS (
+  SELECT open.seg_id seg_id, open.event_start AS event_start, delta.event_end AS event_end, open.event_end AS merge_timestamp
+  FROM open_events_only open
+  INNER JOIN delta_events_only delta
+  ON open.seg_id = delta.seg_id
+  AND open.event_start <= delta.event_end
+  AND open.event_end >= delta.event_start
+),
+-- get messages from backfill and set the event_start and event_end to the merged event
+-- keep all messages from backfill until and including where we merged the events
+backfill_merged AS (
+    SELECT 
+    backfill.* EXCEPT(event_start, event_end, event_end_date), 
+    overlapping_events.event_start AS event_start, 
+    overlapping_events.event_end AS event_end,
+    event_end_date
+  FROM backfill_potentially_open_events AS backfill 
+  INNER JOIN overlapping_events
+  ON overlapping_events.seg_id = backfill.seg_id
+  AND backfill.timestamp <= overlapping_events.merge_timestamp 
+),
+-- get messages from delta and set the event_start and event_end to the merged event
+-- keep all messages from delta after we merged the events
+delta_merged AS (
+  SELECT 
+    delta.* EXCEPT(event_start, event_end, event_end_date), 
+    overlapping_events.event_start AS event_start, 
+    overlapping_events.event_end AS event_end,
+    event_end_date
+  FROM delta_events AS delta 
+  INNER JOIN overlapping_events
+  ON overlapping_events.seg_id = delta.seg_id
+  AND delta.timestamp > overlapping_events.merge_timestamp
+  AND delta.timestamp <= overlapping_events.event_end
+),
+-- get messages from delta that weren't include in delta_merged above
+-- i.e. 1) messages with timestamp after a segment's overlapping event_end
+-- and  2) messages that didn't have an overlapping event
+delta_anti_merged AS (
+  SELECT 
+    delta.*
+  FROM delta_events AS delta 
+  LEFT JOIN overlapping_events
+  ON overlapping_events.seg_id = delta.seg_id
+  WHERE
+    delta.timestamp > overlapping_events.event_end
+  OR 
+    overlapping_events.seg_id IS NULL
+),
+combined AS (
+  SELECT * FROM backfill_merged
+  UNION ALL
+  SELECT * FROM delta_merged
+  UNION ALL
+  SELECT * FROM delta_anti_merged
+)
+
+SELECT * FROM combined
+
