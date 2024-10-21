@@ -28,6 +28,7 @@ DEFAULT = dict(
     nnet_score_night_loitering="nnet_score",
     max_fishing_event_gap_hours=2,
     destination_dataset="world-fishing-827.scratch_matias_ttl_7_days",
+    destination_table_prefix="incremental_fishing_events",
     labels_incremental='{"environment":"develop"}',
     # auth and regions
     source_fishing_events=("world-fishing-827.scratch_matias_ttl_7_days."
@@ -183,6 +184,13 @@ def parse(arguments):
         help="The destination dataset having fishing events.",
         type=str,
         default=DEFAULT["destination_dataset"],
+    )
+    incremental.add_argument(
+        "-dest_tbl_prefix",
+        "--destination_table_prefix",
+        help="The destination table prefix having fishing events.",
+        type=str,
+        default=DEFAULT["destination_table_prefix"],
     )
     incremental.add_argument(
         "-labels",

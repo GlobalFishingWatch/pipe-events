@@ -15,14 +15,6 @@ def dest_table_description(**extra_items):
     )
 
 
-def fishing_aim(params):
-    return (
-        "fishing"
-        if params["nnet_score_night_loitering"] == "nnet_score"
-        else params["nnet_score_night_loitering"]
-    )
-
-
 def run(bq, params):
     log = logging.getLogger()
     # start a session
@@ -30,13 +22,12 @@ def run(bq, params):
 
     log.info("*** 1. Run fishing-events-1-incremental.sql.j2 inside a BQ session.")
 
-    base_table_name = f"incremental_{fishing_aim(params)}_events"
     temp_table = "_SESSION.{}".format(
         "_".join(
             list(
                 map(
                     lambda x: x.replace("-", ""),
-                    [base_table_name, params["start_date"], params["end_date"]],
+                    [params["destination_table_prefix"], params["start_date"], params["end_date"]],
                 )
             )
         )
@@ -48,7 +39,7 @@ def run(bq, params):
     log.info("*** 2. Ensure the merge table already exists or create it.")
     params_copy = params.copy()
     params_copy["temp_table"] = temp_table
-    prefix_table = f'{params["destination_dataset"]}.{base_table_name}'
+    prefix_table = f'{params["destination_dataset"]}.{params["destination_table_prefix"]}'
     params_copy["existing_merged_fishing_events"] = f"{prefix_table}_merged"
     bq.create_table(
         params_copy["existing_merged_fishing_events"],
