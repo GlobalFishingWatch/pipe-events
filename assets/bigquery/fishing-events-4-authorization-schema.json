@@ -15,7 +15,7 @@
         "name": "vessel_id",
         "type": "STRING",
         "mode": "NULLABLE",
-        "description": "Source specific vessel id. This is the transponder id, and for AIS this is the MMSI."
+        "description": "Unique vessel identifier. Vessel IDs are an internal GFW value derived from the set of core identity characteristics for a vessel (MMSI, shipname, callsign, and IMO)."
     },
     {
         "name": "seg_id",
@@ -172,7 +172,7 @@
         "name": "prod_shiptype",
         "type": "STRING",
         "mode": "NULLABLE",
-        "description": "type of ship from prod eyes."
+        "description": "Type of ship as determined for products."
     },
     {
         "name": "event_end_date",
