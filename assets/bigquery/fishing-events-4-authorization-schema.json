@@ -169,12 +169,6 @@
         "description": "Event vessels."
     },
     {
-        "name": "prod_shiptype",
-        "type": "STRING",
-        "mode": "NULLABLE",
-        "description": "Type of ship as determined for products."
-    },
-    {
         "name": "event_end_date",
         "type": "DATE",
         "description": "The end date of the event."
