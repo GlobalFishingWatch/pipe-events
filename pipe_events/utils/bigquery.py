@@ -104,7 +104,7 @@ class BigqueryHelper:
         # Set labels
         view.labels = labels
 
-        view = self.client.create_table(view)
+        view = self.client.create_table(view, exists_ok=True)
         print(f"Created {view.table_type}: {str(view.reference)}")
 
     def create_table(
