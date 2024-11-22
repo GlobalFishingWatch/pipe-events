@@ -2,10 +2,12 @@ import pipe_events.cli as cli
 import unittest.mock as utm
 import pytest
 
+
 class Args:
-    project:str = ''
-    operation:str = ''
-    test:bool = True
+
+    project: str = ''
+    operation: str = ''
+    test: bool = True
 
     def __init__(self, **kwargs):
         for k in kwargs:
@@ -17,19 +19,18 @@ class TestCli:
     @utm.patch("pipe_events.utils.bigquery.BigqueryHelper")
     def test_cli(self, mocked):
         cl = cli.Cli(Args())
-        print(cl)
-        assert cl != None
+        assert cl is not None
 
     @utm.patch("pipe_events.utils.bigquery.BigqueryHelper")
     def test_unknown_operation_main(self, mocked):
         with pytest.raises(SystemExit) as err:
-            parse = utm.MagicMock(return_value=Args())
+            utm.MagicMock(return_value=Args())
             cli.main()
         assert err.value.code == 2
 
     @utm.patch("pipe_events.utils.bigquery.BigqueryHelper")
     def test_invalid_operation_cli(self, mocked):
-        with pytest.raises(RuntimeError) as err:
+        with pytest.raises(RuntimeError):
             cl = cli.Cli(Args())
             cl.run()
 

@@ -40,7 +40,9 @@ def run(bq, params):
     params_copy = params.copy()
     params_copy["temp_table"] = temp_table
     prefix_table = f'{params["destination_dataset"]}.{params["destination_table_prefix"]}'
-    params_copy["existing_merged_fishing_events"] = f"{prefix_table}_merged" if not params["use_merged_table"] else params["use_merged_table"]
+    params_copy["existing_merged_fishing_events"] = params["use_merged_table"]
+    if not params["use_merged_table"]:
+        params_copy["existing_merged_fishing_events"] = f"{prefix_table}_merged"
     bq.create_table(
         params_copy["existing_merged_fishing_events"],
         schema_file="./assets/bigquery/fishing-events-2-merge-schema.json",

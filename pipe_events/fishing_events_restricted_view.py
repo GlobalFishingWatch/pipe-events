@@ -18,4 +18,5 @@ def run(bq, params):
         dest_table_description(**params),
         labels=params["labels"],
     )
+    log.info(f"The view {params['dest_lr_events']} is ready.")
     return True
