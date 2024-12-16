@@ -61,6 +61,7 @@ fi
 # Check if FISHING_LIST is restrictive
 if [[ ${FISHING_LIST} == "less_restrictive" ]]; then
   FISHING_LIST_FILTERS="potential_fishing OR on_fishing_list_sr"
+  START_DATE="2020-01-01"
 fi
 
 if [[ ${FISHING_LIST} == "restrictive" ]]; then
@@ -112,7 +113,6 @@ if [ "$?" -ne 0 ]; then
   echo "  Unable to create table ${DEST_TABLE_NAME}"
   exit 1
 fi
-echo "  Events table exists"
 
 
 # previous table
@@ -126,7 +126,14 @@ if [ "$?" -ne 0 ]; then
   echo "  Unable to create table ${END_DATE_MINUS_ONE_DAY}"
   exit 1
 fi
-echo "  Events table exists"
+
+# if the type is less_restrictive, we need to copy data from the previous table
+# because we are going to update the data from 2020-01-01
+if [[ ${FISHING_LIST} == "less_restrictive" ]]; then
+  bq cp --force --append_table \
+  "${one_day_previous_table_name}" \
+  "${current_table_name}"
+fi
 
 ################################################################################
 # Delete existing records
