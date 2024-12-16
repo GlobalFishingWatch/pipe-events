@@ -130,6 +130,7 @@ fi
 # if the type is less_restrictive, we need to copy data from the previous table
 # because we are going to update the data from 2020-01-01
 if [[ ${FISHING_LIST} == "less_restrictive" ]]; then
+  echo "Copying data from ${one_day_previous_table_name} to ${current_table_name}"
   bq cp --force --append_table \
   "${one_day_previous_table_name}" \
   "${current_table_name}"
