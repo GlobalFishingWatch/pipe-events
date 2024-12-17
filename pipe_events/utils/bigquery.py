@@ -74,6 +74,39 @@ class BigqueryHelper:
             table, default_project=self.client.project
         )
 
+    def create_view(
+        self,
+        view_id,
+        view_query,
+        table_description,
+        labels={},
+    ):
+        """
+        Create a BigQuery view.
+
+        :param view_id: fully qualified table name 'project_id.dataset.table'.
+        :param view_query: query of the view.
+        :param table_description: text to include in the table's description field.
+        :parma labels: labels to audit the table.
+        :return: A new google.cloud.bigquery.table.Table
+        """
+        table_ref = self.table_ref(view_id)
+
+        # Create BQ table object
+        view = bigquery.Table(table_ref)
+
+        # Assing query view
+        view.view_query = view_query
+
+        # Set table description
+        view.description = table_description
+
+        # Set labels
+        view.labels = labels
+
+        view = self.client.create_table(view, exists_ok=True)
+        print(f"Created {view.table_type}: {str(view.reference)}")
+
     def create_table(
         self,
         full_table_name,
@@ -93,6 +126,7 @@ class BigqueryHelper:
         :param partition_field: name of field to use for time partitioning (None for no partition)
         :param exists_ok: Defaults to True. If True, ignore “already exists”
         errors when creating the table.
+        :parma labels: labels to audit the table.
         :return: A new google.cloud.bigquery.table.Table
         """
 

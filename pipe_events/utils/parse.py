@@ -43,6 +43,10 @@ DEFAULT = dict(
                         "product_vessel_info_summary"),
     destination="world-fishing-827.scratch_matias_ttl_7_days.fishing_events_final",
     labels_auth='{"environment":"develop"}',
+    # restrictive_view
+    source_lr_events="world-fishing-827.scratch_matias_ttl_7_days.fishing_events_final",
+    dest_lr_events="world-fishing-827.scratch_matias_ttl_7_days.fishing_events_lr_final",
+    labels_restictive_view='{"environment":"develop"}',
 )
 
 
@@ -120,6 +124,10 @@ def parse(arguments):
     auth_and_regions = subparsers.add_parser(
         "auth_and_regions_fishing_events",
         help="Combine the fishing and night_loitering with authorization and regions.",
+    )
+    restrictive_view = subparsers.add_parser(
+        "restricted_view_events",
+        help="Generates a view with the restrictive fishing events in case does not exists.",
     )
 
     incremental.add_argument(
@@ -199,6 +207,14 @@ def parse(arguments):
         type=json.loads,
         default=DEFAULT["labels_incremental"],
     )
+    incremental.add_argument(
+        "-mtbl",
+        "--use_merged_table",
+        help="The prodiuct vessel info summary table.",
+        type=valid_table,
+        required=False,
+        default=None,
+    )
 
     auth_and_regions.add_argument(
         "-source_fishing",
@@ -262,6 +278,28 @@ def parse(arguments):
         help="The labels assigned to each table.",
         type=json.loads,
         default=DEFAULT["labels_auth"],
+    )
+
+    restrictive_view.add_argument(
+        "-source_events",
+        "--source_lr_events",
+        help="The source of less restrictive events table.",
+        type=valid_table,
+        default=DEFAULT["source_lr_events"],
+    )
+    restrictive_view.add_argument(
+        "-destlrev",
+        "--dest_lr_events",
+        help="The destination table to place the less restrictive events table.",
+        type=valid_table,
+        default=DEFAULT["dest_lr_events"],
+    )
+    restrictive_view.add_argument(
+        "-labels",
+        "--labels",
+        help="The labels assigned to each table.",
+        type=json.loads,
+        default=DEFAULT["labels_restictive_view"],
     )
 
     args = parser.parse_args(arguments[1:])

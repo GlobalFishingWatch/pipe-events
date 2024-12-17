@@ -444,7 +444,6 @@ WITH
                     vessel_region_authorizations AS public_authorizations
                 )
             ]) as event_vessels,
-            vessel.prod_shiptype AS prod_shiptype
         FROM
             -- link fishing events with authorizaiton
             complete_fe_with_authorizations AS cfe
