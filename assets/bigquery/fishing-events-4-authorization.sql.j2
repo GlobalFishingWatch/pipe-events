@@ -3,6 +3,8 @@
 -- Include some utility functions
 {% include 'util.sql.j2' %}
 
+
+
 --
 -- Fishing Events
 --
@@ -56,6 +58,10 @@ WITH
         SELECT
             *
         FROM `{{source_fishing_events}}`
+        UNION ALL
+        SELECT 
+            *
+        FROM `{{source_night_loitering_events}}`
     ),
 
     source_fishing_vessels AS (
@@ -64,7 +70,7 @@ WITH
         FROM
             `{{ all_vessels_byyear }}`
         WHERE
-            {{ fishing_list_filters }}
+            potential_fishing OR on_fishing_list_sr
     ),
 
 
@@ -437,7 +443,7 @@ WITH
                     -- add authorization information
                     vessel_region_authorizations AS public_authorizations
                 )
-            ]) as event_vessels
+            ]) as event_vessels,
         FROM
             -- link fishing events with authorizaiton
             complete_fe_with_authorizations AS cfe
@@ -450,5 +456,5 @@ WITH
     -- Return final fishing events table
     --
     SELECT
-        *
+        *, DATE(event_end) event_end_date
     FROM final_fishing_event

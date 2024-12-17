@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='pipe-events',
-    version='4.2.0',
+    version='4.2.1',
     author="Global Fishing Watch.",
     description=(
         "Pipeline for publishing summarized event information"
@@ -20,4 +20,9 @@ setup(
         'jinja2-cli<1',
         'google-cloud-bigquery<4',
     ],
+    entry_points={
+        'console_scripts': [
+            'pipe = pipe_events.cli:main',
+        ]
+    },
 )
