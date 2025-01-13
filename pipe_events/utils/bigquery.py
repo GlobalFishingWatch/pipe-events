@@ -192,6 +192,11 @@ class BigqueryHelper:
         else:
             job.result()
 
+    def update_table_schema(self, table, schema_file):
+        table = self.client.get_table(self.table_ref(table))  # API request
+        table.schema = load_schema(schema_file)
+        table = self.client.update_table(table, ["schema"])  # API request
+
     def update_table_description(self, table, description):
         table = self.client.get_table(self.table_ref(table))  # API request
         table.description = description
