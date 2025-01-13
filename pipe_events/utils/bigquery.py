@@ -229,20 +229,20 @@ class BigqueryHelper:
     def log_job_stats(self, job):
         execution_seconds = (job.ended - job.started).total_seconds()
         slot_seconds = (job.slot_millis or 0) / 1000
-        self.log.debug(f"  execution_seconds:     {execution_seconds}")
-        self.log.debug(f"  slot_seconds:          {slot_seconds}")
-        self.log.debug(f"  num_child_jobs:        {job.num_child_jobs}")
-        self.log.debug(f"  total_bytes_processed: {job.total_bytes_processed}")
-        self.log.debug(f"  total_bytes_billed:    {job.total_bytes_billed}")
-        self.log.debug("  referenced_tables:")
+        self.log.info(f"  execution_seconds:     {execution_seconds}")
+        self.log.info(f"  slot_seconds:          {slot_seconds}")
+        self.log.info(f"  num_child_jobs:        {job.num_child_jobs}")
+        self.log.info(f"  total_bytes_processed: {job.total_bytes_processed}")
+        self.log.info(f"  total_bytes_billed:    {job.total_bytes_billed}")
+        self.log.info("  referenced_tables:")
         for table in job.referenced_tables:
-            self.log.debug(f"    {table.project}.{table.dataset_id}.{table.table_id}")
+            self.log.info(f"    {table.project}.{table.dataset_id}.{table.table_id}")
         if job.destination:
-            self.log.debug("  output_table:")
-            self.log.debug(f"    {job.destination}")
+            self.log.info("  output_table:")
+            self.log.info(f"    {job.destination}")
 
-        self.log.debug(f"  reservation_usage:     {job.reservation_usage}")
-        self.log.debug(f"  script_statistics:     {job.script_statistics}")
+        self.log.info(f"  reservation_usage:     {job.reservation_usage}")
+        self.log.info(f"  script_statistics:     {job.script_statistics}")
 
     def dump_query(self, query):
         self.log.warning("\n*** BEGIN SQL ***\n")
@@ -319,6 +319,7 @@ class BigqueryHelper:
             sleep(0.1)
         if self.log.level == logging.DEBUG:
             self.log.debug(" " * 80)  # overwrite the previous line
+            self.dump_query(job.query)
         self.log.info("Bigquery job done.")
 
         if job.dry_run:
