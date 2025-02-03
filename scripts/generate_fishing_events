@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "\n!== DEPRECATED: Please use the pipe_events/cli.py instead.\n"
 source pipe-tools-utils
 
 THIS_SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )"

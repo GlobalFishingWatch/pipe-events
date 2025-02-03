@@ -12,6 +12,14 @@ from jinja2 import StrictUndefined
 import json
 
 
+def dest_table_description(**items) -> str:
+    """Returns the table description."""
+    return (
+        f"{items.get('base_table_description', '')}\n"
+        f"{items.get('table_description', '')}"
+    )
+
+
 def as_date_str(d):
     result = d
     if type(d) in [dt.datetime, dt.date]:
