@@ -1,4 +1,5 @@
 import logging
+from pipe_events.utils.bigquery import dest_table_description
 
 
 def run_incremental_fishing_events_query(temp_table, fishing_events_incremental_query):
@@ -6,13 +7,6 @@ def run_incremental_fishing_events_query(temp_table, fishing_events_incremental_
     PARTITION BY DATE_TRUNC(event_end_date, MONTH)
     CLUSTER BY event_end_date, seg_id, timestamp
     AS ({fishing_events_incremental_query})"""
-
-
-def dest_table_description(**extra_items):
-    return (
-        f"{extra_items['base_table_description']}\n"
-        f"{extra_items['table_description']}"
-    )
 
 
 def run(bq, params):

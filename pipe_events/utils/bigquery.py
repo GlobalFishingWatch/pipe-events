@@ -12,6 +12,14 @@ from jinja2 import StrictUndefined
 import json
 
 
+def dest_table_description(**items) -> str:
+    """Returns the table description."""
+    return (
+        f"{items.get('base_table_description', '')}\n"
+        f"{items.get('table_description', '')}"
+    )
+
+
 def as_date_str(d):
     result = d
     if type(d) in [dt.datetime, dt.date]:
@@ -37,7 +45,6 @@ def format_query(template_file: str, **params) -> str:
 def load_schema(schema_file):
     with open(schema_file) as file:
         return json.load(file)
-
 
 class BigqueryHelper:
     def __init__(self, project=None, logger=None, dry_run=False):

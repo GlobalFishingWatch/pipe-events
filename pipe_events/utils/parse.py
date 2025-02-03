@@ -1,69 +1,53 @@
 import argparse
-import datetime
-import re
 import logging
 import json
 import pkg_resources
 import sys
 import os
+from pipe_events.utils.validators import valid_date, valid_table
 
 PIPELINE_NAME = "pipe-events"
 PIPELINE_VERSION = pkg_resources.require(PIPELINE_NAME)[0].version
 PIPELINE_DESCRIPTION = "Generate the incremental fishing events"
+PROJ = "world-fishing-827"
 
 DEFAULT = dict(
+    # common
     test=False,
     verbose=0,
     quiet=0,
-    project="world-fishing-827",
+    project=PROJ,
     table_description="",
+    labels='{"environment":"develop"}',
+    reference_date="2020-01-02",
     # incremental_fishing_events
     start_date="2020-01-01",
     end_date="2020-01-02",
-    messages_table="world-fishing-827.pipe_ais_test_202408290000_internal.research_messages",
-    segs_activity_table="world-fishing-827.pipe_ais_test_202408290000_published.segs_activity",
-    segment_vessel_table="world-fishing-827.pipe_ais_test_202408290000_internal.segment_vessel",
-    product_vessel_info_summary_table=("world-fishing-827.pipe_ais_test_202408290000_published"
+    messages_table=f"{PROJ}.pipe_ais_test_202408290000_internal.research_messages",
+    segs_activity_table=f"{PROJ}.pipe_ais_test_202408290000_published.segs_activity",
+    segment_vessel_table=f"{PROJ}.pipe_ais_test_202408290000_internal.segment_vessel",
+    product_vessel_info_summary_table=(f"{PROJ}.pipe_ais_test_202408290000_published"
                                        ".product_vessel_info_summary"),
     nnet_score_night_loitering="nnet_score",
     max_fishing_event_gap_hours=2,
-    destination_dataset="world-fishing-827.scratch_matias_ttl_7_days",
+    destination_dataset=f"{PROJ}.scratch_matias_ttl_7_days",
     destination_table_prefix="incremental_fishing_events",
-    labels_incremental='{"environment":"develop"}',
     # auth and regions
-    source_fishing_events=("world-fishing-827.scratch_matias_ttl_7_days."
+    source_fishing_events=(f"{PROJ}.scratch_matias_ttl_7_days."
                            "incremental_fishing_events_filtered"),
-    source_night_loitering_events=("world-fishing-827.scratch_matias_ttl_7_days."
+    source_night_loitering_events=(f"{PROJ}.scratch_matias_ttl_7_days."
                                    "incremental_night_loitering_events_filtered"),
-    vessel_identity_core="world-fishing-827.pipe_ais_v3_internal.identity_core",
-    vessel_identity_authorization="world-fishing-827.pipe_ais_v3_internal.identity_authorization",
-    spatial_measures_table="world-fishing-827.pipe_static.spatial_measures_clustered_20230307",
-    regions_table="world-fishing-827.pipe_regions_layers.event_regions",
-    all_vessels_byyear=("world-fishing-827.pipe_ais_test_202408290000_published."
+    vessel_identity_core=f"{PROJ}.pipe_ais_v3_internal.identity_core",
+    vessel_identity_authorization=f"{PROJ}.pipe_ais_v3_internal.identity_authorization",
+    spatial_measures_table=f"{PROJ}.pipe_static.spatial_measures_clustered_20230307",
+    regions_table=f"{PROJ}.pipe_regions_layers.event_regions",
+    all_vessels_byyear=(f"{PROJ}.pipe_ais_test_202408290000_published."
                         "product_vessel_info_summary"),
-    destination="world-fishing-827.scratch_matias_ttl_7_days.fishing_events_final",
-    labels_auth='{"environment":"develop"}',
-    # restrictive_view
-    source_lr_events="world-fishing-827.scratch_matias_ttl_7_days.fishing_events_final",
-    dest_lr_events="world-fishing-827.scratch_matias_ttl_7_days.fishing_events_lr_final",
-    labels_restictive_view='{"environment":"develop"}',
+    destination=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_v",
+    # fishing_restrictive
+    source_restrictive_events=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_v",
+    dest_restrictive_events=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_restrictive_v",
 )
-
-
-def valid_date(s: str) -> datetime.date:
-    try:
-        return datetime.datetime.strptime(s, "%Y-%m-%d").date()
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"not a valid date: {s!r}")
-
-
-def valid_table(s: str) -> datetime.datetime:
-    matched = re.fullmatch(r"[\w\-_]+[:\.][\w\-_]+\.[\w\-_]+", s)
-    if matched is None:
-        raise argparse.ArgumentTypeError(
-            f"not a valid table pattern (project.dataset.table): {s!r}"
-        )
-    return s
 
 
 def setup_logging(verbosity):
@@ -125,9 +109,9 @@ def parse(arguments):
         "auth_and_regions_fishing_events",
         help="Combine the fishing and night_loitering with authorization and regions.",
     )
-    restrictive_view = subparsers.add_parser(
-        "restricted_view_events",
-        help="Generates a view with the restrictive fishing events in case does not exists.",
+    fishing_restrictive = subparsers.add_parser(
+        "fishing_restrictive",
+        help="Generates a table with the fishing restrictive events in case does not exists.",
     )
 
     incremental.add_argument(
@@ -205,7 +189,7 @@ def parse(arguments):
         "--labels",
         help="The labels assigned to each table.",
         type=json.loads,
-        default=DEFAULT["labels_incremental"],
+        default=DEFAULT["labels"],
     )
     incremental.add_argument(
         "-mtbl",
@@ -273,39 +257,56 @@ def parse(arguments):
         default=DEFAULT["destination"],
     )
     auth_and_regions.add_argument(
+        "-rdate",
+        "--reference_date",
+        help="The reference date that has the less restrictive fishing events.",
+        type=valid_date,
+        default=DEFAULT["reference_date"],
+    )
+    auth_and_regions.add_argument(
         "-labels",
         "--labels",
         help="The labels assigned to each table.",
         type=json.loads,
-        default=DEFAULT["labels_auth"],
+        default=DEFAULT["labels"],
     )
 
-    restrictive_view.add_argument(
+    fishing_restrictive.add_argument(
         "-source_events",
-        "--source_lr_events",
-        help="The source of less restrictive events table.",
+        "--source_restrictive_events",
+        help="The source of restrictive events table.",
         type=valid_table,
-        default=DEFAULT["source_lr_events"],
+        default=DEFAULT["source_restrictive_events"],
     )
-    restrictive_view.add_argument(
-        "-destlrev",
-        "--dest_lr_events",
-        help="The destination table to place the less restrictive events table.",
+    fishing_restrictive.add_argument(
+        "-destrest",
+        "--dest_restrictive_events",
+        help="The destination table to place the restrictive events table.",
         type=valid_table,
-        default=DEFAULT["dest_lr_events"],
+        default=DEFAULT["dest_restrictive_events"],
     )
-    restrictive_view.add_argument(
+    fishing_restrictive.add_argument(
+        "-rdate",
+        "--reference_date",
+        help="The reference date that has the restrictive fishing events.",
+        type=valid_date,
+        default=DEFAULT["reference_date"],
+    )
+    fishing_restrictive.add_argument(
         "-labels",
         "--labels",
         help="The labels assigned to each table.",
         type=json.loads,
-        default=DEFAULT["labels_restictive_view"],
+        default=DEFAULT["labels"],
     )
 
     args = parser.parse_args(arguments[1:])
     if hasattr(args, "start_date") and hasattr(args, "end_date"):
         args.start_date = args.start_date.strftime("%Y-%m-%d")
         args.end_date = args.end_date.strftime("%Y-%m-%d")
+    if hasattr(args, "reference_date"):
+        args.reference_date = args.reference_date.strftime("%Y-%m-%d").replace('-', '')
+
     setup_logging(args.verbosity)
     log = logging.getLogger()
 
