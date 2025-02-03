@@ -18,6 +18,37 @@ docker-compose run gcloud auth login
 
 ## Configuration
 
+### The fishing events incremental load
+
+The way the fishing events was calculated took unexpected time and resources, to improve the calculation the incremental load was developed. See more in `./assets/bigquery/README.md`.
+
+There is a specific python client to make the calls under `./pipe_events/cli.py`.
+It has 3 operations:
+* `incremental_events` : Opens a BQ session and calculates fishing event by segment. Merges messges by seg_id and timestamp versus a historical fishing events table and updates event_end/event_start. Apply filters, add vessel_id, identities fields and remove overlapping_and_short segments.
+    It can be invoked:
+    ```bash
+    # run daily incremental fishing events
+    $ pipe -v --project fishing_events_test incremental_events
+    # run daily incremental night loitering
+    $ pipe -v --project fishing_events_test incremental_events -sfield night_loitering -dest_tbl_prefix incremental_night_loitering_events
+    ```
+
+* `auth_and_regions_fishing_events`: Adds authorization and regions position.
+    It can be invoked:
+    ```bash
+    # run daily incremental fishing events
+    $ pipe -v --project fishing_events_test auth_and_regions_fishing_events
+    ```
+
+* `fishing_restrictive`: restrict the events using a specific list.
+    It can be invoked:
+    ```bash
+    # run daily incremental fishing events
+    $ pipe -v --project fishing_events_test fishing_restrictive
+    ```
+
+### The former standard way
+
 The pipeline exposes the following standard settings:
 
 * `pipe_events.docker_run`: Command to run docker inside the airflow server.
@@ -47,6 +78,7 @@ In addition to this, the following custom settings are required for this pipelin
 * `pipe_events.anchorages.events_table`: BigQuery table to publish the anchorages to. Defaults to `published_events_ports`.
 * `pipe_events.anchorages.anchorages_dataset`: BigQuery dataset which contains the named anchorages table. Defaults to `gfw_research`.
 * `pipe_events.anchorages.named_anchorages`: BigQuery table containing anchorage information. Defaults to `named_anchorages_v20190307`.
+    **DEPRECATED BY INCREMENTAL LOAD**
 * `pipe_events.fishing.source_table`: BigQuery table containing the scored messages to read from. Defaults to `messages_scored_`.
 * `pipe_events.fishing.events_table`: BigQuery table to publish the fishing events to. Defaults to `published_events_fishing`.
 * `pipe_events.fishing.segment_vessel`: BigQuery table containing segent information. Defaults to `segment_vessel`.

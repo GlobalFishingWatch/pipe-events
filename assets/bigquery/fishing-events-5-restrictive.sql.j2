@@ -2,6 +2,6 @@
 SELECT
   *
   FROM
-    `{{ source_lr_events }}`
+    `{{ source_restrictive_events }}`
     WHERE
       json_extract((json_extract_array(event_vessels, '$')[0]), '$.type') = '"fishing"'
