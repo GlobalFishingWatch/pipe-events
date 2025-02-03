@@ -19,6 +19,7 @@ class Cli:
         return vars(self._args)
 
     def _run_incremental_fishing_events(self) -> bool:
+        print(f"***{run_incremental(self._bq, self._params)}***")
         return run_incremental(self._bq, self._params)
 
     def _run_auth_and_regions_fishing_events(self) -> bool:
