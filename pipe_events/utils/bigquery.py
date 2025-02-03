@@ -46,6 +46,7 @@ def load_schema(schema_file):
     with open(schema_file) as file:
         return json.load(file)
 
+
 class BigqueryHelper:
     def __init__(self, project=None, logger=None, dry_run=False):
         self.project = project

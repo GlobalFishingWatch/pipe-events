@@ -2,13 +2,14 @@ import pytest
 from datetime import date
 from pipe_events.utils.validators import valid_date, valid_table
 
+
 class TestValidators:
 
     @pytest.mark.parametrize(
         "entry,expected",
         [
-            ("2020-01-01", date(2020,1,1)),
-            ("2024-02-29", date(2024,2,29)),
+            ("2020-01-01", date(2020, 1, 1)),
+            ("2024-02-29", date(2024, 2, 29)),
             pytest.param("test", "test", marks=pytest.mark.xfail),
         ]
     )
@@ -27,4 +28,3 @@ class TestValidators:
     )
     def test_table_valid(self, table, expected):
         assert expected == valid_table(table)
-
