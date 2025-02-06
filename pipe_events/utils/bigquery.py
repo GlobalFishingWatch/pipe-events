@@ -113,7 +113,7 @@ class BigqueryHelper:
         view.labels = labels
 
         view = self.client.create_table(view, exists_ok=True)
-        print(f"Created {view.table_type}: {str(view.reference)}")
+        self.log.info(f"Created {view.table_type}: {str(view.reference)}")
 
     def create_table(
         self,
