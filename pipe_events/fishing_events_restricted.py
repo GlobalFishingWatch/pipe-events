@@ -13,7 +13,7 @@ def run(bq, params):
         dest,
         schema_file=schema_path,
         table_description=dest_table_description(**params),
-        partition_field="TIMESTAMP_TRUNC(event_start, MONTH)",
+        partition_field="event_start",
         clustering_fields=["seg_id", "event_start"],
         labels=params["labels"],
     )
@@ -24,7 +24,7 @@ def run(bq, params):
         auth_query,
         dest_table=dest,
         write_disposition="WRITE_TRUNCATE",
-        partition_field="TIMESTAMP_TRUNC(event_start, MONTH)",
+        partition_field="event_start",
         clustering_fields=["seg_id", "event_start"],
         labels=params["labels"],
     )
