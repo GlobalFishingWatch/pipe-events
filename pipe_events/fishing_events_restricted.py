@@ -13,8 +13,8 @@ def run(bq, params):
         dest,
         schema_file=schema_path,
         table_description=dest_table_description(**params),
-        partition_field="event_end_date",
-        clustering_fields=["event_end_date", "seg_id", "event_start"],
+        partition_field="event_start",
+        clustering_fields=["seg_id", "event_start"],
         labels=params["labels"],
     )
 
@@ -24,8 +24,8 @@ def run(bq, params):
         auth_query,
         dest_table=dest,
         write_disposition="WRITE_TRUNCATE",
-        partition_field="event_end_date",
-        clustering_fields=["event_end_date", "seg_id", "event_start"],
+        partition_field="event_start",
+        clustering_fields=["seg_id", "event_start"],
         labels=params["labels"],
     )
     bq.update_table_schema(dest, schema_path)  # schema should be kept after trucate
