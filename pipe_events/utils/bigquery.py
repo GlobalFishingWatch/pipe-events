@@ -10,6 +10,7 @@ from jinja2 import Environment
 from jinja2 import FileSystemLoader
 from jinja2 import StrictUndefined
 import json
+from google.cloud.exceptions import Conflict
 
 
 def dest_table_description(**items) -> str:
@@ -112,8 +113,12 @@ class BigqueryHelper:
         # Set labels
         view.labels = labels
 
-        view = self.client.create_table(view, exists_ok=True)
-        self.log.info(f"Created {view.table_type}: {str(view.reference)}")
+        try:
+            view = self.client.create_table(view)
+            self.log.info(f"Created {view.table_type}: {str(view.reference)}")
+        except Conflict:
+            view = self.client.update_table(view, ["view_query", "description", "labels"])
+            self.log.info(f"Updated {view.table_type}: {str(view.reference)}")
 
     def create_table(
         self,
