@@ -30,4 +30,16 @@ def run(bq, params):
     )
     bq.update_table_schema(dest, schema_path)  # schema should be kept after trucate
     log.info(f"The table {dest} is ready.")
+
+    log.info("*** 2. Creates/Updates the view over the restricted table.")
+    bq.create_view(
+        params["dest_rest_view"],
+        f"select * from `{dest}`",
+        dest_table_description(**params),
+        params["labels"],
+    )
+    bq.update_table_schema(
+        params["dest_rest_view"],
+        schema_path
+    )
     return True

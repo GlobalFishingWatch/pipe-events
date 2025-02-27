@@ -44,9 +44,11 @@ DEFAULT = dict(
     all_vessels_byyear=(f"{PROJ}.pipe_ais_test_202408290000_published."
                         "product_vessel_info_summary"),
     destination=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_v",
+    dest_view=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events",
     # fishing_restrictive
     source_restrictive_events=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_v",
     dest_restrictive_events=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_restrictive_v",
+    dest_rest_view=f"{PROJ}.scratch_matias_ttl_7_days.fishing_restrictive_events",
 )
 
 
@@ -257,6 +259,13 @@ def parse(arguments):
         default=DEFAULT["destination"],
     )
     auth_and_regions.add_argument(
+        "-dest_view",
+        "--destination_view",
+        help="The destination view pointing to latest table having fishing events.",
+        type=valid_table,
+        default=DEFAULT["dest_view"],
+    )
+    auth_and_regions.add_argument(
         "-rdate",
         "--reference_date",
         help="The reference date that has the less restrictive fishing events.",
@@ -284,6 +293,13 @@ def parse(arguments):
         help="The destination table to place the restrictive events table.",
         type=valid_table,
         default=DEFAULT["dest_restrictive_events"],
+    )
+    fishing_restrictive.add_argument(
+        "-destrestview",
+        "--dest_rest_view",
+        help="The destination view pointing to the restrictive events table.",
+        type=valid_table,
+        default=DEFAULT["dest_rest_view"],
     )
     fishing_restrictive.add_argument(
         "-rdate",
