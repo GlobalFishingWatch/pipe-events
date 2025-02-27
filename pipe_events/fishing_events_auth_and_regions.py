@@ -30,4 +30,15 @@ def run(bq, params):
         dest,
         schema_path
     )  # schema should be kept after trucate
+    log.info("*** 2. Creates/Updates the view over the authorized with regions table.")
+    bq.create_view(
+        params["destination_view"],
+        f"select * from `{dest}`",
+        dest_table_description(**params),
+        params["labels"],
+    )
+    bq.update_table_schema(
+        params["destination_view"],
+        schema_path
+    )
     return True
