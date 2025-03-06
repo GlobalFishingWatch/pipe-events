@@ -113,7 +113,7 @@ WITH
     # Include basic vessel information on the event
     #
     complete_encounter_event AS (
-        SELECT
+        SELECT DISTINCT
             encounter.*,
             main_vessel.vessel_id AS main_vessel_id,
             main_vessel.shipname AS main_vessel_shipname,
@@ -124,7 +124,7 @@ WITH
             encountered_vessel2.ssvid AS encountered_vessel_ssvid,
             encountered_vessel2.prod_shiptype AS encountered_vessel_class,
             encountered_vessel2.mmsi_flag AS encountered_vessel_flag,
-            ST_GEOGPOINT(mean_longitude, mean_latitude) as geo,
+            -- removed geo column to use DISTINCT clause that does not work with GEOGRAPHY type in BQ
             S2_CELLIDFROMPOINT(ST_GEOGPOINT(mean_longitude, mean_latitude), s2_level()) as s2_cell
         FROM flattened_encounters AS encounter
                  LEFT JOIN source_all_vessels AS main_vessel ON (
@@ -288,7 +288,15 @@ WITH
             id,
             layer
         FROM
-            complete_encounter_event AS encounters
+            (
+                -- Adding geo columns here ad-hoc so that we can reduce duplicates in 
+                -- complete_encounter_event using the DISTINCT clause that does not work 
+                -- with GEOGRAPHY type in BQ
+                SELECT *,
+                    ST_GEOGPOINT(mean_longitude, mean_latitude) as geo
+                FROM complete_encounter_event 
+            )
+            AS encounters
                 JOIN gridded_regions r ON (encounters.s2_cell = r.s2_cell)
         WHERE ST_INTERSECTS(encounters.geo, r.geo)
     ),
@@ -331,7 +339,7 @@ WITH
     # Add spatial measures region information
     #
     encounters_regions AS (
-        SELECT
+        SELECT DISTINCT
             encounters.*,
             spatial_measures_mean.regions AS regions_mean_position
         FROM
