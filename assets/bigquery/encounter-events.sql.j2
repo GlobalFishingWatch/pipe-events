@@ -529,9 +529,9 @@ WITH
             regions.regions_mean_position
         FROM
             complete_encounter_event AS encounter
-                INNER JOIN encounter_authorizations AS authorization USING (event_id)
+                LEFT JOIN encounter_authorizations AS authorization USING (event_id)
                 -- join regions information; previously done in last step of v1 encs query 1 code
-                INNER JOIN encounters_regions AS regions USING (event_id)
+                LEFT JOIN encounters_regions AS regions USING (event_id)
     )
 
 
