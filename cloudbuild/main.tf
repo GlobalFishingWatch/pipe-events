@@ -1,8 +1,8 @@
 provider "google" {
   project = "gfw-int-infrastructure"
 }
-resource "google_cloudbuild_trigger" "gfw-tool-processing" {
-  name     = "gfw-tool-processing-tag"
+resource "google_cloudbuild_trigger" "pipe-events" {
+  name     = "pipe-events-tag"
   location = "us-central1"
 
 
@@ -30,7 +30,7 @@ resource "google_cloudbuild_trigger" "gfw-tool-processing" {
          
           docker build \
             -t \
-            us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/gfw-tool:$TAG_NAME \
+            us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/github-globalfishingwatch-pipe-events:$TAG_NAME \
             .
             
         EOF
@@ -38,7 +38,7 @@ resource "google_cloudbuild_trigger" "gfw-tool-processing" {
 
     }
 
-    images = ["us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/gfw-tool:$TAG_NAME"]
+    images = ["us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/github-globalfishingwatch-pipe-events:$TAG_NAME"]
 
 
 
