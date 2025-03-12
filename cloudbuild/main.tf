@@ -7,7 +7,7 @@ resource "google_cloudbuild_trigger" "pipe-events" {
 
 
   github {
-    name  = "gfw-tool"
+    name  = "pipe-events"
     owner = "GlobalFishingWatch"
     push {
       tag          = ".*"
