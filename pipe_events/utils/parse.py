@@ -24,14 +24,18 @@ DEFAULT = dict(
     start_date="2020-01-01",
     end_date="2020-01-02",
     messages_table=f"{PROJ}.pipe_ais_test_202408290000_internal.research_messages",
-    segs_activity_table=f"{PROJ}.pipe_ais_test_202408290000_published.segs_activity",
-    segment_vessel_table=f"{PROJ}.pipe_ais_test_202408290000_internal.segment_vessel",
-    product_vessel_info_summary_table=(f"{PROJ}.pipe_ais_test_202408290000_published"
-                                       ".product_vessel_info_summary"),
     nnet_score_night_loitering="nnet_score",
     max_fishing_event_gap_hours=2,
     destination_dataset=f"{PROJ}.scratch_matias_ttl_7_days",
     destination_table_prefix="incremental_fishing_events",
+    use_merged_table=None,
+    # incremental_filter_fishing_events
+    segs_activity_table=f"{PROJ}.pipe_ais_test_202408290000_published.segs_activity",
+    segment_vessel_table=f"{PROJ}.pipe_ais_test_202408290000_internal.segment_vessel",
+    product_vessel_info_summary_table=(f"{PROJ}.pipe_ais_test_202408290000_published"
+                                       ".product_vessel_info_summary"),
+    merged_table=(f"{PROJ}.scratch_matias_ttl_7_days."
+                  "incremental_fishing_events_merged"),
     # auth and regions
     source_fishing_events=(f"{PROJ}.scratch_matias_ttl_7_days."
                            "incremental_fishing_events_filtered"),
@@ -107,6 +111,10 @@ def parse(arguments):
         "incremental_events",
         help="Generates the incremental fishing or night loitering events.",
     )
+    incremental_filter = subparsers.add_parser(
+        "incremental_filter_events",
+        help="Takes the incremental fishing or night loitering events and apply filters.",
+    )
     auth_and_regions = subparsers.add_parser(
         "auth_and_regions_fishing_events",
         help="Combine the fishing and night_loitering with authorization and regions.",
@@ -136,27 +144,6 @@ def parse(arguments):
         help="The source messages table having fishing and night loitering info.",
         type=valid_table,
         default=DEFAULT["messages_table"],
-    )
-    incremental.add_argument(
-        "-segsact",
-        "--segs_activity_table",
-        help="The segments activity table.",
-        type=valid_table,
-        default=DEFAULT["segs_activity_table"],
-    )
-    incremental.add_argument(
-        "-segvessel",
-        "--segment_vessel_table",
-        help="The segment vessel table.",
-        type=valid_table,
-        default=DEFAULT["segment_vessel_table"],
-    )
-    incremental.add_argument(
-        "-pvesselinfo",
-        "--product_vessel_info_summary_table",
-        help="The prodiuct vessel info summary table.",
-        type=valid_table,
-        default=DEFAULT["product_vessel_info_summary_table"],
     )
     incremental.add_argument(
         "-sfield",
@@ -196,10 +183,68 @@ def parse(arguments):
     incremental.add_argument(
         "-mtbl",
         "--use_merged_table",
-        help="The prodiuct vessel info summary table.",
+        help="The product vessel info summary table.",
         type=valid_table,
         required=False,
-        default=None,
+        default=DEFAULT["use_merged_table"],
+    )
+
+    incremental_filter.add_argument(
+        "-segsact",
+        "--segs_activity_table",
+        help="The segments activity table.",
+        type=valid_table,
+        default=DEFAULT["segs_activity_table"],
+    )
+    incremental_filter.add_argument(
+        "-segvessel",
+        "--segment_vessel_table",
+        help="The segment vessel table.",
+        type=valid_table,
+        default=DEFAULT["segment_vessel_table"],
+    )
+    incremental_filter.add_argument(
+        "-pvesselinfo",
+        "--product_vessel_info_summary_table",
+        help="The prodiuct vessel info summary table.",
+        type=valid_table,
+        default=DEFAULT["product_vessel_info_summary_table"],
+    )
+    incremental_filter.add_argument(
+        "-sfield",
+        "--nnet_score_night_loitering",
+        help="The field name that has the score to eval.",
+        choices=["nnet_score", "night_loitering"],
+        default=DEFAULT["nnet_score_night_loitering"],
+    )
+    incremental_filter.add_argument(
+        "-dest",
+        "--destination_dataset",
+        help="The destination dataset having fishing events.",
+        type=str,
+        default=DEFAULT["destination_dataset"],
+    )
+    incremental_filter.add_argument(
+        "-dest_tbl_prefix",
+        "--destination_table_prefix",
+        help="The destination table prefix having fishing events.",
+        type=str,
+        default=DEFAULT["destination_table_prefix"],
+    )
+    incremental_filter.add_argument(
+        "-labels",
+        "--labels",
+        help="The labels assigned to each table.",
+        type=json.loads,
+        default=DEFAULT["labels"],
+    )
+    incremental_filter.add_argument(
+        "-mtbl",
+        "--merged_table",
+        help="An existence merged table.",
+        type=valid_table,
+        required=False,
+        default=DEFAULT["merged_table"],
     )
 
     auth_and_regions.add_argument(
