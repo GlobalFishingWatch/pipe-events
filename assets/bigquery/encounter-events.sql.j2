@@ -282,21 +282,22 @@ WITH
             registry_authorized_to
     ),
 
+    complete_encounter_event_with_geo as (
+        -- Adding geo columns here ad-hoc so that we can reduce duplicates in 
+        -- complete_encounter_event using the DISTINCT clause that does not work 
+        -- with GEOGRAPHY type in BQ
+        SELECT *,
+            ST_GEOGPOINT(mean_longitude, mean_latitude) as geo
+        FROM complete_encounter_event 
+    ),
+
     create_event_region_matches as (
         SELECT
             encounters.event_id,
             id,
             layer
         FROM
-            (
-                -- Adding geo columns here ad-hoc so that we can reduce duplicates in 
-                -- complete_encounter_event using the DISTINCT clause that does not work 
-                -- with GEOGRAPHY type in BQ
-                SELECT *,
-                    ST_GEOGPOINT(mean_longitude, mean_latitude) as geo
-                FROM complete_encounter_event 
-            )
-            AS encounters
+            complete_encounter_event_with_geo AS encounters
                 JOIN gridded_regions r ON (encounters.s2_cell = r.s2_cell)
         WHERE ST_INTERSECTS(encounters.geo, r.geo)
     ),
