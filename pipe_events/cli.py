@@ -2,6 +2,7 @@ import sys
 import logging
 from pipe_events.utils.parse import parse
 from pipe_events.fishing_events_incremental import run as run_incremental
+from pipe_events.fishing_events_incremental_filter import run as run_incremental_filter_events
 from pipe_events.fishing_events_auth_and_regions import run as run_auth_and_regions
 from pipe_events.fishing_events_restricted import run as run_restricted
 from pipe_events.utils.bigquery import BigqueryHelper
@@ -21,6 +22,9 @@ class Cli:
     def _run_incremental_fishing_events(self) -> bool:
         return run_incremental(self._bq, self._params)
 
+    def _run_incremental_filter_events(self) -> bool:
+        return run_incremental_filter_events(self._bq, self._params)
+
     def _run_auth_and_regions_fishing_events(self) -> bool:
         return run_auth_and_regions(self._bq, self._params)
 
@@ -32,6 +36,8 @@ class Cli:
         result = False
         if self._args.operation == "incremental_events":
             result = self._run_incremental_fishing_events()
+        elif self._args.operation == "incremental_filter_events":
+            result = self._run_incremental_filter_events()
         elif self._args.operation == "auth_and_regions_fishing_events":
             result = self._run_auth_and_regions_fishing_events()
         elif self._args.operation == "fishing_restrictive":

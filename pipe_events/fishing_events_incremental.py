@@ -54,33 +54,6 @@ def run(bq, params):
     )
     merge_query = bq.format_query("fishing-events-2b-merge-into.sql.j2", **params_copy)
     bq.run_query(merge_query, session_id=session_id)
-
-    log.info("*** 4. Ensures filter table exists.")
-    params_copy["filtered_table"] = f"{prefix_table}_filtered"
-    bq.create_table(
-        params_copy["filtered_table"],
-        schema_file="./assets/bigquery/fishing-events-3-filter-schema.json",
-        table_description=dest_table_description(**params),
-        partition_field="event_end_date",
-        clustering_fields=["event_end_date", "seg_id"],
-        labels=params["labels"],
-    )
-
     bq.end_session(session_id)  # required to use destination in QueryJobConfig then
-
-    log.info("*** 5. Runs the filter over the merged table with truncated data.")
-    filter_query = bq.format_query("fishing-events-3-filter.sql.j2", **params_copy)
-    bq.run_query(
-        filter_query,
-        dest_table=params_copy["filtered_table"],
-        write_disposition="WRITE_TRUNCATE",
-        partition_field="event_end_date",
-        clustering_fields=["event_end_date", "seg_id"],
-        labels=params["labels"],
-    )  # Ends the session previously because cannot set the destination with it
-    bq.update_table_schema(
-        params_copy["filtered_table"],
-        "./assets/bigquery/fishing-events-3-filter-schema.json"
-    )  # schema should be kept after trucate
 
     return True
