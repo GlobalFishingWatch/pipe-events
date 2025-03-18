@@ -17,7 +17,7 @@ resource "google_cloudbuild_trigger" "pipe-events" {
   }
 
 
-  service_account = "projects/gfw-int-infrastructure/serviceAccounts/terraform-deployer@gfw-int-infrastructure.iam.gserviceaccount.com"
+  service_account = "projects/gfw-int-infrastructure/serviceAccounts/cloudbuild@gfw-int-infrastructure.iam.gserviceaccount.com"
   build {
 
     step {
