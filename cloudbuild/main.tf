@@ -31,6 +31,8 @@ resource "google_cloudbuild_trigger" "pipe-events" {
           docker build \
             -t \
             us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/github-globalfishingwatch-pipe-events:$TAG_NAME \
+            -t \
+            us-central1-docker.pkg.dev/gfw-int-infrastructure/core/github.com/globalfishingwatch/pipe-events:$TAG_NAME \
             .
             
         EOF
@@ -38,7 +40,10 @@ resource "google_cloudbuild_trigger" "pipe-events" {
 
     }
 
-    images = ["us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/github-globalfishingwatch-pipe-events:$TAG_NAME"]
+    images = [
+      "us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/github-globalfishingwatch-pipe-events:$TAG_NAME",
+      "us-central1-docker.pkg.dev/gfw-int-infrastructure/core/github.com/globalfishingwatch/pipe-events:$TAG_NAME",
+    ]
 
 
 
