@@ -10,6 +10,8 @@ PIPELINE_NAME = "pipe-events"
 PIPELINE_VERSION = pkg_resources.require(PIPELINE_NAME)[0].version
 PIPELINE_DESCRIPTION = "Generate the incremental fishing events"
 PROJ = "world-fishing-827"
+DATASET_IN = "pipe_ais_test_202408290000"
+DATASET_OUT = "scratch_matias_ttl_7_days"
 
 DEFAULT = dict(
     # common
@@ -23,36 +25,36 @@ DEFAULT = dict(
     # incremental_fishing_events
     start_date="2020-01-01",
     end_date="2020-01-02",
-    messages_table=f"{PROJ}.pipe_ais_test_202408290000_internal.research_messages",
+    messages_table=f"{PROJ}.{DATASET_IN}_internal.research_messages",
     nnet_score_night_loitering="nnet_score",
     max_fishing_event_gap_hours=2,
-    destination_dataset=f"{PROJ}.scratch_matias_ttl_7_days",
+    destination_dataset=f"{PROJ}.{DATASET_OUT}",
     destination_table_prefix="incremental_fishing_events",
     use_merged_table=None,
     # incremental_filter_fishing_events
-    segs_activity_table=f"{PROJ}.pipe_ais_test_202408290000_published.segs_activity",
-    segment_vessel_table=f"{PROJ}.pipe_ais_test_202408290000_internal.segment_vessel",
-    product_vessel_info_summary_table=(f"{PROJ}.pipe_ais_test_202408290000_published"
+    segs_activity_table=f"{PROJ}.{DATASET_IN}_published.segs_activity",
+    segment_vessel_table=f"{PROJ}.{DATASET_IN}_internal.segment_vessel",
+    product_vessel_info_summary_table=(f"{PROJ}.{DATASET_IN}_published"
                                        ".product_vessel_info_summary"),
-    merged_table=(f"{PROJ}.scratch_matias_ttl_7_days."
+    merged_table=(f"{PROJ}.{DATASET_OUT}."
                   "incremental_fishing_events_merged"),
     # auth and regions
-    source_fishing_events=(f"{PROJ}.scratch_matias_ttl_7_days."
+    source_fishing_events=(f"{PROJ}.{DATASET_OUT}."
                            "incremental_fishing_events_filtered"),
-    source_night_loitering_events=(f"{PROJ}.scratch_matias_ttl_7_days."
+    source_night_loitering_events=(f"{PROJ}.{DATASET_OUT}."
                                    "incremental_night_loitering_events_filtered"),
     vessel_identity_core=f"{PROJ}.pipe_ais_v3_internal.identity_core",
     vessel_identity_authorization=f"{PROJ}.pipe_ais_v3_internal.identity_authorization",
     spatial_measures_table=f"{PROJ}.pipe_static.spatial_measures_clustered_20230307",
     regions_table=f"{PROJ}.pipe_regions_layers.event_regions",
-    all_vessels_byyear=(f"{PROJ}.pipe_ais_test_202408290000_published."
+    all_vessels_byyear=(f"{PROJ}.{DATASET_IN}_published."
                         "product_vessel_info_summary"),
-    destination=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_v",
-    dest_view=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events",
+    destination=f"{PROJ}.{DATASET_OUT}.fishing_events_v",
+    dest_view=f"{PROJ}.{DATASET_OUT}.fishing_events",
     # fishing_restrictive
-    source_restrictive_events=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_v",
-    dest_restrictive_events=f"{PROJ}.scratch_matias_ttl_7_days.fishing_events_restrictive_v",
-    dest_rest_view=f"{PROJ}.scratch_matias_ttl_7_days.fishing_restrictive_events",
+    source_restrictive_events=f"{PROJ}.{DATASET_OUT}.fishing_events_v",
+    dest_restrictive_events=f"{PROJ}.{DATASET_OUT}.fishing_events_restrictive_v",
+    dest_rest_view=f"{PROJ}.{DATASET_OUT}.fishing_restrictive_events",
 )
 
 

@@ -10,10 +10,16 @@ You just need [docker](https://www.docker.com/) and [docker-compose](https://doc
 
 ## Setup
 
+First of all build the image.
+
+```
+$ docker compose build
+```
+
 The pipeline reads it's input from BigQuery, so you need to first authenticate with your google cloud account inside the docker images. To do that, you need to run this command and follow the instructions:
 
 ```
-docker-compose run gcloud auth login
+$ docker compose run gcloud auth login
 ```
 
 ## Configuration
@@ -23,28 +29,55 @@ docker-compose run gcloud auth login
 The way the fishing events was calculated took unexpected time and resources, to improve the calculation the incremental load was developed. See more in `./assets/bigquery/README.md`.
 
 There is a specific python client to make the calls under `./pipe_events/cli.py`.
-It has 3 operations:
-* `incremental_events` : Opens a BQ session and calculates fishing event by segment. Merges messges by seg_id and timestamp versus a historical fishing events table and updates event_end/event_start. Apply filters, add vessel_id, identities fields and remove overlapping_and_short segments.
-    It can be invoked:
+It has 4 subcommands:
+* `incremental_events` : Opens a BQ session and calculates fishing event by segment. Merges messges by seg_id and timestamp versus a historical fishing events table and updates event_end/event_start stitching the history with what has produced the latest day. If the events in the history overlaps with the events in the daily they are updated, if not the events are addded. The output for this process is the table with the `_merged` suffix.
+    It can be invoked (using the default values of the paramters that points to a scratch):
     ```bash
-    # run daily incremental fishing events
-    $ pipe -v --project fishing_events_test incremental_events
-    # run daily incremental night loitering
-    $ pipe -v --project fishing_events_test incremental_events -sfield night_loitering -dest_tbl_prefix incremental_night_loitering_events
+    # run daily incremental fishing events, outputs: scratch_matias_ttl_7_days.incremental_fishing_events_merged
+    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 incremental_events
+    # runs daily night loitering. outputs: scratch_matias_ttl_7_days.incremental_night_loitering_events_merged
+    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 incremental_events -sfield night_loitering -dest_tbl_prefix incremental_night_loitering_events
+    ```
+    NOTE: the default dataset source is "pipe_ais_test_202408290000" and the dataset out is "scratch_matias_ttl_7_days".
+    Show all options:
+    ```bash
+    $ docker compose run --entrypoint pipe pipeline incremental_events -h
     ```
 
+* `incremental_filter_events`: Tooks a fishing events history table (`_merged`) and applies filters, add vessel_id, identities fields and remove overlapping_and_short segments. It outputs the `_filtered` table.
+It can be invoked (using the default values of the paramters that points to a scratch):
+    ```bash
+    # run filter for the fishing events. outputs: scratch_matias_ttl_7_days.incremental_fishing_events_filtered
+    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 incremental_filter_events
+    # run filter for the night loitering. outputs: scratch_matias_ttl_7_days.incremental_night_loitering_events_filtered
+    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 incremental_filter_events sfield night_loitering --merged_table world-fishing-827.scratch_matias_ttl_7_days.incremental_night_loitering_events_merged -incremental_night_loitering_events_filtered
+    ```
+    NOTE: the default dataset source is "pipe_ais_test_202408290000" and the dataset out is "scratch_matias_ttl_7_days".
+    Show all options:
+    ```bash
+    $ docker compose run --entrypoint pipe pipeline incremental_filter_events -h
+    ```
 * `auth_and_regions_fishing_events`: Adds authorization and regions position.
     It can be invoked:
     ```bash
-    # run daily incremental fishing events
-    $ pipe -v --project fishing_events_test auth_and_regions_fishing_events
+    # run daily incremental fishing events. outputs: scratch_matias_ttl_7_days.fishing_events_v20200102 and scratch_matias_ttl_7_days.fishing_events
+    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 auth_and_regions_fishing_events
     ```
-
+    NOTE: the default dataset source is "pipe_ais_test_202408290000" and the dataset out is "scratch_matias_ttl_7_days".
+    Show all options:
+    ```bash
+    $ docker compose run --entrypoint pipe pipeline auth_and_regions_fishing_events -h
+    ```
 * `fishing_restrictive`: restrict the events using a specific list.
     It can be invoked:
     ```bash
-    # run daily incremental fishing events
-    $ pipe -v --project fishing_events_test fishing_restrictive
+    # run daily incremental fishing events. outputs: scratch_matias_ttl_7_days.fishing_events_restrictive_v20200102 and scratch_matias_ttl_7_days.fishing_events_restrictive
+    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 fishing_restrictive
+    ```
+    NOTE: the default dataset source is "pipe_ais_test_202408290000" and the dataset out is "scratch_matias_ttl_7_days".
+    Show all options:
+    ```bash
+    $ docker compose run --entrypoint pipe pipeline fishing_restrictive -h
     ```
 
 ### The former standard way
