@@ -5,7 +5,7 @@ USING (
 ON target.seg_id = staged.seg_id
 AND target.event_start = staged.event_start
 AND target.timestamp = staged.timestamp
-AND target.event_end_date >= '{{ start_date }}'
+AND target.event_end_date >= DATE_SUB('{{ start_date }}', INTERVAL 1 DAY)
 WHEN MATCHED THEN UPDATE
 SET
   target.ssvid = staged.ssvid,

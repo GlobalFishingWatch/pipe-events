@@ -8,13 +8,17 @@
 -- Aggregate position messages that have been annotated with a fishing score into fishing events
 -- A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
 -- messages with score=null are ignored
+-- if we're getting a date range of e.g. start_date=2025-03-30; end_date=2025-03-31 from Airflow
+-- we want to get new fishing events for 2025-03-30; but since we need to pad one day before that
+-- for the merge step we really want to process 2025-03-29 to 2025-03-30 (i.e. exclusive 2025-03-31 00:00:00)
 WITH
     -- Source tables
     source_research_messages AS (
         SELECT *
         FROM `{{ messages_table }}`
         -- allow incremental as well as backfill loads
-        WHERE DATE(timestamp) BETWEEN '{{ start_date }}' AND '{{ end_date }}'
+        WHERE DATE(timestamp) >= DATE_SUB(DATE('{{ start_date }}'), INTERVAL 1 DAY)
+        AND DATE(timestamp) < DATE('{{ end_date }}')
     ),
 
     source_messages AS (
