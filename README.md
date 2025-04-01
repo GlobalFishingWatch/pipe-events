@@ -96,6 +96,7 @@ A pipeline that runs all incremental fishing events steps subsequently is availa
 To run a full backfill on the staging pipeline you can use the following command:
 
 ```
+docker compose build
 cd scripts
 ./generate_incremental_fishing_events.sh --pipeline_prefix PIPELINE12345_staging_test --start_d 2020-01-01 --end_d 2020-12-31
 ```
