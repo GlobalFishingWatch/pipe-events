@@ -11,14 +11,14 @@
 -- get potentially open events which must be within the last {{ max_fishing_event_gap_hours }} hours of the previous day
 -- only get the most recent event by seg_id because previous events have been permanently closed
 WITH backfill_potentially_open_events AS (
-  SELECT * FROM {{ existing_merged_fishing_events }}
+  SELECT * FROM `{{ existing_merged_fishing_events }}`
   WHERE event_end >= TIMESTAMP_SUB(TIMESTAMP('{{ start_date }}'), INTERVAL {{ max_fishing_event_gap_hours }} HOUR)
   AND event_end_date >= DATE_SUB('{{ start_date }}', INTERVAL 1 DAY)
   QUALIFY event_end = MAX(event_end) OVER (PARTITION BY seg_id)
 ),
 -- get events from the previous day that might have to be merged to existing merged events
 delta_events AS (
-  SELECT * FROM {{ temp_incremental_fishing_events }}
+  SELECT * FROM `{{ temp_incremental_fishing_events }}`
   WHERE event_end >= TIMESTAMP_SUB(TIMESTAMP('{{ start_date }}'), INTERVAL {{ max_fishing_event_gap_hours }} HOUR)
 ),
 -- for merging, all we need are the event boundaries instead of messages
