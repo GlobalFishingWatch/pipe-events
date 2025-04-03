@@ -46,8 +46,9 @@ def run(bq, params):
         clustering_fields=["event_end_date", "seg_id", "timestamp"],
         labels=params_copy["labels"],
     )
-    
-    log.info("Truncate incremental fishing events merged table and update event_end and event_end_date.")
+
+    log.info("Truncate incremental fishing events merged table and update event_end and "
+             "event_end_date.")
     truncation_query = bq.format_query(
         "fishing-events-2a-truncate-before-merge.sql.j2",
         existing_merged_fishing_events=params_copy["existing_merged_fishing_events"],
