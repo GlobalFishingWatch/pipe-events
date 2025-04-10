@@ -1,0 +1,20 @@
+DELETE FROM `{{ existing_merged_fishing_events }}`
+WHERE event_end_date >= '{{ start_date }}'
+AND DATE(timestamp) >= '{{ start_date }}';
+
+
+-- truncating the merged table alone is not enough
+-- we need to also recalculate the event_end and event_end_date
+-- this is because we update those columns on historical messages for cost reasons
+MERGE INTO `{{ existing_merged_fishing_events }}` t
+USING(
+  SELECT * EXCEPT(event_end, event_end_date), MAX(timestamp) OVER(PARTITION BY seg_id, event_start) AS event_end, MAX(DATE(timestamp)) OVER(PARTITION BY seg_id, event_start) AS event_end_date
+  FROM `{{ existing_merged_fishing_events }}`
+  WHERE event_end_date >= '{{ start_date }}'
+) s
+ON t.seg_id = s.seg_id
+AND t.timestamp = s.timestamp
+AND t.event_end_date >= '{{ start_date }}'
+WHEN matched THEN UPDATE
+SET t.event_end = s.event_end,
+t.event_end_date = s.event_end_date;

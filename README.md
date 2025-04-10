@@ -26,6 +26,14 @@ $ docker compose run gcloud auth login
 
 ### The fishing events incremental load
 
+Incremental fishing events consists of 4 steps. Only the first step is actually incremental and the rest are just a series of transformations to get the final events. The steps are:
+1. **Incremental merge**: This step loads messages and calculates fishing events. It runs twice, once for `nnet_score` and once for `night_loitering` because at this point we don't know yet what shiptype a vessel is. It is incremental because it only loads the messages that have been added since the last time it was run. Given an input date range of start_date and end_date, it loads the day before start_date as padding in order to perform the merge step, as well as data from start_date until end_date (exclusive). The incremental query is run as a temporary table which is merged into the `incremental_fishing/night_loitering_events_merged` table.
+2. **Filter**: This step applies noise filters on segments, filters for potential fishing vessels, and for fishing events that actually fit the criteria of fishing events (e.g. duration > 20 minutes). This step also runs twice, once for `nnet_score` and once for `night_loitering`.
+3. **Authorization**: This step adds the authorization information to the events. It also combines `nnet_score` and `night_loitering` events into a single table.
+4. **Restrictive**: This step applies the more restrictive `prod_shiptype='fishing'` filter which is required in our API.
+
+#### CLI
+
 The way the fishing events was calculated took unexpected time and resources, to improve the calculation the incremental load was developed. See more in `./assets/bigquery/README.md`.
 
 There is a specific python client to make the calls under `./pipe_events/cli.py`.
@@ -79,6 +87,19 @@ It can be invoked (using the default values of the paramters that points to a sc
     ```bash
     $ docker compose run --entrypoint pipe pipeline fishing_restrictive -h
     ```
+
+
+#### Docker compose
+
+A pipeline that runs all incremental fishing events steps subsequently is available in [scripts/generate_incremental_fishing_events.sh](scripts/generate_incremental_fishing_events.sh). It uses docker compose to run the pipeline in a containerized environment.
+
+To run a full backfill on the staging pipeline you can use the following command:
+
+```
+docker compose build
+cd scripts
+./generate_incremental_fishing_events.sh --pipeline_prefix PIPELINE12345_staging_test --start_d 2020-01-01 --end_d 2020-12-31
+```
 
 ### The former standard way
 
