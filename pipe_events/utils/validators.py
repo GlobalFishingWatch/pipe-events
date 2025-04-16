@@ -10,7 +10,7 @@ def valid_date(s: str) -> datetime.date:
         raise argparse.ArgumentTypeError(f"not a valid date: {s!r}")
 
 
-def valid_table(s: str) -> datetime.datetime:
+def valid_table(s: str) -> str:
     matched = re.fullmatch(r"[\w\-_]+[:\.][\w\-_]+\.[\w\-_]+", s)
     if matched is None:
         raise argparse.ArgumentTypeError(
