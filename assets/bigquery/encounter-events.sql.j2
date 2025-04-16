@@ -124,7 +124,6 @@ WITH
             encountered_vessel2.ssvid AS encountered_vessel_ssvid,
             encountered_vessel2.prod_shiptype AS encountered_vessel_class,
             encountered_vessel2.mmsi_flag AS encountered_vessel_flag,
-            ST_GEOGPOINT(mean_longitude, mean_latitude) as geo,
             S2_CELLIDFROMPOINT(ST_GEOGPOINT(mean_longitude, mean_latitude), s2_level()) as s2_cell
         FROM flattened_encounters AS encounter
                  LEFT JOIN source_all_vessels AS main_vessel ON (
@@ -282,13 +281,19 @@ WITH
             registry_authorized_to
     ),
 
+    complete_encounter_event_with_geo as (
+        SELECT *,
+            ST_GEOGPOINT(mean_longitude, mean_latitude) as geo
+        FROM complete_encounter_event 
+    ),
+
     create_event_region_matches as (
         SELECT
             encounters.event_id,
             id,
             layer
         FROM
-            complete_encounter_event AS encounters
+            complete_encounter_event_with_geo AS encounters
                 JOIN gridded_regions r ON (encounters.s2_cell = r.s2_cell)
         WHERE ST_INTERSECTS(encounters.geo, r.geo)
     ),
@@ -529,9 +534,9 @@ WITH
             regions.regions_mean_position
         FROM
             complete_encounter_event AS encounter
-                INNER JOIN encounter_authorizations AS authorization USING (event_id)
+                LEFT JOIN encounter_authorizations AS authorization USING (event_id)
                 -- join regions information; previously done in last step of v1 encs query 1 code
-                INNER JOIN encounters_regions AS regions USING (event_id)
+                LEFT JOIN encounters_regions AS regions USING (event_id)
     )
 
 
