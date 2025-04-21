@@ -68,6 +68,42 @@ WITH
     ),
 
     #
+    # Voyages source 
+    #
+    voyages_source as (
+        SELECT
+            *,
+        FROM `{{ voyages_table }}`
+    ),
+
+     #
+    # We need to flatten voyages so that we have a record for each vessel id
+    #
+    flattened_voyages AS (
+        SELECT
+            trip_id,
+            trip_start,
+            trip_end,
+            trip_start_anchorage_id,
+            trip_end_anchorage_id,
+            trip_end_visit_id,
+            vessel_id
+        FROM voyages_source
+        WHERE trip_start != '1979-01-01' OR trip_start IS NULL
+    ),
+
+    #
+    # Port visits source, replacing named achorages source 
+    #
+    port_visit_source as (
+        SELECT
+            JSON_EXTRACT_SCALAR(event_info, "$.visit_id") as visit_id,
+            *,
+        FROM `{{ port_visits_table }}`
+    ),
+
+
+    #
     # Good encounter events
     #
     encounters AS (
@@ -120,6 +156,11 @@ WITH
             main_vessel.ssvid AS main_vessel_ssvid,
             main_vessel.prod_shiptype AS main_vessel_class,
             main_vessel.mmsi_flag AS main_vessel_flag,
+            ## add main vessel next port visit information
+            main_vessel_trip_end_anchorages.event_id AS main_trip_end_event_id,
+            SAFE.STRING(PARSE_JSON(main_vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.id) as main_trip_end_port_id,
+            SAFE.STRING(PARSE_JSON(main_vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.flag) as main_trip_end_port_flag,
+            SAFE.STRING(PARSE_JSON(main_vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.name) as main_trip_end_port_name,
             encountered_vessel2.shipname AS encountered_vessel_shipname,
             encountered_vessel2.ssvid AS encountered_vessel_ssvid,
             encountered_vessel2.prod_shiptype AS encountered_vessel_class,
@@ -134,6 +175,14 @@ WITH
                     encountered_vessel_id = encountered_vessel2.vessel_id
                 AND (EXTRACT(YEAR FROM encounter.start_time)= encountered_vessel2.year OR encountered_vessel2.year IS NULL)
             )
+            ## add voyages and anchorage information 
+            LEFT JOIN flattened_voyages AS main_vessel_voyages ON (
+                main_vessel.vessel_id = main_vessel_voyages.vessel_id
+                AND (main_vessel_voyages.trip_start < encounter.start_time OR main_vessel_voyages.trip_start IS NULL)
+                AND main_vessel_voyages.trip_end > encounter.end_time )
+            LEFT JOIN
+            port_visit_source AS main_vessel_trip_end_anchorages ON
+                main_vessel_voyages.trip_end_visit_id = main_vessel_trip_end_anchorages.visit_id
     ),
 
 
@@ -568,7 +617,14 @@ WITH
                 potential_risk,
                 -- authorization for main and encountered vessel
                 main_vessel_public_authorization_status,
-                encountered_vessel_public_authorization_status
+                encountered_vessel_public_authorization_status,
+                STRUCT(
+                    -- destination port after encounter for main encountered vessel
+                    main_trip_end_event_id AS event_id,
+                    main_trip_end_port_id as id,
+                    main_trip_end_port_flag as flag,
+                    main_trip_end_port_name as name
+                ) as main_vessel_destination_port
             )
         ) AS event_info,
         TO_JSON_STRING([
