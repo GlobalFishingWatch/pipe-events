@@ -13,6 +13,8 @@ ARGS=( \
   VESSEL_INFO_TABLE \
   VESSEL_IDENTITY_CORE \
   VESSEL_IDENTITY_AUTHORIZATION \
+  VOYAGES_TABLE \
+  PORT_VISITS_TABLE \
   DEST_TABLE_NAME \
 )
 
@@ -136,6 +138,8 @@ jinja2 "${INSERT_SQL}" \
    -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    -D regions_table=${REGIONS_TABLE//:/.} \
+   -D voyages_table=${VOYAGES_TABLE//:/.} \
+   -D port_visits_table=${PORT_VISITS_TABLE//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
      --append_table \
      --destination_table ${current_table_name}
