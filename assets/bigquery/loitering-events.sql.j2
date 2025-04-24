@@ -159,7 +159,7 @@ WITH
                         SAFE.STRING(PARSE_JSON(vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.id) as id,
                         SAFE.STRING(PARSE_JSON(vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.flag) as flag,
                         SAFE.STRING(PARSE_JSON(vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.name) as name
-                    ) as vessel_destination_port
+                    ) as main_vessel_destination_port
                 )
             ) AS event_info,
             TO_JSON_STRING([
