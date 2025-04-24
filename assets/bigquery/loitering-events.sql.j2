@@ -6,7 +6,43 @@
 WITH
 
     #
-    # Source tables
+    # Voyages source 
+    #
+    voyages_source as (
+        SELECT
+            *,
+        FROM `{{ voyages_table }}`
+    ),
+
+     #
+    # We need to flatten voyages so that we have a record for each vessel id
+    #
+    flattened_voyages AS (
+        SELECT
+            trip_id,
+            trip_start,
+            trip_end,
+            trip_start_anchorage_id,
+            trip_end_anchorage_id,
+            trip_end_visit_id,
+            vessel_id
+        FROM voyages_source
+        WHERE trip_start != '1979-01-01' OR trip_start IS NULL
+    ),
+
+    #
+    # Port visits source, replacing named achorages source 
+    #
+    port_visit_source as (
+        SELECT
+            JSON_EXTRACT_SCALAR(event_info, "$.visit_id") as visit_id,
+            *,
+        FROM `{{ port_visits_table }}`
+    ),
+
+
+    #
+    # Loitering
     #
 
     source_loitering AS (
@@ -98,10 +134,10 @@ WITH
     #
     base_loitering_event AS (
         SELECT
-            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'loitering', vessel_id, loitering_start_timestamp, loitering_end_timestamp))) AS event_id,
+            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'loitering', vessel.vessel_id, loitering_start_timestamp, loitering_end_timestamp))) AS event_id,
             'loitering' AS event_type,
-            vessel_id,
-            seg_id,
+            vessel.vessel_id,
+            si.seg_id,
             loitering_start_timestamp AS event_start,
             loitering_end_timestamp AS event_end,
             (start_lat + end_lat) / 2 AS lat_mean,
@@ -116,15 +152,22 @@ WITH
                     convert_nm_to_km(tot_distance_nm) AS total_distance_km,
                     convert_nm_to_km(avg_distance_from_shore_nm) AS avg_distance_from_shore_km,
                     avg_speed_knots,
-                    vessel.prod_shiptype as vessel_class
+                    vessel.prod_shiptype as vessel_class,
+                    STRUCT(
+                    -- destination port after event
+                        vessel_trip_end_anchorages.event_id AS event_id,
+                        SAFE.STRING(PARSE_JSON(vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.id) as id,
+                        SAFE.STRING(PARSE_JSON(vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.flag) as flag,
+                        SAFE.STRING(PARSE_JSON(vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.name) as name
+                    ) as vessel_destination_port
                 )
             ) AS event_info,
             TO_JSON_STRING([
                 STRUCT(
-                    vessel_id AS `id`,
+                    vessel.vessel_id AS `id`,
                     lo.ssvid AS `ssvid`,
                     vessel.shipname AS `name`,
-                    seg_id,
+                    si.seg_id,
                     vessel.prod_shiptype AS `type`,
                     vessel.mmsi_flag AS `flag`
                 )
@@ -132,6 +175,13 @@ WITH
         FROM denoised_loitering AS lo
             JOIN source_segment_info si USING (seg_id)
             JOIN source_all_vessels vessel USING (vessel_id, year)
+            LEFT JOIN flattened_voyages AS voyages ON ( 
+                vessel.vessel_id = voyages.vessel_id 
+                AND (voyages.trip_start < loitering_start_timestamp OR voyages.trip_start IS NULL)
+                AND voyages.trip_end > loitering_end_timestamp 
+            )
+            LEFT JOIN  port_visit_source AS vessel_trip_end_anchorages ON
+                voyages.trip_end_visit_id = vessel_trip_end_anchorages.visit_id
     ),
 
 
