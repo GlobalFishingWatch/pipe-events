@@ -26,13 +26,9 @@ WITH source_segs AS (
             potential_fishing OR on_fishing_list_sr
     ),
 
-    cleanup_overlapping_events AS (
-        SELECT * FROM `{{ merged_table }}`
-    ),
-
  
 fishing_events_merged_good_segments AS (
-  SELECT * FROM cleanup_overlapping_events
+  SELECT * FROM `{{ merged_table }}`
   WHERE seg_id IN (
     SELECT
         seg_id
