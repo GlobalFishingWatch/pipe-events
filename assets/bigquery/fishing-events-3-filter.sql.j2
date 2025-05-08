@@ -26,15 +26,8 @@ WITH source_segs AS (
             potential_fishing OR on_fishing_list_sr
     ),
 
-    -- there are two special cases that could happen in rare cases for multi-day events:
-    -- if we intend to merge an event to the previous event it could happen that the next day we won't be able to merge to the combined event
-    -- this leads to duplication with two different outcomes:
-    -- 1. we create an event that overlaps with a previous and next event
-    -- 2. we create an event with the same event end as the next event but a different start
-    -- we then only keep the messages for the event that first started
     cleanup_overlapping_events AS (
         SELECT * FROM `{{ merged_table }}`
-        QUALIFY event_start = MIN(event_start) OVER(PARTITION BY seg_id, event_end)
     ),
 
  

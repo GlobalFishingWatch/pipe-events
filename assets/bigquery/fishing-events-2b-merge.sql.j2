@@ -26,14 +26,23 @@ open_events_only AS (
   SELECT DISTINCT seg_id, event_start, event_end
   FROM backfill_potentially_open_events
 ),
--- only get first event by seg_id because subsequent events must not be merged
+-- only get the most recent event that had a timestamp during the last {{ max_fishing_event_gap_hours }} hours of the previous day
+-- so until 23:59:59 on the previous day
+-- this is because we only want to merge with the most recent event
 delta_events_only AS (
-  SELECT DISTINCT seg_id, event_start, event_end
+  SELECT DISTINCT seg_id, event_start, event_end, event_end_date
   FROM delta_events
-  QUALIFY event_end = MIN(event_end) OVER (PARTITION BY seg_id)
+  WHERE timestamp >= TIMESTAMP_SUB(TIMESTAMP('{{ start_date }}'), INTERVAL {{ max_fishing_event_gap_hours }} HOUR)
+  AND timestamp < TIMESTAMP('{{ start_date }}')
+  QUALIFY event_end = MAX(event_end) OVER (PARTITION BY seg_id)
 ),
 overlapping_events AS (
-  SELECT open.seg_id seg_id, open.event_start AS event_start, delta.event_end AS event_end, open.event_end AS merge_timestamp
+  SELECT
+    open.seg_id AS seg_id,
+    open.event_start AS event_start,
+    delta.event_end AS event_end,
+    delta.event_end_date AS event_end_date,
+    open.event_end AS merge_timestamp
   FROM open_events_only open
   INNER JOIN delta_events_only delta
   ON open.seg_id = delta.seg_id
@@ -47,7 +56,7 @@ backfill_merged AS (
     backfill.* EXCEPT(event_start, event_end, event_end_date), 
     overlapping_events.event_start AS event_start, 
     overlapping_events.event_end AS event_end,
-    event_end_date
+    overlapping_events.event_end_date AS event_end_date
   FROM backfill_potentially_open_events AS backfill 
   INNER JOIN overlapping_events
   ON overlapping_events.seg_id = backfill.seg_id
@@ -60,7 +69,7 @@ delta_merged AS (
     delta.* EXCEPT(event_start, event_end, event_end_date), 
     overlapping_events.event_start AS event_start, 
     overlapping_events.event_end AS event_end,
-    event_end_date
+    overlapping_events.event_end_date AS event_end_date
   FROM delta_events AS delta 
   INNER JOIN overlapping_events
   ON overlapping_events.seg_id = delta.seg_id
