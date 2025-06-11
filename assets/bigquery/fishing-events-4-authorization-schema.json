@@ -129,6 +129,30 @@
                 "type": "STRING",
                 "mode": "REPEATED",
                 "description": "MPA no take."
+            },
+            {
+                "name": "hsp",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "High seas pocket."
+            },
+            {
+                "name": "protectedseas",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "Protected seas."
+            },
+            {
+                "name": "duke_paa",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "Preferential Access Areas - Duke."
+            },
+            {
+                "name": "fra_gfcm_fao",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "General Fisheries Commission for the Mediterranean - GFCM."
             }
         ]
     },
