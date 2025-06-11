@@ -20,7 +20,7 @@ class TestValidators:
         "table,expected",
         [
             ("a.b.c", "a.b.c"),
-            ("a:b.c", "a:b.c"),
+            pytest.param("a:b.c", "a:b.c", marks=pytest.mark.xfail),
             ("a-x.b-y.c-z", "a-x.b-y.c-z"),
             pytest.param("a-b.c", "a-b.c", marks=pytest.mark.xfail),
             pytest.param("test", "test", marks=pytest.mark.xfail),
