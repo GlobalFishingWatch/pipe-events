@@ -10,10 +10,13 @@ def valid_date(s: str) -> datetime.date:
         raise argparse.ArgumentTypeError(f"not a valid date: {s!r}")
 
 
+TABLE_REGEX = r"[\w\-_]+\.[\w\-_]+\.[\w\-_]+"
+
+
 def valid_table(s: str) -> str:
-    matched = re.fullmatch(r"[\w\-_]+[:\.][\w\-_]+\.[\w\-_]+", s)
+    matched = re.fullmatch(TABLE_REGEX, s)
     if matched is None:
         raise argparse.ArgumentTypeError(
-            f"not a valid table pattern (project.dataset.table): {s!r}"
+            f"not a valid table pattern (Format allowed <{TABLE_REGEX}>): {s!r}"
         )
     return s
