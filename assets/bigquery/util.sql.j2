@@ -74,7 +74,7 @@ CREATE TEMPORARY FUNCTION
 
 CREATE TEMP FUNCTION s2_level() AS (10);
 CREATE TEMP FUNCTION parse_regions_to_struct(regions_str STRING)
-  RETURNS STRUCT<eez ARRAY<STRING>, mpa ARRAY<STRING>, rfmo ARRAY<STRING>, fao ARRAY<STRING>,major_fao ARRAY<STRING>, eez12nm ARRAY<STRING>, high_seas ARRAY<STRING>, mpa_no_take_partial ARRAY<STRING>, mpa_no_take ARRAY<STRING>>
+  RETURNS STRUCT<eez ARRAY<STRING>, mpa ARRAY<STRING>, rfmo ARRAY<STRING>, fao ARRAY<STRING>,major_fao ARRAY<STRING>, eez12nm ARRAY<STRING>, high_seas ARRAY<STRING>, mpa_no_take_partial ARRAY<STRING>, mpa_no_take ARRAY<STRING>>, duke_paa ARRAY<STRING>, protectedseas ARRAY<STRING>, hsp ARRAY<STRING>, fra_gfcm_fao ARRAY<STRING>>
   LANGUAGE js AS
 """
     const regions = JSON.parse(regions_str)
@@ -87,5 +87,9 @@ CREATE TEMP FUNCTION parse_regions_to_struct(regions_str STRING)
     this.major_fao = regions.major_fao || [];
     this.eez12nm = regions.eez12nm || [];
     this.high_seas = regions.high_seas || [];
+    this.duke_paa = regions.duke_paa || [];
+    this.protectedseas = regions.protectedseas || [];
+    this.hsp = regions.hsp || [];
+    this.fra_gfcm_fao = regions.fra_gfcm_fao || [];
     return this;
 """;
