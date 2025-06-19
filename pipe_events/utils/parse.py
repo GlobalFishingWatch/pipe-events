@@ -11,7 +11,7 @@ PIPELINE_VERSION = pkg_resources.require(PIPELINE_NAME)[0].version
 PIPELINE_DESCRIPTION = "Generate the incremental fishing events"
 PROJ = "world-fishing-827"
 DATASET_IN = "pipe_ais_test_202408290000"
-DATASET_OUT = "scratch_matias_ttl_7_days"
+DATASET_OUT = "scratch_matias_ttl7d"
 
 DEFAULT = dict(
     # common

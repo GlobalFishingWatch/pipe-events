@@ -50,7 +50,6 @@ def load_schema(schema_file):
 
 class BigqueryHelper:
     def __init__(self, project=None, logger=None, dry_run=False):
-        self.project = project
         self.log = logger or logging.getLogger(__name__)
         self.dry_run = dry_run
         self.client = bigquery.Client(project=project)
@@ -139,7 +138,7 @@ class BigqueryHelper:
         :param partition_field: name of field to use for time partitioning (None for no partition)
         :param exists_ok: Defaults to True. If True, ignore “already exists”
         errors when creating the table.
-        :parma labels: labels to audit the table.
+        :param labels: labels to audit the table.
         :return: A new google.cloud.bigquery.table.Table
         """
 
