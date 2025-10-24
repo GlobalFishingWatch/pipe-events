@@ -103,6 +103,19 @@ if [ "$?" -ne 0 ]; then
 fi
 echo "  Events table exists"
 
+################################################################################
+# Truncate table
+################################################################################
+TRUNCATE_SQL=${ASSETS}/bigquery/truncate-table.sql.j2
+echo "Truncating existing records in ${current_table_name}"
+jinja2 ${TRUNCATE_SQL} \
+  -D table=${current_table_name//:/.} \
+  | bq query --max_rows=0
+if [ "$?" -ne 0 ]; then
+  echo "  Unable to truncate records for table ${current_table_name}"
+  exit 1
+fi
+
 
 ################################################################################
 # Inserting new records
