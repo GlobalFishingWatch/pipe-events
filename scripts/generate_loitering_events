@@ -101,24 +101,22 @@ bq mk --force \
   --time_partitioning_type=MONTH \
   "${current_table_name}"
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to create table ${DEST_TABLE_NAME}"
+  echo "  Unable to create table ${current_table_name}"
   exit 1
 fi
 echo "  Events table exists"
 
 
 ################################################################################
-# Delete existing records
+# Truncate table
 ################################################################################
-DELETE_SQL=${ASSETS}/bigquery/delete-daterange.sql.j2
-echo "Deleting existing records for ${START_DATE} to ${END_DATE}"
-jinja2 ${DELETE_SQL} \
+TRUNCATE_SQL=${ASSETS}/bigquery/truncate-table.sql.j2
+echo "Truncating existing records in ${current_table_name}"
+jinja2 ${TRUNCATE_SQL} \
   -D table=${current_table_name//:/.} \
-  -D start_date=${START_DATE} \
-  -D end_date=${END_DATE} \
   | bq query --max_rows=0
 if [ "$?" -ne 0 ]; then
-  echo "  Unable to delete records for table ${current_table_name} from ${START_DATE} to ${END_DATE}"
+  echo "  Unable to truncate records for table ${current_table_name}"
   exit 1
 fi
 
@@ -144,7 +142,6 @@ jinja2 "${INSERT_SQL}" \
    -D voyages_table=${VOYAGES_TABLE//:/.} \
    -D port_visits_table=${PORT_VISITS_TABLE//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
-     --append_table \
      --destination_table ${current_table_name}
 
 if [ "$?" -ne 0 ]; then
