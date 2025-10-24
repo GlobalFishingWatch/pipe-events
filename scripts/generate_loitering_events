@@ -142,6 +142,7 @@ jinja2 "${INSERT_SQL}" \
    -D voyages_table=${VOYAGES_TABLE//:/.} \
    -D port_visits_table=${PORT_VISITS_TABLE//:/.} \
    | bq query --headless --max_rows=0 --allow_large_results \
+      --append_table \
      --destination_table ${current_table_name}
 
 if [ "$?" -ne 0 ]; then

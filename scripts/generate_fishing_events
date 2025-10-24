@@ -171,6 +171,7 @@ jinja2 "${INSERT_SQL}" \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
    -D fishing_list_filters="${FISHING_LIST_FILTERS}" \
    | bq query --headless --max_rows=0 --allow_large_results \
+     --append_table \
      --destination_table ${current_table_name_fishing_events}
 
 if [ "$?" -ne 0 ]; then

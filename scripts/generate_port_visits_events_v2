@@ -137,6 +137,7 @@ jinja2 "${INSERT_SQL}" \
    -D start_date="${START_DATE}" \
    -D end_date="${END_DATE}" \
    | bq query --headless --max_rows=0 --allow_large_results \
+     --append_table \
      --destination_table ${current_table_name}
 
 if [ "$?" -ne 0 ]; then
