@@ -32,7 +32,7 @@ WITH
             *
         FROM `{{ port_visits_table }}`
         WHERE confidence >= 2
-          AND end_timestamp <= '{{ end_date }}'
+          AND DATE(end_timestamp) <= '{{ end_date }}'
     ),
 
     #
