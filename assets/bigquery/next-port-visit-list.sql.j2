@@ -1,0 +1,20 @@
+#standardSQL
+
+-- Include some utility functions
+{% include 'util.sql.j2' %}
+
+WITH combined_next_port_visit_events AS (
+  SELECT event_type, event_info FROM `{{ source_product_events_loitering }}`
+  UNION ALL
+  SELECT event_type, event_info FROM `{{ source_product_events_encounter }}`
+)
+
+SELECT
+  DISTINCT
+  event_type,
+  JSON_EXTRACT_SCALAR(event_info, '$.main_vessel_destination_port.id') id,
+  JSON_EXTRACT_SCALAR(event_info, '$.main_vessel_destination_port.flag') flag,
+  JSON_EXTRACT_SCALAR(event_info, '$.main_vessel_destination_port.name') name
+FROM combined_next_port_visit_events
+WHERE JSON_EXTRACT_SCALAR(event_info, '$.main_vessel_destination_port.event_id') IS NOT NULL
+AND JSON_EXTRACT_SCALAR(event_info, '$.main_vessel_destination_port.id') IS NOT NULL -- there is a very small number of next port events that are missing the port id
