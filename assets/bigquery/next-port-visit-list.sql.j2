@@ -9,8 +9,7 @@ WITH combined_next_port_visit_events AS (
   SELECT event_type, event_info FROM `{{ source_product_events_encounter }}`
 )
 
-SELECT
-  DISTINCT
+SELECT DISTINCT
   event_type,
   JSON_EXTRACT_SCALAR(event_info, '$.main_vessel_destination_port.id') id,
   JSON_EXTRACT_SCALAR(event_info, '$.main_vessel_destination_port.flag') flag,
