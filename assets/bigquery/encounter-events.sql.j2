@@ -641,7 +641,7 @@ WITH
                 ),
             STRUCT(
                 encountered_vessel_id AS `id`,
-                encountered_vessel_ssvid AS `ssvid`,
+                filter_invalid_ssvid(encountered_vessel_ssvid) AS `ssvid`,
                 encountered_vessel_shipname AS `name`,
                 encountered_point_count AS point_count,
                 encountered_vessel_class as `type`,

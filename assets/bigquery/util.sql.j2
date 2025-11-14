@@ -2,6 +2,14 @@
 
 # Utility Functions
 
+# Validate SSVID
+# Returns NULL if the SSVID is valid (64 characters), otherwise returns the original SSVID
+# This is useful for filtering out VMS ssvids
+# more context here: https://github.com/GlobalFishingWatch/pipe-events/pull/135
+CREATE TEMPORARY FUNCTION filter_invalid_ssvid( ssvid STRING )
+AS (
+  IF (LENGTH(ssvid) = 64, NULL, ssvid)
+);
 
 # Get the longitude of the antipode for a given longitude
 #
