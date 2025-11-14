@@ -165,7 +165,7 @@ WITH
             TO_JSON_STRING([
                 STRUCT(
                     vessel.vessel_id AS `id`,
-                    lo.ssvid AS `ssvid`,
+                    filter_invalid_ssvid(lo.ssvid) AS `ssvid`,
                     vessel.shipname AS `name`,
                     si.seg_id,
                     vessel.prod_shiptype AS `type`,
