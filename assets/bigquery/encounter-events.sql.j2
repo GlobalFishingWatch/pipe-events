@@ -612,7 +612,7 @@ WITH
                 ROUND(median_distance_km,3) AS median_distance_km,
                 ROUND(median_speed_knots,3) AS median_speed_knots,
                 encountered_vessel_id,
-                CONCAT(main_vessel_class, '-', encountered_vessel_class) AS vessel_classes,
+                CONCAT(COALESCE(main_vessel_class, ''), '-', COALESCE(encountered_vessel_class, '')) AS vessel_classes,
                 ## NEW change field name from joint_authorization to potential_risk
                 potential_risk,
                 -- authorization for main and encountered vessel
