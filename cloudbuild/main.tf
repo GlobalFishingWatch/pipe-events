@@ -1,50 +1,17 @@
-provider "google" {
-  project = "gfw-int-infrastructure"
+module "trigger_push_to_tag" {
+  source              = "git::https://github.com/GlobalFishingWatch/gfw-terraform-modules.git//modules/cloudbuild-trigger?ref=v0.2.0"
+  registry_artifact   = "publication"
+  repo_name           = "pipe-events"
+  tag                 = ".*"
+  trigger_description = "Builds and publishes a Docker image on every tag push." 
 }
-resource "google_cloudbuild_trigger" "pipe-events" {
-  name     = "pipe-events-tag"
-  location = "us-central1"
 
-
-  github {
-    name  = "pipe-events"
-    owner = "GlobalFishingWatch"
-    push {
-      tag          = ".*"
-      invert_regex = false
-    }
-
-  }
-
-
-  service_account = "projects/gfw-int-infrastructure/serviceAccounts/cloudbuild@gfw-int-infrastructure.iam.gserviceaccount.com"
-  build {
-
-    step {
-      id         = "docker build"
-      name       = "gcr.io/cloud-builders/docker"
-      entrypoint = "/bin/bash"
-      args = [
-        "-c",
-        <<-EOF
-         
-          docker build \
-            -t \
-            us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/github-globalfishingwatch-pipe-events:$TAG_NAME \
-            .
-            
-        EOF
-      ]
-
-    }
-
-    images = ["us-central1-docker.pkg.dev/gfw-int-infrastructure/publication/github-globalfishingwatch-pipe-events:$TAG_NAME"]
-
-
-
-    options {
-      logging = "CLOUD_LOGGING_ONLY"
-    }
-    timeout = "1200s"
-  }
+module "trigger_push_to_main" {
+  source              = "git::https://github.com/GlobalFishingWatch/gfw-terraform-modules.git//modules/cloudbuild-trigger?ref=v0.2.0"
+  registry_artifact   = "publication"
+  repo_name           = "pipe-events"
+  branch              = "main"
+  trigger_description = "Builds and publishes a Docker image on every push to the main branch."
 }
+
+

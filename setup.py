@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='pipe-events',
-    version='4.2.11',
+    version='4.2.16',
     author="Global Fishing Watch.",
     description=(
         "Pipeline for publishing summarized event information"
@@ -17,9 +17,15 @@ setup(
     url="https://github.com/GlobalFishingWatch/pipe-events",
     packages=find_packages(exclude=['test*.*', 'tests']),
     install_requires=[
-        'jinja2-cli<1',
-        'google-cloud-bigquery<4',
+        'jinja2-cli~=0.8',
+        'google-cloud-bigquery~=3.26',
     ],
+    extras_require={
+        "dev": [
+            "pip-tools",
+            "flake8",
+        ],
+    },
     entry_points={
         'console_scripts': [
             'pipe = pipe_events.cli:main',
