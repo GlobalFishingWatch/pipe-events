@@ -65,7 +65,7 @@ pycparser==2.23
     # via cffi
 python-dateutil==2.9.0.post0
     # via google-cloud-bigquery
-requests==2.32.4
+requests==2.33.0
     # via
     #   google-api-core
     #   google-cloud-bigquery
