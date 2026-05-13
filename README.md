@@ -1,6 +1,18 @@
-# Events pipeline
+<h1 align="center" style="border-bottom: none;"> pipe-events </h1>
+
+<p align="center">
+  <a href="https://codecov.io/gh/GlobalFishingWatch/pipe-events">
+    <img alt="Coverage" src="https://codecov.io/gh/GlobalFishingWatch/pipe-events/graph/badge.svg?token=HLSEOQKEER">
+  </a>
+  <a>
+    <img alt="Python versions" src="https://img.shields.io/badge/python-3.8-blue">
+  </a>
+</p>
 
 This repository contains the events pipeline, a simple pipeline which extracts summarized events from various datasets we produce.
+
+[git workflow documentation]: GITHUB-FLOW.md
+
 
 # Running
 
@@ -21,6 +33,10 @@ The pipeline reads it's input from BigQuery, so you need to first authenticate w
 ```
 $ docker compose run gcloud auth login
 ```
+
+## Git Workflow
+
+Please refer to our [git workflow documentation] to know how to manage branches in this repository.
 
 ## Configuration
 

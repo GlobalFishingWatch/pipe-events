@@ -30,8 +30,7 @@ def test_formatter(test_input, expected,  monkeypatch: pytest.MonkeyPatch):
         m.setattr(sys, 'stdout', mocked_stdout)
 
         # load the module
-        spec = importlib.util.spec_from_file_location(modname, "pipe_events/postgis/formatter.py")
-        sys.modules[modname] = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(sys.modules[modname])
+        import pipe_events.postgis.formatter as formatter
+        importlib.reload(formatter)
 
         assert mocked_stdout.getvalue().strip() == expected
