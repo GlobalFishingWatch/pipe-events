@@ -436,8 +436,8 @@ WITH
                 STRUCT(
                     cfe.vessel_id AS `id`,
                     filter_invalid_ssvid(cfe.ssvid) AS `ssvid`,
-                    vessel.shipname AS `name`,
-                    vessel.mmsi_flag as `flag`,
+                    vessel.ais_shipname AS `name`,
+                    vessel.ais_mmsi_flag as `flag`,
                     vessel.prod_shiptype AS `type`,
                     seg_id,
                     -- add authorization information
