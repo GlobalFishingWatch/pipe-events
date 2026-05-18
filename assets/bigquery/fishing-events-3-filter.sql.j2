@@ -65,8 +65,8 @@ fishing_events_identity AS (
       vesselinfo.vessel_id,
       vesselinfo.prod_geartype AS best_best_vessel_class,
       vesselinfo.ssvid AS main_vessel_ssvid,
-      vesselinfo.mmsi_flag as main_vessel_flag,
-      vesselinfo.shipname AS main_vessel_shipname
+      vesselinfo.ais_mmsi_flag as main_vessel_flag,
+      vesselinfo.ais_shipname AS main_vessel_shipname
   FROM
       fishing_events_vessel_id
       LEFT JOIN source_fishing_vessels AS vesselinfo USING (vessel_id, year)  
