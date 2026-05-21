@@ -166,10 +166,10 @@ WITH
                 STRUCT(
                     vessel.vessel_id AS `id`,
                     filter_invalid_ssvid(lo.ssvid) AS `ssvid`,
-                    vessel.shipname AS `name`,
+                    vessel.ais_shipname AS `name`,
                     si.seg_id,
                     vessel.prod_shiptype AS `type`,
-                    vessel.mmsi_flag AS `flag`
+                    vessel.ais_mmsi_flag AS `flag`
                 )
             ]) AS event_vessels
         FROM denoised_loitering AS lo
