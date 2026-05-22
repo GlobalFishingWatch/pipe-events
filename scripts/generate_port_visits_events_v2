@@ -121,7 +121,7 @@ fi
 ################################################################################
 # Inserting new records
 ################################################################################
-INSERT_SQL=${ASSETS}/bigquery/port-visits-events.sql.j2
+INSERT_SQL=${ASSETS}/bigquery/port-visits-events-v2.sql.j2
 
 echo "SQl query: ${INSERT_SQL}"
 echo "Inserting new records for ${START_DATE} to ${END_DATE}"
