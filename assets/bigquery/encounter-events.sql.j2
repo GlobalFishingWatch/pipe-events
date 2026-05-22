@@ -11,7 +11,7 @@ WITH
     source_all_vessels AS (
         SELECT
             *
-        FROM `{{ all_vessels_byyear_v_table }}`
+        FROM `{{ product_vessel_info_summary_table }}`
     ),
 
     #
@@ -152,19 +152,19 @@ WITH
         SELECT
             encounter.*,
             main_vessel.vessel_id AS main_vessel_id,
-            main_vessel.ais_shipname AS main_vessel_shipname,
+            main_vessel.{{ product_vessel_info_summary_field_prefix }}shipname AS main_vessel_shipname,
             main_vessel.ssvid AS main_vessel_ssvid,
             main_vessel.prod_shiptype AS main_vessel_class,
-            main_vessel.ais_mmsi_flag AS main_vessel_flag,
+            main_vessel.{{ product_vessel_info_summary_field_prefix }}mmsi_flag AS main_vessel_flag,
             ## add main vessel next port visit information
             main_vessel_trip_end_anchorages.event_id AS main_trip_end_event_id,
             SAFE.STRING(PARSE_JSON(main_vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.id) as main_trip_end_port_id,
             SAFE.STRING(PARSE_JSON(main_vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.flag) as main_trip_end_port_flag,
             SAFE.STRING(PARSE_JSON(main_vessel_trip_end_anchorages.event_info, wide_number_mode=>'round').intermediate_anchorage.name) as main_trip_end_port_name,
-            encountered_vessel2.ais_shipname AS encountered_vessel_shipname,
+            encountered_vessel2.{{ product_vessel_info_summary_field_prefix }}shipname AS encountered_vessel_shipname,
             encountered_vessel2.ssvid AS encountered_vessel_ssvid,
             encountered_vessel2.prod_shiptype AS encountered_vessel_class,
-            encountered_vessel2.ais_mmsi_flag AS encountered_vessel_flag,
+            encountered_vessel2.{{ product_vessel_info_summary_field_prefix }}mmsi_flag AS encountered_vessel_flag,
             S2_CELLIDFROMPOINT(ST_GEOGPOINT(mean_longitude, mean_latitude), s2_level()) as s2_cell
         FROM flattened_encounters AS encounter
                  LEFT JOIN source_all_vessels AS main_vessel ON (

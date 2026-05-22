@@ -9,8 +9,8 @@ ARGS=( \
   SOURCE_TABLE \
   SPATIAL_MEASURES_TABLE \
   REGIONS_TABLE \
-  ALL_VESSELS_BYYEAR_V_TABLE \
-  VESSEL_INFO_TABLE \
+  PRODUCT_VESSEL_INFO_SUMMARY_TABLE \
+  PRODUCT_VESSEL_INFO_SUMMARY_FIELD_PREFIX \
   VESSEL_IDENTITY_CORE \
   VESSEL_IDENTITY_AUTHORIZATION \
   VOYAGES_TABLE \
@@ -130,8 +130,8 @@ echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 
 jinja2 "${INSERT_SQL}" \
    -D encounters_table=${SOURCE_TABLE//:/.} \
-   -D vessel_info_table=${VESSEL_INFO_TABLE//:/.} \
-   -D all_vessels_byyear_v_table=${ALL_VESSELS_BYYEAR_V_TABLE//:/.} \
+   -D product_vessel_info_summary_table=${PRODUCT_VESSEL_INFO_SUMMARY_TABLE//:/.} \
+   -D product_vessel_info_summary_field_prefix=${PRODUCT_VESSEL_INFO_SUMMARY_FIELD_PREFIX} \
    -D spatial_measures_table=${SPATIAL_MEASURES_TABLE//:/.} \
    -D vessel_identity_core=${VESSEL_IDENTITY_CORE//:/.} \
    -D vessel_identity_authorization=${VESSEL_IDENTITY_AUTHORIZATION//:/.} \
