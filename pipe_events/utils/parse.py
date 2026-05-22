@@ -71,7 +71,6 @@ def parse(arguments):
         description=f"{PIPELINE_NAME}:{PIPELINE_VERSION} - {PIPELINE_DESCRIPTION}"
     )
 
-
     ################################################################################
     # Common arguments
     ################################################################################
