@@ -185,9 +185,9 @@ WITH
                 STRUCT(
                     vessel.vessel_id AS `id`,
                     filter_invalid_ssvid(vessel.ssvid) AS `ssvid`,
-                    vessel.ais_shipname AS `name`,
+                    vessel.{{ product_vessel_info_summary_field_prefix }}shipname AS `name`,
                     vessel.prod_shiptype as `type`,
-                    vessel.ais_mmsi_flag as `flag`
+                    vessel.{{ product_vessel_info_summary_field_prefix }}mmsi_flag as `flag`
                     )
                 ]) as event_vessels
         FROM

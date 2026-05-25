@@ -7,8 +7,8 @@ ASSETS=${THIS_SCRIPT_DIR}/../assets
 ARGS=( \
   DATE_RANGE \
   PORT_VISITS_TABLE \
-  VESSEL_INFO_TABLE \
   PRODUCT_VESSEL_INFO_SUMMARY_TABLE \
+  PRODUCT_VESSEL_INFO_SUMMARY_FIELD_PREFIX \
   SPATIAL_MEASURES_TABLE \
   REGIONS_TABLE \
   NAMED_ANCHORAGES_TABLE \
@@ -129,8 +129,8 @@ echo "Inserting new records for ${START_DATE} to ${END_DATE}"
 jinja2 "${INSERT_SQL}" \
    -D dest="${DEST_TABLE_NAME//:/.}" \
    -D port_visits_table="${PORT_VISITS_TABLE}" \
-   -D vessel_info_table="${VESSEL_INFO_TABLE}" \
-   -D product_vessel_info_summary_table=${PRODUCT_VESSEL_INFO_SUMMARY_TABLE} \
+   -D product_vessel_info_summary_table=${PRODUCT_VESSEL_INFO_SUMMARY_TABLE//:/.} \
+   -D product_vessel_info_summary_field_prefix=${PRODUCT_VESSEL_INFO_SUMMARY_FIELD_PREFIX} \
    -D spatial_measures_table=${SPATIAL_MEASURES_TABLE} \
    -D regions_table=${REGIONS_TABLE//:/.} \
    -D named_anchorages_table=${NAMED_ANCHORAGES_TABLE} \

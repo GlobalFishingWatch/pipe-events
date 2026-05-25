@@ -71,7 +71,9 @@ def parse(arguments):
         description=f"{PIPELINE_NAME}:{PIPELINE_VERSION} - {PIPELINE_DESCRIPTION}"
     )
 
+    ################################################################################
     # Common arguments
+    ################################################################################
     parser.add_argument(
         "--test",
         action="store_true",
@@ -110,23 +112,14 @@ def parse(arguments):
 
     # operations
     subparsers = parser.add_subparsers(dest="operation", required=True)
+
+    ################################################################################
+    # incremental_events
+    ################################################################################
     incremental = subparsers.add_parser(
         "incremental_events",
         help="Generates the incremental fishing or night loitering events.",
     )
-    incremental_filter = subparsers.add_parser(
-        "incremental_filter_events",
-        help="Takes the incremental fishing or night loitering events and apply filters.",
-    )
-    auth_and_regions = subparsers.add_parser(
-        "auth_and_regions_fishing_events",
-        help="Combine the fishing and night_loitering with authorization and regions.",
-    )
-    fishing_restrictive = subparsers.add_parser(
-        "fishing_restrictive",
-        help="Generates a table with the fishing restrictive events in case does not exists.",
-    )
-
     incremental.add_argument(
         "-start",
         "--start_date",
@@ -192,6 +185,13 @@ def parse(arguments):
         default=DEFAULT["use_merged_table"],
     )
 
+    ################################################################################
+    # incremental_filter
+    ################################################################################
+    incremental_filter = subparsers.add_parser(
+        "incremental_filter_events",
+        help="Takes the incremental fishing or night loitering events and apply filters.",
+    )
     incremental_filter.add_argument(
         "-segsact",
         "--segs_activity_table",
@@ -212,6 +212,15 @@ def parse(arguments):
         help="The prodiuct vessel info summary table.",
         type=valid_table,
         default=DEFAULT["product_vessel_info_summary_table"],
+    )
+    incremental_filter.add_argument(
+        "--product_vessel_info_summary_field_prefix",
+        help="""
+            Prefix to use to access vessel info fields in
+            `product_vessel_info_summary_table`. This is to account for
+            differences between PVIS tables in different environments. For
+            example, on ais this is `ais_`, but VMS PVIS has no prefix
+            """,
     )
     incremental_filter.add_argument(
         "-sfield",
@@ -250,6 +259,13 @@ def parse(arguments):
         default=DEFAULT["merged_table"],
     )
 
+    ################################################################################
+    # auth_and_regions
+    ################################################################################
+    auth_and_regions = subparsers.add_parser(
+        "auth_and_regions_fishing_events",
+        help="Combine the fishing and night_loitering with authorization and regions.",
+    )
     auth_and_regions.add_argument(
         "-source_fishing",
         "--source_fishing_events",
@@ -293,11 +309,19 @@ def parse(arguments):
         default=DEFAULT["regions_table"],
     )
     auth_and_regions.add_argument(
-        "-allvessels",
-        "--all_vessels_byyear",
+        "--product_vessel_info_summary_table",
         help="The all vessels by year table.",
         type=valid_table,
         default=DEFAULT["all_vessels_byyear"],
+    )
+    auth_and_regions.add_argument(
+        "--product_vessel_info_summary_field_prefix",
+        help="""
+            Prefix to use to access vessel info fields in
+            `product_vessel_info_summary_table`. This is to account for
+            differences between PVIS tables in different environments. For
+            example, on ais this is `ais_`, but VMS PVIS has no prefix
+            """,
     )
     auth_and_regions.add_argument(
         "-dest",
@@ -328,6 +352,13 @@ def parse(arguments):
         default=DEFAULT["labels"],
     )
 
+    ################################################################################
+    # fishing_restrictive
+    ################################################################################
+    fishing_restrictive = subparsers.add_parser(
+        "fishing_restrictive",
+        help="Generates a table with the fishing restrictive events in case does not exists.",
+    )
     fishing_restrictive.add_argument(
         "-source_events",
         "--source_restrictive_events",
