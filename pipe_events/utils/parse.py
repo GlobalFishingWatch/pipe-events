@@ -23,6 +23,7 @@ DEFAULT = dict(
     table_description="",
     labels='{"environment":"develop"}',
     reference_date="2020-01-02",
+    udfs_project="global-fishing-watch",
     # incremental_fishing_events
     start_date="2020-01-01",
     end_date="2020-01-02",
@@ -102,6 +103,12 @@ def parse(arguments):
         type=str,
         help="GCP project id (default: %(default)s)",
         default=DEFAULT["project"],
+    )
+    parser.add_argument(
+        "--udfs_project",
+        type=str,
+        help="GCP UDFS project id (default: %(default)s)",
+        default=DEFAULT["udfs_project"],
     )
     parser.add_argument(
         "--table_description",
