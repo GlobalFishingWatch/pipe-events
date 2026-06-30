@@ -25,8 +25,8 @@ WITH source_segs AS (
         WHERE
             prod_shiptype = 'fishing'
             OR `{{ udfs_project }}`.udfs_v2.is_fishing(registry_geartype) IS TRUE
-            OR on_fishing_list_nn = TRUE
-            AND shipname_indicates_likely_gear = FALSE
+            OR (on_fishing_list_nn = TRUE
+            AND shipname_indicates_likely_gear = FALSE)
     ),
 
  
