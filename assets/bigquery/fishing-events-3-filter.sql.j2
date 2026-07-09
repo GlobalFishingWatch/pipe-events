@@ -23,7 +23,10 @@ WITH source_segs AS (
         FROM
             `{{ product_vessel_info_summary_table }}`
         WHERE
-            potential_fishing OR on_fishing_list_sr
+            prod_shiptype = 'fishing'
+            OR ((`{{ udfs_project }}`.udfs_v2.is_fishing(registry_geartype) IS TRUE
+            OR on_fishing_list_nn = TRUE)
+            AND shipname_indicates_likely_gear = FALSE)
     ),
 
  
