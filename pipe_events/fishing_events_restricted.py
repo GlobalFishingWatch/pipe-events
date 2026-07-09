@@ -1,10 +1,54 @@
+import json
 import logging
+
 from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.validators import valid_date, valid_table
+
+COMMAND = "fishing_restrictive"
+HELP = "Generates a table with the fishing restrictive events in case does not exists."
+
+
+def add_arguments(parser):
+    parser.add_argument(
+        "-source_events",
+        "--source_restrictive_events",
+        help="The source of restrictive events table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "-destrest",
+        "--dest_restrictive_events",
+        help="The destination table to place the restrictive events table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "-destrestview",
+        "--dest_rest_view",
+        help="The destination view pointing to the restrictive events table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "-rdate",
+        "--reference_date",
+        help="The reference date that has the restrictive fishing events.",
+        type=valid_date,
+        required=True,
+    )
+    parser.add_argument(
+        "-labels",
+        "--labels",
+        help="The labels assigned to each table.",
+        type=json.loads,
+        required=True,
+    )
 
 
 def run(bq, params):
     log = logging.getLogger()
-    ref_date = params['reference_date']
+    ref_date = params['reference_date'].strftime("%Y%m%d")
     params["source_restrictive_events"] += ref_date
     dest = params["dest_restrictive_events"] + ref_date
     # schama is the same just with fishing strict list

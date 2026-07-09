@@ -1,5 +1,80 @@
+import json
 import logging
+
 from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.validators import valid_date, valid_table
+
+COMMAND = "incremental_events"
+HELP = "Generates the incremental fishing or night loitering events."
+
+DEFAULT_MAX_FISHING_EVENT_GAP_HOURS = 2
+
+
+def add_arguments(parser):
+    parser.add_argument(
+        "-start",
+        "--start_date",
+        help="The start date of the source messages.",
+        type=valid_date,
+        required=True,
+    )
+    parser.add_argument(
+        "-end",
+        "--end_date",
+        help="The end date of the source messages.",
+        type=valid_date,
+        required=True,
+    )
+    parser.add_argument(
+        "-messages",
+        "--messages_table",
+        help="The source messages table having fishing and night loitering info.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "-sfield",
+        "--nnet_score_night_loitering",
+        help="The field name that has the score to eval.",
+        choices=["nnet_score", "night_loitering"],
+        required=True,
+    )
+    parser.add_argument(
+        "-maxhs",
+        "--max_fishing_event_gap_hours",
+        help="The max gap hours of yesterday to get potentially open events.",
+        type=int,
+        default=DEFAULT_MAX_FISHING_EVENT_GAP_HOURS,
+    )
+    parser.add_argument(
+        "-dest",
+        "--destination_dataset",
+        help="The destination dataset having fishing events.",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-dest_tbl_prefix",
+        "--destination_table_prefix",
+        help="The destination table prefix having fishing events.",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-labels",
+        "--labels",
+        help="The labels assigned to each table.",
+        type=json.loads,
+        required=True,
+    )
+    parser.add_argument(
+        "-mtbl",
+        "--use_merged_table",
+        help="An existing merged table to use instead of the computed one.",
+        type=valid_table,
+        required=False,
+        default=None,
+    )
 
 
 def run_incremental_fishing_events_query(temp_table, fishing_events_incremental_query):
@@ -11,6 +86,10 @@ def run_incremental_fishing_events_query(temp_table, fishing_events_incremental_
 
 def run(bq, params):
     log = logging.getLogger()
+
+    params["start_date"] = params["start_date"].strftime("%Y-%m-%d")
+    params["end_date"] = params["end_date"].strftime("%Y-%m-%d")
+
     # Starts a BQ session
     session_id = bq.begin_session(params["labels"])
 

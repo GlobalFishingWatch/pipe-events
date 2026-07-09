@@ -34,7 +34,7 @@ mkdir -p $log_dir
 # 2. Run a backfill with daily load
 (
     echo "Starting pipeline 2 - backfill with daily load"
-    ../scripts/generate_incremental_fishing_events.sh \
+    ../examples/generate_incremental_fishing_events.sh \
         --pipeline_prefix ${pipeline_prefix}_2_bfd \
         --start_d $start_date \
         --end_d $end_date_minus_x_days \
@@ -59,7 +59,7 @@ mkdir -p $log_dir
 
         next_day=$(date -d "$current_day + 1 day" +%Y-%m-%d)
         echo "Running daily load for $current_day"
-        ../scripts/generate_incremental_fishing_events.sh \
+        ../examples/generate_incremental_fishing_events.sh \
             --pipeline_prefix ${pipeline_prefix}_2_bfd \
             --start_d $current_day \
             --end_d $next_day \
@@ -77,7 +77,7 @@ mkdir -p $log_dir
 # 3. Run a backfill with daily backfill
 (
     echo "Starting pipeline 3 - backfill with truncation"
-    ../scripts/generate_incremental_fishing_events.sh \
+    ../examples/generate_incremental_fishing_events.sh \
         --pipeline_prefix ${pipeline_prefix}_3_bftruncate \
         --start_d $start_date \
         --end_d $end_date \
@@ -102,7 +102,7 @@ mkdir -p $log_dir
 
         next_day=$(date -d "$current_day + 1 day" +%Y-%m-%d)
         echo "Running truncation for $current_day"
-        ../scripts/generate_incremental_fishing_events.sh \
+        ../examples/generate_incremental_fishing_events.sh \
             --pipeline_prefix ${pipeline_prefix}_3_bftruncate \
             --start_d $current_day \
             --end_d $next_day \

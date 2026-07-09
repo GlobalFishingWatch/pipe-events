@@ -107,13 +107,13 @@ It can be invoked (using the default values of the paramters that points to a sc
 
 #### Docker compose
 
-A pipeline that runs all incremental fishing events steps subsequently is available in [scripts/generate_incremental_fishing_events.sh](scripts/generate_incremental_fishing_events.sh). It uses docker compose to run the pipeline in a containerized environment.
+A pipeline that runs all incremental fishing events steps subsequently is available in [examples/generate_incremental_fishing_events.sh](examples/generate_incremental_fishing_events.sh). It uses docker compose to run the pipeline in a containerized environment.
 
 To run a full backfill on the staging pipeline you can use the following command:
 
 ```
 docker compose build
-cd scripts
+cd examples
 ./generate_incremental_fishing_events.sh --pipeline_prefix PIPELINE12345_staging_test --start_d 2020-01-01 --end_d 2020-12-31
 ```
 

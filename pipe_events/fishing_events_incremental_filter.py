@@ -1,5 +1,85 @@
+import json
 import logging
+
 from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.validators import valid_table
+
+COMMAND = "incremental_filter_events"
+HELP = "Takes the incremental fishing or night loitering events and apply filters."
+
+
+def add_arguments(parser):
+    parser.add_argument(
+        "-segsact",
+        "--segs_activity_table",
+        help="The segments activity table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "-segvessel",
+        "--segment_vessel_table",
+        help="The segment vessel table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "-pvesselinfo",
+        "--product_vessel_info_summary_table",
+        help="The product vessel info summary table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "--product_vessel_info_summary_field_prefix",
+        help="""
+            Prefix to use to access vessel info fields in
+            `product_vessel_info_summary_table`. This is to account for
+            differences between PVIS tables in different environments. For
+            example, on ais this is `ais_`, but VMS PVIS has no prefix
+            """,
+    )
+    parser.add_argument(
+        "-sfield",
+        "--nnet_score_night_loitering",
+        help="The field name that has the score to eval.",
+        choices=["nnet_score", "night_loitering"],
+        required=True,
+    )
+    parser.add_argument(
+        "--udfs_project",
+        help="GCP project id where the shared UDFs live.",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-dest",
+        "--destination_dataset",
+        help="The destination dataset having fishing events.",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-dest_tbl_prefix",
+        "--destination_table_prefix",
+        help="The destination table prefix having fishing events.",
+        type=str,
+        required=True,
+    )
+    parser.add_argument(
+        "-labels",
+        "--labels",
+        help="The labels assigned to each table.",
+        type=json.loads,
+        required=True,
+    )
+    parser.add_argument(
+        "-mtbl",
+        "--merged_table",
+        help="An existing merged table.",
+        type=valid_table,
+        required=True,
+    )
 
 
 def run(bq, params):

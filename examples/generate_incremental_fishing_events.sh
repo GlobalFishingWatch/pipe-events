@@ -9,6 +9,7 @@ internal_ds=${internal_ds:-$pipeline_project.pipe_ais_test_202408290000_internal
 published_ds=${published_ds:-$pipeline_project.pipe_ais_test_202408290000_published}
 pipe_static=${pipe_static:-$pipeline_project.pipe_static}
 pipe_regions_layers=${pipe_regions_layers:-$pipeline_project.pipe_regions_layers}
+udfs_project=${udfs_project:-global-fishing-watch}
 start_d=${start_d:-2020-01-01}
 end_d=${end_d:-2020-01-10}
 
@@ -125,6 +126,7 @@ for nnet_score_nl in nnet_score night_loitering; do
     --table_description '"Filtered fishing events based on $nnet_score_nl"' \
     incremental_filter_events \
     -sfield $nnet_score_nl \
+    --udfs_project $udfs_project \
     -segsact $published_ds.segs_activity \
     -segvessel $internal_ds.segment_vessel \
     -pvesselinfo $published_ds.product_vessel_info_summary \
@@ -143,13 +145,14 @@ echo "3. Authorizations"
  --project $pipeline_project  \
  --table_description '"Fishing events with authorizations"' \
  auth_and_regions_fishing_events      \
+ --udfs_project $udfs_project \
  -source_fishing $dest_ds.${pipeline_prefix}_nnet_score_filtered \
  -source_nl $dest_ds.${pipeline_prefix}_night_loitering_filtered \
  -idcore $published_ds.identity_core \
  -idauth $published_ds.identity_authorization \
  -measures $pipe_static.spatial_measures_20201105 \
  -regions $pipe_regions_layers.event_regions \
- -allvessels $published_ds.product_vessel_info_summary \
+ --product_vessel_info_summary_table $published_ds.product_vessel_info_summary \
  -dest $dest_ds.${pipeline_prefix}_fishing_events_v \
  -dest_view $dest_ds.${pipeline_prefix}_fishing_events \
  -rdate $end_d \
