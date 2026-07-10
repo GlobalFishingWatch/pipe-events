@@ -39,6 +39,7 @@ def add_arguments(parser):
             differences between PVIS tables in different environments. For
             example, on ais this is `ais_`, but VMS PVIS has no prefix
             """,
+        required=True,
     )
     parser.add_argument(
         "--score-field",
