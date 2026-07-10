@@ -10,55 +10,57 @@ HELP = "Combine the fishing and night_loitering with authorization and regions."
 
 def add_arguments(parser):
     parser.add_argument(
-        "-source_fishing",
-        "--source_fishing_events",
+        "--bq-in-fishing-events",
+        dest="source_fishing_events",
         help="The incremental fishing events table.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-source_nl",
-        "--source_night_loitering_events",
+        "--bq-in-night-loitering-events",
+        dest="source_night_loitering_events",
         help="The night loitering events table.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-idcore",
-        "--vessel_identity_core",
+        "--bq-in-vessel-identity-core",
+        dest="vessel_identity_core",
         help="The vessel identity core table.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-idauth",
-        "--vessel_identity_authorization",
+        "--bq-in-vessel-identity-authorization",
+        dest="vessel_identity_authorization",
         help="The vessel identity authorization table.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-measures",
-        "--spatial_measures_table",
+        "--bq-in-spatial-measures",
+        dest="spatial_measures_table",
         help="The spatial measures table.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-regions",
-        "--regions_table",
+        "--bq-in-regions",
+        dest="regions_table",
         help="The event regions table.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "--product_vessel_info_summary_table",
+        "--bq-in-product-vessel-info-summary",
+        dest="product_vessel_info_summary_table",
         help="The all vessels by year table.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "--product_vessel_info_summary_field_prefix",
+        "--product-vessel-info-summary-field-prefix",
+        dest="product_vessel_info_summary_field_prefix",
         help="""
             Prefix to use to access vessel info fields in
             `product_vessel_info_summary_table`. This is to account for
@@ -67,34 +69,34 @@ def add_arguments(parser):
             """,
     )
     parser.add_argument(
-        "--udfs_dataset",
+        "--bq-in-udfs-dataset",
+        dest="udfs_dataset",
         help="Fully-qualified dataset (project.dataset) where the shared UDFs live.",
         type=valid_dataset,
         required=True,
     )
     parser.add_argument(
-        "-dest",
-        "--destination",
+        "--bq-out-events",
+        dest="destination",
         help="The destination table having fishing events.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-dest_view",
-        "--destination_view",
+        "--bq-out-events-view",
+        dest="destination_view",
         help="The destination view pointing to latest table having fishing events.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-rdate",
-        "--reference_date",
+        "--reference-date",
+        dest="reference_date",
         help="The reference date that has the less restrictive fishing events.",
         type=valid_date,
         required=True,
     )
     parser.add_argument(
-        "-labels",
         "--labels",
         help="The labels assigned to each table.",
         type=json.loads,

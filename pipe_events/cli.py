@@ -39,9 +39,10 @@ def setup_logging(verbosity):
 def add_global_arguments(parser):
     """Arguments valid for any subcommand (parsed before the subcommand token)."""
     parser.add_argument(
-        "--test",
+        "--dry-run",
+        dest="test",
         action="store_true",
-        help="Test mode - print query and exit. Do not run queries",
+        help="Print query and exit; do not run queries.",
         default=False,
     )
     parser.add_argument(
@@ -68,7 +69,7 @@ def add_global_arguments(parser):
         required=True,
     )
     parser.add_argument(
-        "--table_description",
+        "--table-description",
         type=str,
         help="Additional text to include in the output table description",
         default="",

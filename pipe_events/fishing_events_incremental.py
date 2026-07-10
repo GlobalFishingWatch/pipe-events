@@ -12,68 +12,52 @@ DEFAULT_MAX_FISHING_EVENT_GAP_HOURS = 2
 
 def add_arguments(parser):
     parser.add_argument(
-        "-start",
-        "--start_date",
+        "--start-date",
+        dest="start_date",
         help="The start date of the source messages.",
         type=valid_date,
         required=True,
     )
     parser.add_argument(
-        "-end",
-        "--end_date",
+        "--end-date",
+        dest="end_date",
         help="The end date of the source messages.",
         type=valid_date,
         required=True,
     )
     parser.add_argument(
-        "-messages",
-        "--messages_table",
+        "--bq-in-messages",
+        dest="messages_table",
         help="The source messages table having fishing and night loitering info.",
         type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-sfield",
-        "--nnet_score_night_loitering",
+        "--score-field",
+        dest="nnet_score_night_loitering",
         help="The field name that has the score to eval.",
         choices=["nnet_score", "night_loitering"],
         required=True,
     )
     parser.add_argument(
-        "-maxhs",
-        "--max_fishing_event_gap_hours",
+        "--max-fishing-event-gap-hours",
+        dest="max_fishing_event_gap_hours",
         help="The max gap hours of yesterday to get potentially open events.",
         type=int,
         default=DEFAULT_MAX_FISHING_EVENT_GAP_HOURS,
     )
     parser.add_argument(
-        "-dest",
-        "--destination_dataset",
-        help="The destination dataset having fishing events.",
-        type=str,
+        "--bq-out-merged-events",
+        dest="merged_events",
+        help="Fully-qualified destination table for the merged fishing events.",
+        type=valid_table,
         required=True,
     )
     parser.add_argument(
-        "-dest_tbl_prefix",
-        "--destination_table_prefix",
-        help="The destination table prefix having fishing events.",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "-labels",
         "--labels",
         help="The labels assigned to each table.",
         type=json.loads,
         required=True,
-    )
-    parser.add_argument(
-        "-mtbl",
-        "--use_merged_table",
-        help="An existing merged table to use instead of the computed one.",
-        type=valid_table,
-        required=False,
-        default=None,
     )
 
 
@@ -95,14 +79,11 @@ def run(bq, params):
 
     log.info("*** 1. Run fishing-events-1-incremental.sql.j2 inside a BQ session.")
 
+    merged_table = params["merged_events"]
     temp_table = "_SESSION.{}".format(
         "_".join(
-            list(
-                map(
-                    lambda x: x.replace("-", ""),
-                    [params["destination_table_prefix"], params["start_date"], params["end_date"]],
-                )
-            )
+            x.replace("-", "")
+            for x in [merged_table.split(".")[-1], params["start_date"], params["end_date"]]
         )
     )
     incremental_query = bq.format_query("fishing-events-1-incremental.sql.j2", **params)
@@ -112,10 +93,7 @@ def run(bq, params):
     log.info("*** 2. Ensure the merge table already exists or create it.")
     params_copy = params.copy()
     params_copy["temp_table"] = temp_table
-    prefix_table = f'{params["destination_dataset"]}.{params["destination_table_prefix"]}'
-    params_copy["existing_merged_fishing_events"] = params["use_merged_table"]
-    if not params["use_merged_table"]:
-        params_copy["existing_merged_fishing_events"] = f"{prefix_table}_merged"
+    params_copy["existing_merged_fishing_events"] = merged_table
     log.info("Create the merged fishing events table if it does not exist.")
     bq.create_table(
         params_copy["existing_merged_fishing_events"],

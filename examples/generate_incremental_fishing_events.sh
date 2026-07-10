@@ -103,15 +103,14 @@ for nnet_score_nl in nnet_score night_loitering; do
     --entrypoint pipe-events pipeline \
     -v \
     --project $pipeline_project \
-    --table_description "Incremental fishing events based on $nnet_score_nl" \
+    --table-description "Incremental fishing events based on $nnet_score_nl" \
     fishing_events_incremental \
-    -start $start_d \
-    -end $end_d \
-    -messages $internal_ds.research_messages \
-    -sfield $nnet_score_nl \
-    -dest $dest_ds \
-    -dest_tbl_prefix ${pipeline_prefix}_${nnet_score_nl} \
-    -labels '{"environment": "production", "resource_creator": "chris", "project": "core_pipeline", "version": "v3", "step": "fishing_events", "stage":  "productive"}'
+    --start-date $start_d \
+    --end-date $end_d \
+    --bq-in-messages $internal_ds.research_messages \
+    --score-field $nnet_score_nl \
+    --bq-out-merged-events $dest_ds.${pipeline_prefix}_${nnet_score_nl}_merged \
+    --labels '{"environment": "production", "resource_creator": "chris", "project": "core_pipeline", "version": "v3", "step": "fishing_events", "stage":  "productive"}'
 done
 
 
@@ -123,17 +122,16 @@ for nnet_score_nl in nnet_score night_loitering; do
     --entrypoint pipe-events pipeline  \
     -v  \
     --project $pipeline_project  \
-    --table_description '"Filtered fishing events based on $nnet_score_nl"' \
+    --table-description '"Filtered fishing events based on $nnet_score_nl"' \
     fishing_events_incremental_filter \
-    -sfield $nnet_score_nl \
-    --udfs_dataset $udfs_dataset \
-    -segsact $published_ds.segs_activity \
-    -segvessel $internal_ds.segment_vessel \
-    -pvesselinfo $published_ds.product_vessel_info_summary \
-    -mtbl $dest_ds.${pipeline_prefix}_${nnet_score_nl}_merged \
-    -dest $dest_ds \
-    -dest_tbl_prefix ${pipeline_prefix}_${nnet_score_nl} \
-    -labels '{"environment": "production", "resource_creator": "chris", "project": "core_pipeline", "version": "v3", "step": "fishing_events", "stage":  "productive"}'
+    --score-field $nnet_score_nl \
+    --bq-in-udfs-dataset $udfs_dataset \
+    --bq-in-segments-activity $published_ds.segs_activity \
+    --bq-in-segment-vessel $internal_ds.segment_vessel \
+    --bq-in-product-vessel-info-summary $published_ds.product_vessel_info_summary \
+    --bq-in-merged-events $dest_ds.${pipeline_prefix}_${nnet_score_nl}_merged \
+    --bq-out-filtered-events $dest_ds.${pipeline_prefix}_${nnet_score_nl}_filtered \
+    --labels '{"environment": "production", "resource_creator": "chris", "project": "core_pipeline", "version": "v3", "step": "fishing_events", "stage":  "productive"}'
 done
 
 
@@ -143,20 +141,20 @@ echo "3. Authorizations"
  --entrypoint pipe-events pipeline  \
  -v  \
  --project $pipeline_project  \
- --table_description '"Fishing events with authorizations"' \
+ --table-description '"Fishing events with authorizations"' \
  fishing_events_auth_and_regions      \
- --udfs_dataset $udfs_dataset \
- -source_fishing $dest_ds.${pipeline_prefix}_nnet_score_filtered \
- -source_nl $dest_ds.${pipeline_prefix}_night_loitering_filtered \
- -idcore $published_ds.identity_core \
- -idauth $published_ds.identity_authorization \
- -measures $pipe_static.spatial_measures_20201105 \
- -regions $pipe_regions_layers.event_regions \
- --product_vessel_info_summary_table $published_ds.product_vessel_info_summary \
- -dest $dest_ds.${pipeline_prefix}_fishing_events_v \
- -dest_view $dest_ds.${pipeline_prefix}_fishing_events \
- -rdate $end_d \
-    -labels '{"environment": "production", "resource_creator": "chris", "project": "core_pipeline", "version": "v3", "step": "fishing_events", "stage":  "productive"}'
+ --bq-in-udfs-dataset $udfs_dataset \
+ --bq-in-fishing-events $dest_ds.${pipeline_prefix}_nnet_score_filtered \
+ --bq-in-night-loitering-events $dest_ds.${pipeline_prefix}_night_loitering_filtered \
+ --bq-in-vessel-identity-core $published_ds.identity_core \
+ --bq-in-vessel-identity-authorization $published_ds.identity_authorization \
+ --bq-in-spatial-measures $pipe_static.spatial_measures_20201105 \
+ --bq-in-regions $pipe_regions_layers.event_regions \
+ --bq-in-product-vessel-info-summary $published_ds.product_vessel_info_summary \
+ --bq-out-events $dest_ds.${pipeline_prefix}_fishing_events_v \
+ --bq-out-events-view $dest_ds.${pipeline_prefix}_fishing_events \
+ --reference-date $end_d \
+    --labels '{"environment": "production", "resource_creator": "chris", "project": "core_pipeline", "version": "v3", "step": "fishing_events", "stage":  "productive"}'
 
 
 echo "4. Restrictive"
@@ -165,13 +163,13 @@ echo "4. Restrictive"
  --entrypoint pipe-events pipeline  \
  -v  \
  --project $pipeline_project  \
- --table_description '"Restrictive fishing events used in products"' \
+ --table-description '"Restrictive fishing events used in products"' \
  fishing_events_restrictive \
- -source_events $dest_ds.${pipeline_prefix}_fishing_events_v  \
- -destrest $dest_ds.${pipeline_prefix}_product_events_fishing_v \
- -destrestview $dest_ds.${pipeline_prefix}_product_events_fishing \
- -rdate $end_d \
-    -labels '{"environment": "production", "resource_creator": "chris", "project": "core_pipeline", "version": "v3", "step": "fishing_events", "stage":  "productive"}'
+ --bq-in-events $dest_ds.${pipeline_prefix}_fishing_events_v  \
+ --bq-out-events $dest_ds.${pipeline_prefix}_product_events_fishing_v \
+ --bq-out-events-view $dest_ds.${pipeline_prefix}_product_events_fishing \
+ --reference-date $end_d \
+    --labels '{"environment": "production", "resource_creator": "chris", "project": "core_pipeline", "version": "v3", "step": "fishing_events", "stage":  "productive"}'
 
 
 # clone all created tables if backup_prefix exists

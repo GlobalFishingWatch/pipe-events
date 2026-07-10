@@ -19,73 +19,85 @@ MAINTAINERS = [
 
 def add_arguments(parser):
     parser.add_argument(
-        "--start_date",
+        "--start-date",
+        dest="start_date",
         type=valid_date,
         required=True,
         help="Start date of the source range.",
     )
     parser.add_argument(
-        "--end_date",
+        "--end-date",
+        dest="end_date",
         type=valid_date,
         required=True,
         help="End date of the source range. Drives the versioned table name.",
     )
     parser.add_argument(
-        "--encounters_table",
+        "--bq-in-encounters",
+        dest="encounters_table",
         type=valid_table,
         required=True,
         help="Source encounters table.",
     )
     parser.add_argument(
-        "--spatial_measures_table",
+        "--bq-in-spatial-measures",
+        dest="spatial_measures_table",
         type=valid_table,
         required=True,
         help="Spatial measures table.",
     )
     parser.add_argument(
-        "--regions_table",
+        "--bq-in-regions",
+        dest="regions_table",
         type=valid_table,
         required=True,
         help="Event regions table.",
     )
     parser.add_argument(
-        "--product_vessel_info_summary_table",
+        "--bq-in-product-vessel-info-summary",
+        dest="product_vessel_info_summary_table",
         type=valid_table,
         required=True,
         help="Product vessel info summary table.",
     )
     parser.add_argument(
-        "--product_vessel_info_summary_field_prefix",
+        "--product-vessel-info-summary-field-prefix",
+        dest="product_vessel_info_summary_field_prefix",
         type=str,
         required=True,
         help="Prefix to access vessel info fields in the PVIS table (e.g. 'ais_').",
     )
     parser.add_argument(
-        "--vessel_identity_core",
+        "--bq-in-vessel-identity-core",
+        dest="vessel_identity_core",
         type=valid_table,
         required=True,
         help="Vessel identity core table.",
     )
     parser.add_argument(
-        "--vessel_identity_authorization",
+        "--bq-in-vessel-identity-authorization",
+        dest="vessel_identity_authorization",
         type=valid_table,
         required=True,
         help="Vessel identity authorization table.",
     )
     parser.add_argument(
-        "--voyages_table",
+        "--bq-in-voyages",
+        dest="voyages_table",
         type=valid_table,
         required=True,
         help="Voyages table.",
     )
     parser.add_argument(
-        "--port_visits_table",
+        "--bq-in-port-visits",
+        dest="port_visits_table",
         type=valid_table,
         required=True,
         help="Port visits table.",
     )
     parser.add_argument(
-        "--dest_table",
+        "--bq-out-events",
+        dest="dest_table",
         type=valid_table,
         required=True,
         help="Destination table. The versioned table and view derive from this.",
