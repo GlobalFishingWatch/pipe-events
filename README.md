@@ -37,8 +37,8 @@ is shipped as a Docker image so you don't need a local Python environment to run
   - [`encounter_events`](#encounter_events)
   - [`loitering_events`](#loitering_events)
   - [`port_visit_events`](#port_visit_events)
-- [Generating incremental fishing events end to end](#generating-incremental-fishing-events-end-to-end)
 - [Development](#development)
+  - [Manual end-to-end testing](#manual-end-to-end-testing)
 - [Git workflow](#git-workflow)
 - [License](#license)
 
@@ -278,26 +278,6 @@ Publishes port visit events for a date range as a versioned table and a view.
 | `--bq-out-events` | yes | Destination table; the versioned table and view derive from this. |
 | `--labels` | yes | JSON object string applied to the output tables. |
 
-## Generating incremental fishing events end to end
-
-[`examples/generate_incremental_fishing_events.sh`](examples/generate_incremental_fishing_events.sh)
-runs all four incremental fishing events steps in order (both score fields where
-applicable), using `docker compose` under the hood. It is the reference for how the
-steps chain together and which tables feed which.
-
-To run a full backfill on the staging pipeline:
-
-```shell
-make docker-build
-cd examples
-./generate_incremental_fishing_events.sh \
-  --pipeline_prefix PIPELINE12345_staging_test \
-  --start_d 2020-01-01 --end_d 2020-12-31
-```
-
-Pass `--backup_prefix <prefix>` to clone every created table afterwards, which is useful
-when running a full backfill first and then backfilling single days incrementally.
-
 ## Development
 
 The project ships a Docker-based workflow driven by `make`; run `make help` for the full
@@ -311,6 +291,65 @@ make docker-shell     # open a shell in the dev container
 
 There is also a local (venv) path for linting, type-checking and tests — `make install`
 then `make all` (lint + codespell + typecheck + audit + test).
+
+### Manual end-to-end testing
+
+The scripts under [`examples/`](examples) run the pipeline end to end against BigQuery
+for manual testing. They use `docker compose` under the hood, bill the `world-fishing-827`
+execution project, and tag output tables with the same development labels. Every table is
+derived from an output dataset and a table prefix, so the scripts share the
+`--bq-out-dataset PROJECT.DATASET` / `--bq-out-table-prefix PREFIX` naming convention.
+
+The incremental fishing events chain is split across two scripts, reflecting how the
+steps are usually tested: the incremental step on its own over a few days, and the
+whole-history steps as a separate consolidated run.
+
+#### 1. Incremental step
+
+[`examples/run_fishing_incremental_stages.sh`](examples/run_fishing_incremental_stages.sh)
+runs `fishing_events_incremental` for both score fields (`nnet_score` and
+`night_loitering`), writing one `*_merged` table per field. This is the only genuinely
+incremental step and is typically tested on a couple of days at a time.
+
+```shell
+make docker-build
+cd examples
+./run_fishing_incremental_stages.sh \
+  --start-date 2020-01-01 --end-date 2020-01-10 \
+  --bq-in-messages world-fishing-827.pipe_ais_test_202408290000_internal.research_messages \
+  --bq-out-dataset world-fishing-827.scratch_example \
+  --bq-out-table-prefix PIPELINE12345_test
+```
+
+Each variant writes to
+`<bq-out-dataset>.<bq-out-table-prefix>_<score_field>_merged`.
+
+#### 2. Consolidated steps
+
+[`examples/run_fishing_consolidated_stages.sh`](examples/run_fishing_consolidated_stages.sh)
+runs the whole-history chain — `fishing_events_incremental_filter` (once per score
+field) → `fishing_events_auth_and_regions` → `fishing_events_restrictive` — feeding the
+output of each step into the next. It takes the two `*_merged` tables produced by step 1
+as inputs, plus the upstream reference datasets.
+
+```shell
+cd examples
+./run_fishing_consolidated_stages.sh \
+  --reference-date 2020-01-10 \
+  --bq-in-merged-nnet-score world-fishing-827.scratch_example.PIPELINE12345_test_nnet_score_merged \
+  --bq-in-merged-night-loitering world-fishing-827.scratch_example.PIPELINE12345_test_night_loitering_merged \
+  --bq-in-identity-published-dataset world-fishing-827.pipe_ais_test_202408290000_published \
+  --bq-in-ais-published-dataset world-fishing-827.pipe_ais_test_202408290000_published \
+  --bq-in-ais-internal-dataset world-fishing-827.pipe_ais_test_202408290000_internal \
+  --bq-out-dataset world-fishing-827.scratch_example \
+  --bq-out-table-prefix PIPELINE12345_test
+```
+
+The identity-published dataset supplies `identity_core`, `identity_authorization` and
+`product_vessel_info_summary`; the AIS-published dataset supplies `segs_activity`; the
+AIS-internal dataset supplies `segment_vessel`. The UDFs dataset, spatial measures and
+event regions tables default to their production locations and can be overridden with
+`--bq-in-udfs-dataset`, `--bq-in-spatial-measures` and `--bq-in-regions`.
 
 ## Git workflow
 
