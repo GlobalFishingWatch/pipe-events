@@ -2,7 +2,7 @@ import json
 import logging
 
 from pipe_events.utils.bigquery import dest_table_description
-from pipe_events.utils.validators import valid_date, valid_table
+from pipe_events.utils.validators import valid_date, valid_dataset, valid_table
 
 COMMAND = "fishing_events_auth_and_regions"
 HELP = "Combine the fishing and night_loitering with authorization and regions."
@@ -67,9 +67,9 @@ def add_arguments(parser):
             """,
     )
     parser.add_argument(
-        "--udfs_project",
-        help="GCP project id where the shared UDFs live.",
-        type=str,
+        "--udfs_dataset",
+        help="Fully-qualified dataset (project.dataset) where the shared UDFs live.",
+        type=valid_dataset,
         required=True,
     )
     parser.add_argument(

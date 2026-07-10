@@ -11,6 +11,7 @@ def valid_date(s: str) -> datetime.date:
 
 
 TABLE_REGEX = r"[\w\-_]+\.[\w\-_]+\.[\w\-_]+"
+DATASET_REGEX = r"[\w\-_]+\.[\w\-_]+"
 
 
 def valid_table(s: str) -> str:
@@ -18,5 +19,14 @@ def valid_table(s: str) -> str:
     if matched is None:
         raise argparse.ArgumentTypeError(
             f"not a valid table pattern (Format allowed <{TABLE_REGEX}>): {s!r}"
+        )
+    return s
+
+
+def valid_dataset(s: str) -> str:
+    matched = re.fullmatch(DATASET_REGEX, s)
+    if matched is None:
+        raise argparse.ArgumentTypeError(
+            f"not a valid dataset pattern (Format allowed <{DATASET_REGEX}>): {s!r}"
         )
     return s

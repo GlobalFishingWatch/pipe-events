@@ -2,7 +2,7 @@ import json
 import logging
 
 from pipe_events.utils.bigquery import dest_table_description
-from pipe_events.utils.validators import valid_table
+from pipe_events.utils.validators import valid_dataset, valid_table
 
 COMMAND = "fishing_events_incremental_filter"
 HELP = "Takes the incremental fishing or night loitering events and apply filters."
@@ -47,9 +47,9 @@ def add_arguments(parser):
         required=True,
     )
     parser.add_argument(
-        "--udfs_project",
-        help="GCP project id where the shared UDFs live.",
-        type=str,
+        "--udfs_dataset",
+        help="Fully-qualified dataset (project.dataset) where the shared UDFs live.",
+        type=valid_dataset,
         required=True,
     )
     parser.add_argument(

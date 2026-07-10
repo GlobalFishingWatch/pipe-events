@@ -1,7 +1,7 @@
 import argparse
 import pytest
 from datetime import date
-from pipe_events.utils.validators import valid_date, valid_table
+from pipe_events.utils.validators import valid_date, valid_dataset, valid_table
 
 
 class TestValidators:
@@ -35,3 +35,18 @@ class TestValidators:
     def test_table_valid_rejects_invalid(self, table):
         with pytest.raises(argparse.ArgumentTypeError):
             valid_table(table)
+
+    @pytest.mark.parametrize(
+        "dataset,expected",
+        [
+            ("a.b", "a.b"),
+            ("a-x.b-y", "a-x.b-y"),
+        ]
+    )
+    def test_dataset_valid(self, dataset, expected):
+        assert expected == valid_dataset(dataset)
+
+    @pytest.mark.parametrize("dataset", ["a.b.c", "a:b", "test"])
+    def test_dataset_valid_rejects_invalid(self, dataset):
+        with pytest.raises(argparse.ArgumentTypeError):
+            valid_dataset(dataset)
