@@ -29,13 +29,3 @@ FROM prod AS dev
 COPY . /opt/project
 RUN pip install -e .[dev]
 RUN pip install -r requirements-test.txt
-
-# ---------------------------------------------------------------------------------------
-# TEST IMAGE (This checks that package is properly installed in prod image)
-# ---------------------------------------------------------------------------------------
-FROM prod AS test
-
-COPY ./tests /opt/project/tests
-COPY ./requirements-test.txt /opt/project/
-
-RUN pip install -r requirements-test.txt

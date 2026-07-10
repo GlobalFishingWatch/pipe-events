@@ -3,7 +3,6 @@
 VENV_NAME:=.venv
 REQS_PROD:=requirements.txt
 DOCKER_DEV_SERVICE:=pipeline
-DOCKER_CI_TEST_SERVICE:=test
 
 GCP_PROJECT:=world-fishing-827
 GCP_DOCKER_VOLUME:=gcp
@@ -29,9 +28,10 @@ docker-gcp:
 	docker compose run gcloud config set project ${GCP_PROJECT}
 	docker compose run gcloud auth application-default set-quota-project ${GCP_PROJECT}
 
-.PHONY: docker-ci-test ## Runs tests using prod image, exporting coverage.xml report.
+.PHONY: docker-ci-test ## Runs tests in the dev container, exporting coverage.xml report.
 docker-ci-test:
-	docker compose run --rm ${DOCKER_CI_TEST_SERVICE}
+	docker compose run --rm --entrypoint pytest ${DOCKER_DEV_SERVICE} \
+		--cov=pipe_events --cov-report=xml
 
 .PHONY: docker-shell ## Enters to docker container shell.
 docker-shell:

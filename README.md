@@ -285,7 +285,7 @@ list. Common entry points:
 
 ```shell
 make docker-build     # build the docker image
-make docker-ci-test   # run the test suite in the prod image (as CI does)
+make docker-ci-test   # run the test suite in the dev container (as CI does)
 make docker-shell     # open a shell in the dev container
 ```
 
