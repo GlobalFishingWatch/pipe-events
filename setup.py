@@ -9,7 +9,7 @@ from setuptools import setup
 
 setup(
     name='pipe-events',
-    version='5.0.0',
+    version='6.0.0',
     author="Global Fishing Watch.",
     description=(
         "Pipeline for publishing summarized event information"
