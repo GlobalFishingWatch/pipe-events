@@ -7,162 +7,317 @@
   <a>
     <img alt="Python versions" src="https://img.shields.io/badge/python-3.12-blue">
   </a>
+  <a>
+    <img alt="Last release" src="https://img.shields.io/github/v/release/GlobalFishingWatch/pipe-events">
+  </a>
 </p>
 
-This repository contains the events pipeline, a simple pipeline which extracts summarized events from various datasets we produce.
+This repository contains the **events pipeline**, which extracts summarized events
+(fishing, encounters, loitering and port visits) from the datasets produced by the
+Global Fishing Watch AIS pipeline. Each command reads its inputs from BigQuery,
+summarizes them, and writes the result back to a BigQuery table.
+
+All commands are exposed through a single command-line interface (`pipe-events`), which
+is shipped as a Docker image so you don't need a local Python environment to run it.
 
 [git workflow documentation]: GITHUB-FLOW.md
 
+## Table of contents
 
-# Running
+- [Pipeline overview](#pipeline-overview)
+- [Requirements](#requirements)
+- [Setup](#setup)
+- [Running the pipeline](#running-the-pipeline)
+  - [Global options](#global-options)
+- [CLI reference](#cli-reference)
+  - [`fishing_events_incremental`](#fishing_events_incremental)
+  - [`fishing_events_incremental_filter`](#fishing_events_incremental_filter)
+  - [`fishing_events_auth_and_regions`](#fishing_events_auth_and_regions)
+  - [`fishing_events_restrictive`](#fishing_events_restrictive)
+  - [`encounter_events`](#encounter_events)
+  - [`loitering_events`](#loitering_events)
+  - [`port_visit_events`](#port_visit_events)
+- [Generating incremental fishing events end to end](#generating-incremental-fishing-events-end-to-end)
+- [Development](#development)
+- [Git workflow](#git-workflow)
+- [License](#license)
 
-## Dependencies
+## Pipeline overview
 
-You just need [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/) in your machine to run the pipeline. No other dependency is required.
+The CLI exposes seven subcommands that fall into two groups.
+
+**Incremental fishing events** is a four-step chain. Only the first step is genuinely
+incremental; the rest are transformations that refine its output. The first two steps
+run twice each — once for `nnet_score` and once for `night_loitering` — because at that
+point the vessel's shiptype is not yet known.
+
+| Subcommand | Output | What it does |
+|---|---|---|
+| `fishing_events_incremental` | `*_merged` table | Opens a BigQuery session, computes fishing events for the input date range (loading the day before `--start-date` as padding), and merges them into the historical merged-events table, stitching overlapping events together. Runs once per score field. |
+| `fishing_events_incremental_filter` | `*_filtered` table | Applies segment noise filters, keeps potential fishing vessels, and drops events that don't meet the fishing-event criteria (e.g. minimum duration). Runs once per score field. |
+| `fishing_events_auth_and_regions` | versioned table + view | Combines the `nnet_score` and `night_loitering` filtered events into a single table and adds authorization and region information. |
+| `fishing_events_restrictive` | versioned table + view | Applies the more restrictive `prod_shiptype='fishing'` filter required by the API. |
+
+**Standalone event publishers** each read their sources and publish one versioned events
+table plus a view pointing at the latest version:
+
+| Subcommand | Output | What it does |
+|---|---|---|
+| `encounter_events` | versioned table + view | Publishes encounter events enriched with vessel identity, authorization and region information. |
+| `loitering_events` | versioned table + view | Publishes loitering events enriched with vessel info and region information. |
+| `port_visit_events` | versioned table + view | Publishes port visit events (intermediate anchorage as mean position). |
+
+How data flows through the incremental fishing events chain (rectangles are subcommands,
+rounded nodes are BigQuery tables):
+
+```mermaid
+flowchart TD
+    messages([research messages])
+
+    incremental[fishing_events_incremental]
+    filter[fishing_events_incremental_filter]
+    auth[fishing_events_auth_and_regions]
+    restrictive[fishing_events_restrictive]
+
+    merged([*_merged])
+    filtered([*_filtered])
+    events([fishing events + view])
+    product([restrictive events + view])
+
+    messages --> incremental --> merged --> filter --> filtered --> auth --> events --> restrictive --> product
+```
+
+## Requirements
+
+You only need [Docker](https://www.docker.com/) and the
+[Docker Compose](https://docs.docker.com/compose/) plugin. No other dependency is
+required to run the pipeline.
 
 ## Setup
 
-First of all build the image.
+The pipeline reads its input from BigQuery, so you must first authenticate with your
+Google Cloud account. Credentials are stored in a Docker volume named `gcp` that is
+shared across pipeline repositories, so you only need to do this once per machine:
 
-```
-$ docker compose build
-```
-
-The pipeline reads it's input from BigQuery, so you need to first authenticate with your google cloud account inside the docker images. To do that, you need to run this command and follow the instructions:
-
-```
-$ docker compose run gcloud auth login
+```shell
+make docker-gcp
 ```
 
-## Git Workflow
+This creates the credentials volume, runs the application-default login flow, and sets
+the billing/quota project (`world-fishing-827`). Follow the printed instructions.
 
-Please refer to our [git workflow documentation] to know how to manage branches in this repository.
+Then build the image:
 
-## Configuration
-
-### The fishing events incremental load
-
-Incremental fishing events consists of 4 steps. Only the first step is actually incremental and the rest are just a series of transformations to get the final events. The steps are:
-1. **Incremental merge**: This step loads messages and calculates fishing events. It runs twice, once for `nnet_score` and once for `night_loitering` because at this point we don't know yet what shiptype a vessel is. It is incremental because it only loads the messages that have been added since the last time it was run. Given an input date range of start_date and end_date, it loads the day before start_date as padding in order to perform the merge step, as well as data from start_date until end_date (exclusive). The incremental query is run as a temporary table which is merged into the `incremental_fishing/night_loitering_events_merged` table.
-2. **Filter**: This step applies noise filters on segments, filters for potential fishing vessels, and for fishing events that actually fit the criteria of fishing events (e.g. duration > 20 minutes). This step also runs twice, once for `nnet_score` and once for `night_loitering`.
-3. **Authorization**: This step adds the authorization information to the events. It also combines `nnet_score` and `night_loitering` events into a single table.
-4. **Restrictive**: This step applies the more restrictive `prod_shiptype='fishing'` filter which is required in our API.
-
-#### CLI
-
-The way the fishing events was calculated took unexpected time and resources, to improve the calculation the incremental load was developed. See more in `./assets/bigquery/README.md`.
-
-There is a specific python client to make the calls under `./pipe_events/cli.py`.
-It has 4 subcommands:
-* `incremental_events` : Opens a BQ session and calculates fishing event by segment. Merges messges by seg_id and timestamp versus a historical fishing events table and updates event_end/event_start stitching the history with what has produced the latest day. If the events in the history overlaps with the events in the daily they are updated, if not the events are addded. The output for this process is the table with the `_merged` suffix.
-    It can be invoked (using the default values of the paramters that points to a scratch):
-    ```bash
-    # run daily incremental fishing events, outputs: scratch_matias_ttl_7_days.incremental_fishing_events_merged
-    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 incremental_events
-    # runs daily night loitering. outputs: scratch_matias_ttl_7_days.incremental_night_loitering_events_merged
-    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 incremental_events -sfield night_loitering -dest_tbl_prefix incremental_night_loitering_events
-    ```
-    NOTE: the default dataset source is "pipe_ais_test_202408290000" and the dataset out is "scratch_matias_ttl_7_days".
-    Show all options:
-    ```bash
-    $ docker compose run --entrypoint pipe pipeline incremental_events -h
-    ```
-
-* `incremental_filter_events`: Tooks a fishing events history table (`_merged`) and applies filters, add vessel_id, identities fields and remove overlapping_and_short segments. It outputs the `_filtered` table.
-It can be invoked (using the default values of the paramters that points to a scratch):
-    ```bash
-    # run filter for the fishing events. outputs: scratch_matias_ttl_7_days.incremental_fishing_events_filtered
-    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 incremental_filter_events
-    # run filter for the night loitering. outputs: scratch_matias_ttl_7_days.incremental_night_loitering_events_filtered
-    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 incremental_filter_events sfield night_loitering --merged_table world-fishing-827.scratch_matias_ttl_7_days.incremental_night_loitering_events_merged -incremental_night_loitering_events_filtered
-    ```
-    NOTE: the default dataset source is "pipe_ais_test_202408290000" and the dataset out is "scratch_matias_ttl_7_days".
-    Show all options:
-    ```bash
-    $ docker compose run --entrypoint pipe pipeline incremental_filter_events -h
-    ```
-* `auth_and_regions_fishing_events`: Adds authorization and regions position.
-    It can be invoked:
-    ```bash
-    # run daily incremental fishing events. outputs: scratch_matias_ttl_7_days.fishing_events_v20200102 and scratch_matias_ttl_7_days.fishing_events
-    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 auth_and_regions_fishing_events
-    ```
-    NOTE: the default dataset source is "pipe_ais_test_202408290000" and the dataset out is "scratch_matias_ttl_7_days".
-    Show all options:
-    ```bash
-    $ docker compose run --entrypoint pipe pipeline auth_and_regions_fishing_events -h
-    ```
-* `fishing_restrictive`: restrict the events using a specific list.
-    It can be invoked:
-    ```bash
-    # run daily incremental fishing events. outputs: scratch_matias_ttl_7_days.fishing_events_restrictive_v20200102 and scratch_matias_ttl_7_days.fishing_events_restrictive
-    $ docker compose run --entrypoint pipe pipeline -v --project world-fishing-827 fishing_restrictive
-    ```
-    NOTE: the default dataset source is "pipe_ais_test_202408290000" and the dataset out is "scratch_matias_ttl_7_days".
-    Show all options:
-    ```bash
-    $ docker compose run --entrypoint pipe pipeline fishing_restrictive -h
-    ```
-
-
-#### Docker compose
-
-A pipeline that runs all incremental fishing events steps subsequently is available in [examples/generate_incremental_fishing_events.sh](examples/generate_incremental_fishing_events.sh). It uses docker compose to run the pipeline in a containerized environment.
-
-To run a full backfill on the staging pipeline you can use the following command:
-
+```shell
+make docker-build
 ```
-docker compose build
+
+## Running the pipeline
+
+The `pipe-events` entrypoint lives inside the image, so you select it with
+`--entrypoint` on the `pipeline` service:
+
+```shell
+docker compose run --rm --entrypoint pipe-events pipeline [global options] <subcommand> [subcommand options]
+```
+
+To see the options accepted by a subcommand, pass `--help` to it:
+
+```shell
+docker compose run --rm --entrypoint pipe-events pipeline fishing_events_incremental --help
+```
+
+### Global options
+
+These options are parsed **before** the subcommand token and apply to every subcommand:
+
+| Option | Required | Description |
+|---|---|---|
+| `--project` | yes | GCP project id billed for executing the BigQuery work. |
+| `--table-description` | no | Extra text appended to the output table description. Default: empty. |
+| `--dry-run` | no | Print the queries and exit without running them. |
+| `-v`, `--verbose` | no | Verbose output; repeat (`-vv`) for more. |
+| `-q`, `--quiet` | no | Quiet output (errors only). |
+
+A full invocation therefore looks like:
+
+```shell
+docker compose run --rm --entrypoint pipe-events pipeline \
+  -v --project world-fishing-827 --table-description "Incremental fishing events" \
+  fishing_events_incremental --start-date 2020-01-01 --end-date 2020-01-10 ...
+```
+
+## CLI reference
+
+Every table option takes a **fully-qualified** `project.dataset.table` value, and
+`--bq-in-udfs-dataset` takes a `project.dataset`. All subcommand options below are
+required unless noted; the [global options](#global-options) above are additional.
+
+### `fishing_events_incremental`
+
+Computes incremental fishing (or night loitering) events for a date range and merges
+them into the historical `*_merged` table inside a BigQuery session. Run once per score
+field.
+
+| Option | Required | Description |
+|---|---|---|
+| `--start-date` | yes | Start date of the source messages (`YYYY-MM-DD`). |
+| `--end-date` | yes | End date of the source messages (`YYYY-MM-DD`). |
+| `--bq-in-messages` | yes | Source messages table with fishing / night loitering scores. |
+| `--score-field` | yes | Score field to evaluate: `nnet_score` or `night_loitering`. |
+| `--max-fishing-event-gap-hours` | no | Max gap (hours) from the prior day used to reopen potentially open events. Default: `2`. |
+| `--bq-out-merged-events` | yes | Destination merged fishing events table. |
+| `--labels` | yes | JSON object string applied to the output tables. |
+
+### `fishing_events_incremental_filter`
+
+Applies the fishing-event filters to a merged table and writes the `*_filtered` table.
+Run once per score field.
+
+| Option | Required | Description |
+|---|---|---|
+| `--bq-in-merged-events` | yes | Source merged events table (output of `fishing_events_incremental`). |
+| `--bq-in-segments-activity` | yes | Segments activity table. |
+| `--bq-in-segment-vessel` | yes | Segment vessel table. |
+| `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
+| `--product-vessel-info-summary-field-prefix` | no | Prefix for vessel info fields in the PVIS table (e.g. `ais_`; empty for VMS PVIS). |
+| `--score-field` | yes | Score field to evaluate: `nnet_score` or `night_loitering`. |
+| `--bq-in-udfs-dataset` | yes | Dataset (`project.dataset`) where the shared UDFs live. |
+| `--bq-out-filtered-events` | yes | Destination filtered fishing events table. |
+| `--labels` | yes | JSON object string applied to the output tables. |
+
+### `fishing_events_auth_and_regions`
+
+Combines the `nnet_score` and `night_loitering` filtered events and adds authorization
+and region information, publishing a versioned table and a view.
+
+| Option | Required | Description |
+|---|---|---|
+| `--bq-in-fishing-events` | yes | Filtered `nnet_score` fishing events table. |
+| `--bq-in-night-loitering-events` | yes | Filtered `night_loitering` events table. |
+| `--bq-in-vessel-identity-core` | yes | Vessel identity core table. |
+| `--bq-in-vessel-identity-authorization` | yes | Vessel identity authorization table. |
+| `--bq-in-spatial-measures` | yes | Spatial measures table. |
+| `--bq-in-regions` | yes | Event regions table. |
+| `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
+| `--product-vessel-info-summary-field-prefix` | no | Prefix for vessel info fields in the PVIS table (e.g. `ais_`). |
+| `--bq-in-udfs-dataset` | yes | Dataset (`project.dataset`) where the shared UDFs live. |
+| `--bq-out-events` | yes | Destination table (the versioned `_v<YYYYMMDD>` name derives from this and `--reference-date`). |
+| `--bq-out-events-view` | yes | Destination view pointing at the latest versioned table. |
+| `--reference-date` | yes | Reference date (`YYYY-MM-DD`) for the less restrictive events; drives the versioned table name. |
+| `--labels` | yes | JSON object string applied to the output tables. |
+
+### `fishing_events_restrictive`
+
+Applies the restrictive fishing filter to the auth-and-regions output, publishing a
+versioned table and a view.
+
+| Option | Required | Description |
+|---|---|---|
+| `--bq-in-events` | yes | Source (less restrictive) events table; `--reference-date` is appended to resolve the versioned name. |
+| `--bq-out-events` | yes | Destination restrictive events table (versioned by `--reference-date`). |
+| `--bq-out-events-view` | yes | Destination view pointing at the restrictive events table. |
+| `--reference-date` | yes | Reference date (`YYYY-MM-DD`) for the restrictive events; drives the versioned table name. |
+| `--labels` | yes | JSON object string applied to the output tables. |
+
+### `encounter_events`
+
+Publishes encounter events for a date range as a versioned table and a view.
+
+| Option | Required | Description |
+|---|---|---|
+| `--start-date` | yes | Start date of the source range (`YYYY-MM-DD`). |
+| `--end-date` | yes | End date of the source range (`YYYY-MM-DD`); drives the versioned table name. |
+| `--bq-in-encounters` | yes | Source encounters table. |
+| `--bq-in-spatial-measures` | yes | Spatial measures table. |
+| `--bq-in-regions` | yes | Event regions table. |
+| `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
+| `--product-vessel-info-summary-field-prefix` | yes | Prefix for vessel info fields in the PVIS table (e.g. `ais_`). |
+| `--bq-in-vessel-identity-core` | yes | Vessel identity core table. |
+| `--bq-in-vessel-identity-authorization` | yes | Vessel identity authorization table. |
+| `--bq-in-voyages` | yes | Voyages table. |
+| `--bq-in-port-visits` | yes | Port visits table. |
+| `--bq-out-events` | yes | Destination table; the versioned table and view derive from this. |
+| `--labels` | yes | JSON object string applied to the output tables. |
+
+### `loitering_events`
+
+Publishes loitering events for a date range as a versioned table and a view.
+
+| Option | Required | Description |
+|---|---|---|
+| `--start-date` | yes | Start date of the source range (`YYYY-MM-DD`). |
+| `--end-date` | yes | End date of the source range (`YYYY-MM-DD`); drives the versioned table name. |
+| `--bq-in-loitering` | yes | Source loitering table. |
+| `--bq-in-segment-info` | yes | Segment info table. |
+| `--bq-in-spatial-measures` | yes | Spatial measures table. |
+| `--bq-in-regions` | yes | Event regions table. |
+| `--bq-in-research-segments` | yes | Research segments table. |
+| `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
+| `--product-vessel-info-summary-field-prefix` | yes | Prefix for vessel info fields in the PVIS table (e.g. `ais_`). |
+| `--minimum-distance-from-shore-nm` | yes | Minimum distance from shore, in nautical miles. |
+| `--bq-in-voyages` | yes | Voyages table. |
+| `--bq-in-port-visits` | yes | Port visits table. |
+| `--bq-out-events` | yes | Destination table; the versioned table and view derive from this. |
+| `--labels` | yes | JSON object string applied to the output tables. |
+
+### `port_visit_events`
+
+Publishes port visit events for a date range as a versioned table and a view.
+
+| Option | Required | Description |
+|---|---|---|
+| `--start-date` | yes | Start date of the source range (`YYYY-MM-DD`). |
+| `--end-date` | yes | End date of the source range (`YYYY-MM-DD`); drives the versioned table name. |
+| `--bq-in-port-visits` | yes | Source port visits table. |
+| `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
+| `--product-vessel-info-summary-field-prefix` | yes | Prefix for vessel info fields in the PVIS table (e.g. `ais_`). |
+| `--bq-in-spatial-measures` | yes | Spatial measures table. |
+| `--bq-in-regions` | yes | Event regions table. |
+| `--bq-in-named-anchorages` | yes | Named anchorages table. |
+| `--bq-out-events` | yes | Destination table; the versioned table and view derive from this. |
+| `--labels` | yes | JSON object string applied to the output tables. |
+
+## Generating incremental fishing events end to end
+
+[`examples/generate_incremental_fishing_events.sh`](examples/generate_incremental_fishing_events.sh)
+runs all four incremental fishing events steps in order (both score fields where
+applicable), using `docker compose` under the hood. It is the reference for how the
+steps chain together and which tables feed which.
+
+To run a full backfill on the staging pipeline:
+
+```shell
+make docker-build
 cd examples
-./generate_incremental_fishing_events.sh --pipeline_prefix PIPELINE12345_staging_test --start_d 2020-01-01 --end_d 2020-12-31
+./generate_incremental_fishing_events.sh \
+  --pipeline_prefix PIPELINE12345_staging_test \
+  --start_d 2020-01-01 --end_d 2020-12-31
 ```
 
-### The former standard way
+Pass `--backup_prefix <prefix>` to clone every created table afterwards, which is useful
+when running a full backfill first and then backfilling single days incrementally.
 
-The pipeline exposes the following standard settings:
+## Development
 
-* `pipe_events.docker_run`: Command to run docker inside the airflow server.
-* `pipe_events.project_id`: Google cloud project id containing all the resources that running this pipeline requires.
-* `pipe_events.temp_bucket`: GCS bucket where temp files may be stored to.
-* `pipe_events.pipeline_bucket`: GCS bucket where all final files generated by this pipeline may be stored to.
-* `pipe_events.pipeline_dataset`: BigQuery dataset containing various tables used in this pipeline.
+The project ships a Docker-based workflow driven by `make`; run `make help` for the full
+list. Common entry points:
 
-In addition to this, the following custom settings are required for this pipeline, and come with default values:
+```shell
+make docker-build     # build the docker image
+make docker-ci-test   # run the test suite in the prod image (as CI does)
+make docker-shell     # open a shell in the dev container
+```
 
-* `INFERENCE_BUFFER_DAYS`: Global airflow variable which determines the amount of days to reprocess because nnet scores might be avaialble. Defaults to `7`.
-* `FLEXIBLE_OPERATOR`: Global airflow variable which determines the operator that will be used to process the events, the possible values could be `bash` or `kubernetes`. Defaults to `bash`.
-* `pipe_events.events_dataset`: BigQuery dataset which will contain the published events. Defaults to `EVENTS_DATASET`.
-* `pipe_events.source_dataset`: BigQuery dataset which contains the different tables that are read to produce the summarized events. Defaults to `PIPELINE_DATASET`.
-* `pipe_events.publish_to_postgres`: Flag to decide if the results are published to posgres. It also can be specified at event level instead of pipe_events level. Since if you only want to publish ports, encounters and fishing but not gaps you can do it. Defaults to `false`.
-* `pipe_events.gaps.source_table`: BigQuery table to read gaps from. Defaults to `position_messages_`.
-* `pipe_events.gaps.events_table`: BigQuery table to publish gap events to. Defaults to `published_events_gaps`.
-* `pipe_events.gaps.segment_vessel`: BigQuery table containing segment information, used to calculate gaps. Defaults to `segment_vessel`.
-* `pipe_events.gaps.vessel_info`: BigQuery table to read vessel information from. Defaults to `vessel_info`.
-* `pipe_events.gaps.gap_min_pos_count`: Only consider segments with a given minimum amount of positions. Defaults to `3`.
-* `pipe_events.gaps.gap_min_dist`: Minimum distance to shore to consider the transponder off events. Defaults to `10000`.
-* `pipe_events.encounters.source_table`: BigQuery table containing the raw encounters to read from. Defaults to `encounters`.
-* `pipe_events.encounters.vessel_info`: BigQuery table to read vessel information from. Defaults to `vessel_info`.
-* `pipe_events.encounters.events_table`: BigQuery table to publish the encounters to. Defaults to `published_events_encounters`.
-* `pipe_events.anchorages.source_table`: BigQuery table containing the raw port events to read from. Defaults to `port_events_`.
-* `pipe_events.anchorages.vessel_info`: BigQuery table to read vessel information from. Defaults to `vessel_info`.
-* `pipe_events.anchorages.events_table`: BigQuery table to publish the anchorages to. Defaults to `published_events_ports`.
-* `pipe_events.anchorages.anchorages_dataset`: BigQuery dataset which contains the named anchorages table. Defaults to `gfw_research`.
-* `pipe_events.anchorages.named_anchorages`: BigQuery table containing anchorage information. Defaults to `named_anchorages_v20190307`.
-    **DEPRECATED BY INCREMENTAL LOAD**
-* `pipe_events.fishing.source_table`: BigQuery table containing the scored messages to read from. Defaults to `messages_scored_`.
-* `pipe_events.fishing.events_table`: BigQuery table to publish the fishing events to. Defaults to `published_events_fishing`.
-* `pipe_events.fishing.segment_vessel`: BigQuery table containing segent information. Defaults to `segment_vessel`.
-* `pipe_events.fishing.segment_info`: BigQuery table containing segment information. Defaults to `segment_info`.
-* `pipe_events.fishing.vessel_info`: BigQuery table to read vessel information from. Defaults to `vessel_info`.
-* `pipe_events.fishing.min_event_duration`: BigQuery table containing the minimum amount of seconds to consider a fishing event actually a fishing event. Defaults to `300`.
+There is also a local (venv) path for linting, type-checking and tests — `make install`
+then `make all` (lint + codespell + typecheck + audit + test).
 
-Finally, the following custom entries do not provide a default value and must be manually configured before using this pipeline:
+## Git workflow
 
-* `pipe_events.postgres_instance`: CloudSQL postgres instance where the data is published to.
-* `pipe_events.postgres_connection_string`: Connection string for the postgres database to publish the events to.
-* `pipe_events.postgres_table`: Table in postgres to publish the events to.
+Please refer to our [git workflow documentation] to know how to manage branches in this
+repository.
 
-# License
+## License
 
 Copyright 2017 Global Fishing Watch
 
