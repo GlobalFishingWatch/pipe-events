@@ -4,7 +4,7 @@ import logging
 from pipe_events.utils.bigquery import dest_table_description
 from pipe_events.utils.validators import valid_date, valid_table
 
-COMMAND = "fishing_restrictive"
+COMMAND = "fishing_events_restrictive"
 HELP = "Generates a table with the fishing restrictive events in case does not exists."
 
 

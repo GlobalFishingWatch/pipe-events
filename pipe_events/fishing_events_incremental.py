@@ -4,7 +4,7 @@ import logging
 from pipe_events.utils.bigquery import dest_table_description
 from pipe_events.utils.validators import valid_date, valid_table
 
-COMMAND = "incremental_events"
+COMMAND = "fishing_events_incremental"
 HELP = "Generates the incremental fishing or night loitering events."
 
 DEFAULT_MAX_FISHING_EVENT_GAP_HOURS = 2

@@ -25,16 +25,16 @@ class TestCli:
 
         from pipe_events.cli import Cli
 
-        cli_test = Cli(Args(operation='incremental_events'))
-        assert cli_test._params['operation'] == 'incremental_events'
+        cli_test = Cli(Args(operation='fishing_events_incremental'))
+        assert cli_test._params['operation'] == 'fishing_events_incremental'
         assert cli_test.run() is not True
 
-        cli_test = Cli(Args(operation='auth_and_regions_fishing_events'))
-        assert cli_test._params['operation'] == 'auth_and_regions_fishing_events'
+        cli_test = Cli(Args(operation='fishing_events_auth_and_regions'))
+        assert cli_test._params['operation'] == 'fishing_events_auth_and_regions'
         assert cli_test.run() is True
 
-        cli_test = Cli(Args(operation='fishing_restrictive'))
-        assert cli_test._params['operation'] == 'fishing_restrictive'
+        cli_test = Cli(Args(operation='fishing_events_restrictive'))
+        assert cli_test._params['operation'] == 'fishing_events_restrictive'
         assert cli_test.run() is True
 
     def test_cli_not_none(self):

@@ -3,10 +3,12 @@ import logging
 import os
 import sys
 
+from pipe_events import encounter_events
 from pipe_events import fishing_events_auth_and_regions as auth_and_regions
 from pipe_events import fishing_events_incremental as incremental
 from pipe_events import fishing_events_incremental_filter as incremental_filter
 from pipe_events import fishing_events_restricted as restricted
+from pipe_events import loitering_events, port_visit_events
 from pipe_events.constants import (
     PIPELINE_DESCRIPTION,
     PIPELINE_NAME,
@@ -20,6 +22,9 @@ COMMAND_MODULES = [
     incremental_filter,
     auth_and_regions,
     restricted,
+    encounter_events,
+    loitering_events,
+    port_visit_events,
 ]
 COMMANDS = {module.COMMAND: module for module in COMMAND_MODULES}
 

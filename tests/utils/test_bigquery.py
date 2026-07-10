@@ -1,3 +1,5 @@
+import unittest.mock as utm
+
 
 class TestUtilsBigQuery:
 
@@ -27,3 +29,12 @@ class TestUtilsBigQuery:
                 "fishing-events-5-restrictive.sql.j2",
                 source_restrictive_events=''
             )
+
+    def test_remove_table_deletes_not_found_ok(self):
+        from pipe_events.utils.bigquery import BigqueryHelper
+        with utm.patch("pipe_events.utils.bigquery.bigquery.Client"):
+            bq = BigqueryHelper(project="p")
+        bq.remove_table("p.d.t")
+        bq.client.delete_table.assert_called_once()
+        _, kwargs = bq.client.delete_table.call_args
+        assert kwargs["not_found_ok"] is True

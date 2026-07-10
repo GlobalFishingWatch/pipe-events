@@ -100,11 +100,11 @@ for nnet_score_nl in nnet_score night_loitering; do
   echo $nnet_score_nl
   docker compose run \
     --remove-orphans \
-    --entrypoint pipe pipeline \
+    --entrypoint pipe-events pipeline \
     -v \
     --project $pipeline_project \
     --table_description "Incremental fishing events based on $nnet_score_nl" \
-    incremental_events \
+    fishing_events_incremental \
     -start $start_d \
     -end $end_d \
     -messages $internal_ds.research_messages \
@@ -120,11 +120,11 @@ for nnet_score_nl in nnet_score night_loitering; do
   echo $nnet_score_nl
     docker compose run \
     --remove-orphans \
-    --entrypoint pipe pipeline  \
+    --entrypoint pipe-events pipeline  \
     -v  \
     --project $pipeline_project  \
     --table_description '"Filtered fishing events based on $nnet_score_nl"' \
-    incremental_filter_events \
+    fishing_events_incremental_filter \
     -sfield $nnet_score_nl \
     --udfs_project $udfs_project \
     -segsact $published_ds.segs_activity \
@@ -140,11 +140,11 @@ done
 echo "3. Authorizations"
  docker compose run \
  --remove-orphans \
- --entrypoint pipe pipeline  \
+ --entrypoint pipe-events pipeline  \
  -v  \
  --project $pipeline_project  \
  --table_description '"Fishing events with authorizations"' \
- auth_and_regions_fishing_events      \
+ fishing_events_auth_and_regions      \
  --udfs_project $udfs_project \
  -source_fishing $dest_ds.${pipeline_prefix}_nnet_score_filtered \
  -source_nl $dest_ds.${pipeline_prefix}_night_loitering_filtered \
@@ -162,11 +162,11 @@ echo "3. Authorizations"
 echo "4. Restrictive"
  docker compose run \
  --remove-orphans \
- --entrypoint pipe pipeline  \
+ --entrypoint pipe-events pipeline  \
  -v  \
  --project $pipeline_project  \
  --table_description '"Restrictive fishing events used in products"' \
- fishing_restrictive \
+ fishing_events_restrictive \
  -source_events $dest_ds.${pipeline_prefix}_fishing_events_v  \
  -destrest $dest_ds.${pipeline_prefix}_product_events_fishing_v \
  -destrestview $dest_ds.${pipeline_prefix}_product_events_fishing \

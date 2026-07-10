@@ -42,8 +42,6 @@ grpcio-status==1.70.0
 idna==3.11
     # via requests
 jinja2==3.1.6
-    # via jinja2-cli
-jinja2-cli==0.8.2
     # via pipe-events (setup.py)
 markupsafe==2.1.5
     # via jinja2

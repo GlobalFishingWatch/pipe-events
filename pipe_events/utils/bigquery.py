@@ -167,6 +167,11 @@ class BigqueryHelper:
         # Create table
         return self.client.create_table(bq_table, exists_ok=exists_ok)
 
+    def remove_table(self, table):
+        """Delete a table if it exists (no-op when it does not)."""
+        self.client.delete_table(self.table_ref(table), not_found_ok=True)
+        self.log.info(f"Removed table {table}")
+
     def clear_table_partition(
         self,
         full_table_name,

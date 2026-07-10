@@ -4,7 +4,7 @@ import logging
 from pipe_events.utils.bigquery import dest_table_description
 from pipe_events.utils.validators import valid_date, valid_table
 
-COMMAND = "auth_and_regions_fishing_events"
+COMMAND = "fishing_events_auth_and_regions"
 HELP = "Combine the fishing and night_loitering with authorization and regions."
 
 

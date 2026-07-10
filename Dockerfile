@@ -10,11 +10,10 @@ RUN pip install . --no-deps && \
     rm -rf /opt/project/*
 
 # Setup the entrypoint for quickly executing the pipelines
-ENTRYPOINT ["scripts/run"]
+ENTRYPOINT ["pipe-events"]
 
 # TEMPORARY (until these are properly installed in the package)
 COPY ./assets /opt/project/assets
-COPY ./scripts /opt/project/scripts
 
 # ---------------------------------------------------------------------------------------
 # DEVELOPMENT IMAGE (editable install and development tools)

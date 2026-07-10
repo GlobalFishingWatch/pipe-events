@@ -4,7 +4,7 @@ import logging
 from pipe_events.utils.bigquery import dest_table_description
 from pipe_events.utils.validators import valid_table
 
-COMMAND = "incremental_filter_events"
+COMMAND = "fishing_events_incremental_filter"
 HELP = "Takes the incremental fishing or night loitering events and apply filters."
 
 
