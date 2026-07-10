@@ -5,7 +5,7 @@
     <img alt="Coverage" src="https://codecov.io/gh/GlobalFishingWatch/pipe-events/graph/badge.svg?token=HLSEOQKEER">
   </a>
   <a>
-    <img alt="Python versions" src="https://img.shields.io/badge/python-3.8-blue">
+    <img alt="Python versions" src="https://img.shields.io/badge/python-3.12-blue">
   </a>
 </p>
 
