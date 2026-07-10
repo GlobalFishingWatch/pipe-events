@@ -17,7 +17,7 @@ pipe_static_measures=${pipe_static_measures:-world-fishing-827.pipe_static.spati
 pipe_regions_layers=${pipe_regions_layers:-world-fishing-827.pipe_regions_layers.event_regions}
 
 # 1. run a normal backfill from start_year-01-01 to end_year-12-31
-../scripts/generate_incremental_fishing_events.sh \
+../examples/generate_incremental_fishing_events.sh \
     --pipeline_prefix ${pipeline_prefix}_1_bf \
     --start_d $start_year-01-01 \
     --end_d $end_year_plus_one-01-01 \
@@ -27,7 +27,7 @@ pipe_regions_layers=${pipe_regions_layers:-world-fishing-827.pipe_regions_layers
 
 
 # 2. run a backfill from start_year-01-01 to end_year-12-28, and then a daily load from end_year-12-29 to end_year-12-31
-../scripts/generate_incremental_fishing_events.sh \
+../examples/generate_incremental_fishing_events.sh \
     --pipeline_prefix ${pipeline_prefix}_2_bfd \
     --start_d $start_year-01-01 \
     --end_d $end_year-12-29 \
@@ -42,7 +42,7 @@ pipe_regions_layers=${pipe_regions_layers:-world-fishing-827.pipe_regions_layers
 for d in $(seq -w 29 31); do
 current_day=$end_year-12-${d}
 next_day=$(date -d "$current_day + 1 day" +%Y-%m-%d)
-    ../scripts/generate_incremental_fishing_events.sh \
+    ../examples/generate_incremental_fishing_events.sh \
         --pipeline_prefix ${pipeline_prefix}_2_bfd \
         --start_d $current_day \
         --end_d $next_day \
@@ -52,7 +52,7 @@ next_day=$(date -d "$current_day + 1 day" +%Y-%m-%d)
 done
 
 # 3. run a backfill from start_year-01-01 to end_year-12-31, and then a (backfill) daily load from end_year-12-29 to end_year-12-31 to test truncation
-../scripts/generate_incremental_fishing_events.sh \
+../examples/generate_incremental_fishing_events.sh \
     --pipeline_prefix ${pipeline_prefix}_3_bftruncate \
     --start_d $start_year-01-01 \
     --end_d $end_year_plus_one-01-01 \
@@ -66,7 +66,7 @@ done
 for d in $(seq -w 29 31); do
 current_day=$end_year-12-${d}
 next_day=$(date -d "$current_day + 1 day" +%Y-%m-%d)
-    ../scripts/generate_incremental_fishing_events.sh \
+    ../examples/generate_incremental_fishing_events.sh \
         --pipeline_prefix ${pipeline_prefix}_3_bftruncate \
         --start_d $current_day \
         --end_d $next_day \

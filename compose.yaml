@@ -17,15 +17,6 @@ services:
       - ".:/opt/project"
       - "gcp:/root/.config/"
 
-  test:
-    image: gfw/pipe-events-test
-    # Runs tests using the production Docker image.
-    # Intended to be executed in the GitHub CI environment.
-    build:
-      context: .
-      target: test
-    entrypoint: "pytest -v"
-
 # Use an external named volume so that we can share gcp auth across containers
 # Before first use, this volume must be manually created with
 #   docker volume create --name=gcp

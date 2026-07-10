@@ -1,15 +1,89 @@
+import json
 import logging
+
 from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.validators import valid_dataset, valid_table
+
+COMMAND = "fishing_events_incremental_filter"
+HELP = "Takes the incremental fishing or night loitering events and apply filters."
+
+
+def add_arguments(parser):
+    parser.add_argument(
+        "--bq-in-segments-activity",
+        dest="segs_activity_table",
+        help="The segments activity table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "--bq-in-segment-vessel",
+        dest="segment_vessel_table",
+        help="The segment vessel table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "--bq-in-product-vessel-info-summary",
+        dest="product_vessel_info_summary_table",
+        help="The product vessel info summary table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "--product-vessel-info-summary-field-prefix",
+        dest="product_vessel_info_summary_field_prefix",
+        help="""
+            Prefix to use to access vessel info fields in
+            `product_vessel_info_summary_table`. This is to account for
+            differences between PVIS tables in different environments. For
+            example, on ais this is `ais_`, but VMS PVIS has no prefix
+            """,
+        required=True,
+    )
+    parser.add_argument(
+        "--score-field",
+        dest="nnet_score_night_loitering",
+        help="The field name that has the score to eval.",
+        choices=["nnet_score", "night_loitering"],
+        required=True,
+    )
+    parser.add_argument(
+        "--bq-in-udfs-dataset",
+        dest="udfs_dataset",
+        help="Fully-qualified dataset (project.dataset) where the shared UDFs live.",
+        type=valid_dataset,
+        required=True,
+    )
+    parser.add_argument(
+        "--bq-out-filtered-events",
+        dest="filtered_events",
+        help="Fully-qualified destination table for the filtered fishing events.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "--labels",
+        help="The labels assigned to each table.",
+        type=json.loads,
+        required=True,
+    )
+    parser.add_argument(
+        "--bq-in-merged-events",
+        dest="merged_table",
+        help="An existing merged table.",
+        type=valid_table,
+        required=True,
+    )
 
 
 def run(bq, params):
     log = logging.getLogger()
     params_copy = params.copy()
-    prefix_table = f'{params["destination_dataset"]}.{params["destination_table_prefix"]}'
     schema_file = "./assets/bigquery/fishing-events-3-filter-schema.json"
 
     log.info("*** 1. Ensures filter table exists.")
-    params_copy["filtered_table"] = f"{prefix_table}_filtered"
+    params_copy["filtered_table"] = params["filtered_events"]
     bq.create_table(
         params_copy["filtered_table"],
         schema_file=schema_file,

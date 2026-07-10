@@ -21,7 +21,7 @@ mkdir -p "$log_dir"
 # 1. Run a normal backfill from 2020-01-01 to 2020-12-31 (in background)
 {
     echo "Starting pipeline 1: simple full load" 
-    ../scripts/generate_incremental_fishing_events.sh \
+    ../examples/generate_incremental_fishing_events.sh \
         --pipeline_prefix ${pipeline_prefix}_1_bf \
         --start_d 2020-01-01 \
         --end_d 2021-01-01 \
@@ -33,7 +33,7 @@ pid1=$!
 # 2. Run a backfill from 2020-01-01 to 2020-12-20, and then a daily load (in background)
 {
     echo "Starting pipeline 2: full load followed by daily load"
-    ../scripts/generate_incremental_fishing_events.sh \
+    ../examples/generate_incremental_fishing_events.sh \
         --pipeline_prefix ${pipeline_prefix}_2_bfd \
         --start_d 2020-01-01 \
         --end_d 2020-12-29 \
@@ -43,7 +43,7 @@ pid1=$!
     for d in $(seq -w 29 31); do
         current_day=2020-12-${d}
         next_day=$(date -d "$current_day + 1 day" +%Y-%m-%d)
-        ../scripts/generate_incremental_fishing_events.sh \
+        ../examples/generate_incremental_fishing_events.sh \
             --pipeline_prefix ${pipeline_prefix}_2_bfd \
             --start_d $current_day \
             --end_d $next_day \
@@ -56,7 +56,7 @@ pid2=$!
 # 3. Run a backfill from 2020-01-01 to 2020-12-31, then daily load for truncation test (in background)
 {
     echo "Starting pipeline 3: full load followed by backfill daily load" 
-    ../scripts/generate_incremental_fishing_events.sh \
+    ../examples/generate_incremental_fishing_events.sh \
         --pipeline_prefix ${pipeline_prefix}_3_bftruncate \
         --start_d 2020-01-01 \
         --end_d 2021-01-01 \
@@ -66,7 +66,7 @@ pid2=$!
     for d in $(seq -w 29 31); do
         current_day=2020-12-${d}
         next_day=$(date -d "$current_day + 1 day" +%Y-%m-%d)
-        ../scripts/generate_incremental_fishing_events.sh \
+        ../examples/generate_incremental_fishing_events.sh \
             --pipeline_prefix ${pipeline_prefix}_3_bftruncate \
             --start_d $current_day \
             --end_d $next_day \
