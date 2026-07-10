@@ -19,8 +19,8 @@ bq_out_table_prefix=""
 
 # Stable reference inputs; defaulted but overridable.
 bq_in_spatial_measures="global-fishing-watch.pipe_static.spatial_measures_clustered_v20260403"
-bq_in_regions="world-fishing-827.pipe_regions_layers.event_regions"
-pvis_field_prefix="ais_"
+bq_in_regions="global-fishing-watch.pipe_regions_layers.event_regions"
+pvis_field_prefix="self_reported_"
 
 usage() {
   cat <<'EOF'

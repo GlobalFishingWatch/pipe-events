@@ -30,9 +30,10 @@ bq_out_dataset=""
 bq_out_table_prefix=""
 
 # Stable reference inputs; defaulted but overridable.
+pvis_field_prefix="self_reported_"   # PVIS field prefix; identity v5 uses `self_reported_` (v4 used `ais_`, VMS has no prefix)
 bq_in_udfs_dataset="global-fishing-watch.udfs_v2"
 bq_in_spatial_measures="global-fishing-watch.pipe_static.spatial_measures_clustered_v20260403"
-bq_in_regions="world-fishing-827.pipe_regions_layers.event_regions"
+bq_in_regions="global-fishing-watch.pipe_regions_layers.event_regions"
 
 usage() {
   cat <<'EOF'
@@ -45,6 +46,7 @@ Usage: run_fishing_consolidated_stages.sh \
   --bq-in-ais-internal-dataset PROJECT.DATASET \
   --bq-out-dataset PROJECT.DATASET \
   --bq-out-table-prefix PREFIX \
+  [--pvis-field-prefix PREFIX] \
   [--bq-in-udfs-dataset PROJECT.DATASET] \
   [--bq-in-spatial-measures PROJECT.DATASET.TABLE] \
   [--bq-in-regions PROJECT.DATASET.TABLE]
@@ -70,6 +72,7 @@ while [[ $# -gt 0 ]]; do
     --bq-in-ais-internal-dataset) bq_in_ais_internal_dataset="$2"; shift 2 ;;
     --bq-out-dataset) bq_out_dataset="$2"; shift 2 ;;
     --bq-out-table-prefix) bq_out_table_prefix="$2"; shift 2 ;;
+    --pvis-field-prefix) pvis_field_prefix="$2"; shift 2 ;;
     --bq-in-udfs-dataset) bq_in_udfs_dataset="$2"; shift 2 ;;
     --bq-in-spatial-measures) bq_in_spatial_measures="$2"; shift 2 ;;
     --bq-in-regions) bq_in_regions="$2"; shift 2 ;;
@@ -120,6 +123,7 @@ echo "Merged (nl):       $bq_in_merged_night_loitering"
 echo "Identity dataset:  $bq_in_identity_published_dataset"
 echo "AIS published:     $bq_in_ais_published_dataset"
 echo "AIS internal:      $bq_in_ais_internal_dataset"
+echo "PVIS field prefix: $pvis_field_prefix"
 echo "UDFs dataset:      $bq_in_udfs_dataset"
 echo "Spatial measures:  $bq_in_spatial_measures"
 echo "Regions:           $bq_in_regions"
@@ -144,6 +148,7 @@ for score_field in nnet_score night_loitering; do
     --bq-in-segments-activity "$segs_activity" \
     --bq-in-segment-vessel "$segment_vessel" \
     --bq-in-product-vessel-info-summary "$product_vessel_info_summary" \
+    --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \
     --bq-in-merged-events "$merged_in" \
     --bq-out-filtered-events "$filtered_out" \
     --labels "$LABELS"
@@ -165,6 +170,7 @@ docker compose run \
   --bq-in-spatial-measures "$bq_in_spatial_measures" \
   --bq-in-regions "$bq_in_regions" \
   --bq-in-product-vessel-info-summary "$product_vessel_info_summary" \
+  --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \
   --bq-out-events "$fishing_events_v" \
   --bq-out-events-view "$fishing_events_view" \
   --reference-date "$reference_date" \

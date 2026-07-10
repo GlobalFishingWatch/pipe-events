@@ -23,8 +23,8 @@ bq_out_table_prefix=""
 
 # Stable reference inputs; defaulted but overridable.
 bq_in_spatial_measures="global-fishing-watch.pipe_static.spatial_measures_clustered_v20260403"
-bq_in_regions="world-fishing-827.pipe_regions_layers.event_regions"
-pvis_field_prefix="ais_"
+bq_in_regions="global-fishing-watch.pipe_regions_layers.event_regions"
+pvis_field_prefix="self_reported_"
 minimum_distance_from_shore_nm="20"
 
 usage() {
@@ -37,7 +37,6 @@ Usage: run_loitering_events.sh \
   --bq-in-research-segments PROJECT.DATASET.TABLE \
   --bq-in-voyages PROJECT.DATASET.TABLE \
   --bq-in-port-visits PROJECT.DATASET.TABLE \
-  --minimum-distance-from-shore-nm NUMBER \
   --bq-in-identity-published-dataset PROJECT.DATASET \
   --bq-out-dataset PROJECT.DATASET \
   --bq-out-table-prefix PREFIX \
