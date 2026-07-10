@@ -120,3 +120,6 @@ test.csv
 *.tfstate.backup
 .terraform
 .terraform.lock.hcl
+
+# Local examples
+examples/local/
