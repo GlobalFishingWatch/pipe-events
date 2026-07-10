@@ -300,11 +300,13 @@ execution project, and tag output tables with the same development labels. Every
 derived from an output dataset and a table prefix, so the scripts share the
 `--bq-out-dataset PROJECT.DATASET` / `--bq-out-table-prefix PREFIX` naming convention.
 
-The incremental fishing events chain is split across two scripts, reflecting how the
-steps are usually tested: the incremental step on its own over a few days, and the
+#### Fishing events
+
+Fishing event generation is a multi-step chain, split across two scripts that reflect how
+the steps are usually tested: the incremental step on its own over a few days, and the
 whole-history steps as a separate consolidated run.
 
-#### 1. Incremental step
+##### Incremental step
 
 [`examples/run_fishing_incremental_stages.sh`](examples/run_fishing_incremental_stages.sh)
 runs `fishing_events_incremental` for both score fields (`nnet_score` and
@@ -324,13 +326,13 @@ cd examples
 Each variant writes to
 `<bq-out-dataset>.<bq-out-table-prefix>_<score_field>_merged`.
 
-#### 2. Consolidated steps
+##### Consolidated steps
 
 [`examples/run_fishing_consolidated_stages.sh`](examples/run_fishing_consolidated_stages.sh)
 runs the whole-history chain — `fishing_events_incremental_filter` (once per score
 field) → `fishing_events_auth_and_regions` → `fishing_events_restrictive` — feeding the
-output of each step into the next. It takes the two `*_merged` tables produced by step 1
-as inputs, plus the upstream reference datasets.
+output of each step into the next. It takes the two `*_merged` tables produced by the
+incremental step as inputs, plus the upstream reference datasets.
 
 ```shell
 cd examples
@@ -350,6 +352,36 @@ The identity-published dataset supplies `identity_core`, `identity_authorization
 AIS-internal dataset supplies `segment_vessel`. The UDFs dataset, spatial measures and
 event regions tables default to their production locations and can be overridden with
 `--bq-in-udfs-dataset`, `--bq-in-spatial-measures` and `--bq-in-regions`.
+
+#### Other event types
+
+The standalone publishers are each a single command, so each has its own single-command
+script following the same conventions (execution project, labels and `--bq-out-dataset` /
+`--bq-out-table-prefix` naming). Each writes one versioned table plus a view, derived from
+`--bq-out-events`:
+
+| Script | Command | Output table |
+|---|---|---|
+| [`run_encounter_events.sh`](examples/run_encounter_events.sh) | `encounter_events` | `<prefix>_encounter_events` |
+| [`run_loitering_events.sh`](examples/run_loitering_events.sh) | `loitering_events` | `<prefix>_loitering_events` |
+| [`run_port_visit_events.sh`](examples/run_port_visit_events.sh) | `port_visit_events` | `<prefix>_port_visit_events` |
+
+```shell
+cd examples
+./run_encounter_events.sh \
+  --start-date 2020-01-01 --end-date 2020-01-10 \
+  --bq-in-encounters world-fishing-827.pipe_ais_test_202408290000_published.encounters \
+  --bq-in-voyages world-fishing-827.pipe_ais_test_202408290000_published.voyages \
+  --bq-in-port-visits world-fishing-827.pipe_ais_test_202408290000_published.port_visits \
+  --bq-in-identity-published-dataset world-fishing-827.pipe_ais_test_202408290000_published \
+  --bq-out-dataset world-fishing-827.scratch_example \
+  --bq-out-table-prefix PIPELINE12345_test
+```
+
+The identity-published dataset supplies `product_vessel_info_summary` (and, for
+encounters, `identity_core` and `identity_authorization`). Spatial measures and event
+regions default to their production locations; `--pvis-field-prefix` defaults to `ais_`.
+Run each script with `--help` for its full argument list.
 
 ## Git workflow
 

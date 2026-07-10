@@ -31,7 +31,7 @@ bq_out_table_prefix=""
 
 # Stable reference inputs; defaulted but overridable.
 bq_in_udfs_dataset="global-fishing-watch.udfs_v2"
-bq_in_spatial_measures="world-fishing-827.pipe_static.spatial_measures_20201105"
+bq_in_spatial_measures="global-fishing-watch.pipe_static.spatial_measures_clustered_v20260403"
 bq_in_regions="world-fishing-827.pipe_regions_layers.event_regions"
 
 usage() {
