@@ -133,52 +133,52 @@ echo "Spatial measures:  $bq_in_spatial_measures"
 echo "Regions:           $bq_in_regions"
 echo "----------------------------------------"
 
-# echo "1. Filtered"
-# for score_field in nnet_score night_loitering; do
-#   case $score_field in
-#     nnet_score) merged_in="$bq_in_merged_nnet_score"; filtered_out="$filtered_nnet_score" ;;
-#     night_loitering) merged_in="$bq_in_merged_night_loitering"; filtered_out="$filtered_night_loitering" ;;
-#   esac
-#   echo "==> fishing_events_incremental_filter ($score_field)"
-#   docker compose run \
-#     --rm \
-#     --entrypoint pipe-events pipeline \
-#     -v \
-#     --project "$EXECUTION_PROJECT" \
-#     --table-description "Filtered fishing events based on $score_field" \
-#     fishing_events_incremental_filter \
-#     --score-field "$score_field" \
-#     --bq-in-udfs-dataset "$bq_in_udfs_dataset" \
-#     --bq-in-segments-activity "$segs_activity" \
-#     --bq-in-segment-vessel "$segment_vessel" \
-#     --bq-in-product-vessel-info-summary "$product_vessel_info_summary" \
-#     --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \
-#     --bq-in-merged-events "$merged_in" \
-#     --bq-out-filtered-events "$filtered_out" \
-#     --labels "$LABELS"
-# done
+echo "1. Filtered"
+for score_field in nnet_score night_loitering; do
+  case $score_field in
+    nnet_score) merged_in="$bq_in_merged_nnet_score"; filtered_out="$filtered_nnet_score" ;;
+    night_loitering) merged_in="$bq_in_merged_night_loitering"; filtered_out="$filtered_night_loitering" ;;
+  esac
+  echo "==> fishing_events_incremental_filter ($score_field)"
+  docker compose run \
+    --rm \
+    --entrypoint pipe-events pipeline \
+    -v \
+    --project "$EXECUTION_PROJECT" \
+    --table-description "Filtered fishing events based on $score_field" \
+    fishing_events_incremental_filter \
+    --score-field "$score_field" \
+    --bq-in-udfs-dataset "$bq_in_udfs_dataset" \
+    --bq-in-segments-activity "$segs_activity" \
+    --bq-in-segment-vessel "$segment_vessel" \
+    --bq-in-product-vessel-info-summary "$product_vessel_info_summary" \
+    --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \
+    --bq-in-merged-events "$merged_in" \
+    --bq-out-filtered-events "$filtered_out" \
+    --labels "$LABELS"
+done
 
-# echo "2. Authorizations and regions"
-# docker compose run \
-#   --rm \
-#   --entrypoint pipe-events pipeline \
-#   -v \
-#   --project "$EXECUTION_PROJECT" \
-#   --table-description "Fishing events with authorizations" \
-#   fishing_events_auth_and_regions \
-#   --bq-in-udfs-dataset "$bq_in_udfs_dataset" \
-#   --bq-in-fishing-events "$filtered_nnet_score" \
-#   --bq-in-night-loitering-events "$filtered_night_loitering" \
-#   --bq-in-vessel-identity-core "$identity_core" \
-#   --bq-in-vessel-identity-authorization "$identity_authorization" \
-#   --bq-in-spatial-measures "$bq_in_spatial_measures" \
-#   --bq-in-regions "$bq_in_regions" \
-#   --bq-in-product-vessel-info-summary "$product_vessel_info_summary" \
-#   --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \
-#   --bq-out-events "$fishing_events_v" \
-#   --bq-out-events-view "$fishing_events_view" \
-#   --reference-date "$reference_date" \
-#   --labels "$LABELS"
+echo "2. Authorizations and regions"
+docker compose run \
+  --rm \
+  --entrypoint pipe-events pipeline \
+  -v \
+  --project "$EXECUTION_PROJECT" \
+  --table-description "Fishing events with authorizations" \
+  fishing_events_auth_and_regions \
+  --bq-in-udfs-dataset "$bq_in_udfs_dataset" \
+  --bq-in-fishing-events "$filtered_nnet_score" \
+  --bq-in-night-loitering-events "$filtered_night_loitering" \
+  --bq-in-vessel-identity-core "$identity_core" \
+  --bq-in-vessel-identity-authorization "$identity_authorization" \
+  --bq-in-spatial-measures "$bq_in_spatial_measures" \
+  --bq-in-regions "$bq_in_regions" \
+  --bq-in-product-vessel-info-summary "$product_vessel_info_summary" \
+  --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \
+  --bq-out-events "$fishing_events_v" \
+  --bq-out-events-view "$fishing_events_view" \
+  --reference-date "$reference_date" \
+  --labels "$LABELS"
 
 echo "3. Restrictive"
 docker compose run \
