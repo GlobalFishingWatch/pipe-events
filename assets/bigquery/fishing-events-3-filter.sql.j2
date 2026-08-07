@@ -14,7 +14,7 @@ WITH source_segs AS (
         SELECT
             *
         FROM
-            `{{ segment_vessel_table }}`
+            `{{ segment_vessel_table }}`, unnest (seg_ids) as seg
     ),
 
     source_fishing_vessels AS (
@@ -47,16 +47,16 @@ fishing_events_merged_good_segments AS (
 
 
 --
--- Get a vessel_id for each segment
+-- Get a entity_id for each segment
 --
 best_segment_vessel AS (
     SELECT DISTINCT 
       seg_id,
-      FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
+      FIRST_VALUE(entity_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, entity_id) AS entity_id
     FROM source_segment_vessel
 ),
 
-fishing_events_vessel_id AS (
+fishing_events_entity_id AS (
   SELECT *
   FROM fishing_events_merged_good_segments fe
   INNER JOIN best_segment_vessel
@@ -65,15 +65,15 @@ fishing_events_vessel_id AS (
 
 fishing_events_identity AS (
   SELECT
-      fishing_events_vessel_id.* EXCEPT (vessel_id),
-      vesselinfo.vessel_id,
+      fishing_events_entity_id.* EXCEPT (entity_id),
+      vesselinfo.entity_id,
       vesselinfo.prod_geartype AS best_best_vessel_class,
       vesselinfo.ssvid AS main_vessel_ssvid,
       vesselinfo.{{ product_vessel_info_summary_field_prefix }}mmsi_flag as main_vessel_flag,
       vesselinfo.{{ product_vessel_info_summary_field_prefix }}shipname AS main_vessel_shipname
   FROM
-      fishing_events_vessel_id
-      LEFT JOIN source_fishing_vessels AS vesselinfo USING (vessel_id, year)  
+      fishing_events_entity_id
+      LEFT JOIN source_fishing_vessels AS vesselinfo USING (entity_id, year)  
 ),
 
 fishing_event_point AS (
@@ -89,7 +89,7 @@ fishing_event_point AS (
         SELECT
             ssvid,
             seg_id,
-            vessel_id,
+            entity_id,
             main_vessel_shipname,
             main_vessel_flag,
             best_best_vessel_class,
@@ -129,7 +129,7 @@ fishing_event_point AS (
         GROUP BY
             ssvid,
             seg_id,
-            vessel_id,
+            entity_id,
             main_vessel_shipname,
             main_vessel_flag,
             best_best_vessel_class,
@@ -176,7 +176,7 @@ fishing_event_point AS (
     complete_fishing_event AS (
         SELECT
             *,
-            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'fishing', vessel_id, event_start, event_end))) AS event_id
+            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'fishing', entity_id, event_start, event_end))) AS event_id
         FROM
             fishing_event_dateline
         WHERE
