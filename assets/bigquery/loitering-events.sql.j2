@@ -25,7 +25,7 @@ WITH
             trip_start_anchorage_id,
             trip_end_anchorage_id,
             trip_end_visit_id,
-            vessel_id
+            entity_id
         FROM voyages_source
         WHERE trip_start != '1979-01-01' OR trip_start IS NULL
     ),
@@ -57,7 +57,7 @@ WITH
         SELECT
             *
         FROM
-            `{{ source_segment_info }}`
+            `{{ source_segment_info }}`, unnest(seg_ids)
     ),
 
     #
@@ -129,14 +129,14 @@ WITH
     ),
 
     #
-    # Get base info, populate vessel info, and calculate vessel_id, lat_mean,
+    # Get base info, populate vessel info, and calculate entity_id, lat_mean,
     # lot_mean and convert distances to km
     #
     base_loitering_event AS (
         SELECT
-            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'loitering', vessel.vessel_id, loitering_start_timestamp, loitering_end_timestamp))) AS event_id,
+            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'loitering', vessel.entity_id, loitering_start_timestamp, loitering_end_timestamp))) AS event_id,
             'loitering' AS event_type,
-            vessel.vessel_id,
+            vessel.entity_id,
             si.seg_id,
             loitering_start_timestamp AS event_start,
             loitering_end_timestamp AS event_end,
@@ -164,7 +164,7 @@ WITH
             ) AS event_info,
             TO_JSON_STRING([
                 STRUCT(
-                    vessel.vessel_id AS `id`,
+                    vessel.entity_id AS `id`,
                     filter_invalid_ssvid(lo.ssvid) AS `ssvid`,
                     vessel.{{ product_vessel_info_summary_field_prefix }}shipname AS `name`,
                     si.seg_id,
@@ -174,9 +174,9 @@ WITH
             ]) AS event_vessels
         FROM denoised_loitering AS lo
             JOIN source_segment_info si USING (seg_id)
-            JOIN source_all_vessels vessel USING (vessel_id, year)
+            JOIN source_all_vessels vessel USING (entity_id, year)
             LEFT JOIN flattened_voyages AS voyages ON ( 
-                vessel.vessel_id = voyages.vessel_id 
+                vessel.entity_id = voyages.entity_id 
                 AND (voyages.trip_start < loitering_start_timestamp OR voyages.trip_start IS NULL)
                 AND voyages.trip_end > loitering_end_timestamp 
             )
@@ -192,7 +192,7 @@ WITH
         SELECT
             event_id,
             event_type,
-            vessel_id,
+            entity_id,
             seg_id,
             event_start,
             event_end,
