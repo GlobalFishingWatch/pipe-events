@@ -1,198 +1,129 @@
 #standardSQL
 
--- Include some utility functions
+-- Step 3b: Filter + vessel identity enrichment
+--
+-- This step ALWAYS runs as a FULL scan (WRITE_TRUNCATE) because the
+-- dimension tables it joins -- segs_activity, segment_vessel,
+-- product_vessel_info_summary -- change daily and must use fresh data
+-- for ALL events, not just the current day's slice. The input is the
+-- event-level `_aggregated` table (produced by step 3a), NOT the
+-- message-level `_merged` table -- so the full scan is cheap (one row
+-- per event, not one row per AIS message).
+
 {% include 'util.sql.j2' %}
 
 
-WITH source_segs AS (
-        SELECT
-            *
-        FROM
-            `{{ segs_activity_table }}`
-    ),
-    source_segment_vessel AS (
-        SELECT
-            *
-        FROM
-            `{{ segment_vessel_table }}`
+WITH
+    source_segs AS (
+        SELECT *
+        FROM `{{ segs_activity_table }}`
     ),
 
+    source_segment_vessel AS (
+        SELECT *
+        FROM `{{ segment_vessel_table }}`
+    ),
+
+    -- Fishing-vessel candidate set. Mirrors current main's step-3 filter
+    -- (`prod_shiptype='fishing' OR ((is_fishing(registry_geartype) OR
+    -- on_fishing_list_nn OR on_fishing_list_sr) AND
+    -- shipname_indicates_likely_gear = FALSE)`) so the rebased refactor
+    -- produces the same candidate set as main; any output difference
+    -- attributed to the refactor is a step-4-shape difference, not a
+    -- filter-shape difference.
     source_fishing_vessels AS (
-        SELECT
-            *
-        FROM
-            `{{ product_vessel_info_summary_table }}`
+        SELECT *
+        FROM `{{ product_vessel_info_summary_table }}`
         WHERE
             prod_shiptype = 'fishing'
             OR ((`{{ udfs_dataset }}`.is_fishing(registry_geartype) IS TRUE
-            OR on_fishing_list_nn = TRUE
-            OR on_fishing_list_sr = TRUE)
-            AND shipname_indicates_likely_gear = FALSE)
-    ),
-
- 
-fishing_events_merged_good_segments AS (
-  SELECT * FROM `{{ merged_table }}`
-  WHERE seg_id IN (
-    SELECT
-        seg_id
-    FROM
-        source_segs
-    WHERE
-        good_seg
-      AND positions > 10
-      AND NOT overlapping_and_short
-  )
-),
-
-
---
--- Get a vessel_id for each segment
---
-best_segment_vessel AS (
-    SELECT DISTINCT 
-      seg_id,
-      FIRST_VALUE(vessel_id) OVER (PARTITION BY seg_id ORDER BY last_date DESC, vessel_id) AS vessel_id
-    FROM source_segment_vessel
-),
-
-fishing_events_vessel_id AS (
-  SELECT *
-  FROM fishing_events_merged_good_segments fe
-  INNER JOIN best_segment_vessel
-  USING(seg_id)
-),
-
-fishing_events_identity AS (
-  SELECT
-      fishing_events_vessel_id.* EXCEPT (vessel_id),
-      vesselinfo.vessel_id,
-      vesselinfo.prod_geartype AS best_best_vessel_class,
-      vesselinfo.ssvid AS main_vessel_ssvid,
-      vesselinfo.{{ product_vessel_info_summary_field_prefix }}mmsi_flag as main_vessel_flag,
-      vesselinfo.{{ product_vessel_info_summary_field_prefix }}shipname AS main_vessel_shipname
-  FROM
-      fishing_events_vessel_id
-      LEFT JOIN source_fishing_vessels AS vesselinfo USING (vessel_id, year)  
-),
-
-fishing_event_point AS (
-  SELECT *, SAFE.ST_GEOGPOINT(lon, lat) AS point
-  FROM fishing_events_identity
-),
-
-    --
-    -- Now aggregate all the messages that are in the same range into a single event record
-    -- Filter out short events or events where vessel is moving too fast
-    --
-    fishing_event AS (
-        SELECT
-            ssvid,
-            seg_id,
-            vessel_id,
-            main_vessel_shipname,
-            main_vessel_flag,
-            best_best_vessel_class,
-            ST_CENTROID(ST_UNION_AGG(point)) AS centroid,
-            ARRAY_AGG(struct(point as point, S2_CELLIDFROMPOINT(point, s2_level()) as s2_cell)) as geo_info,
-            -- compute centoid of all the lat/lon pairs in the event
-            event_start,
-            MAX(timestamp) AS event_end,
-            MIN(lat) AS lat_min,
-            MAX(lat) AS lat_max,
-            MIN(lon) AS lon_min,
-            MAX(lon) AS lon_max,
-            MIN(anti_lon(lon)) AS anti_lon_min,
-            -- Also get min/max for the anti_longitude (180 degrees opposite) to deal wiht dateline crossing
-            MAX(anti_lon(lon)) AS anti_lon_max,
-            -- calculate number of positions, and average vessel speed during event
-            COUNT(*) AS message_count,
-            AVG(speed_knots) AS avg_speed_knots,
-            -- remove first implied_speed_knots value in each event summary as value comes from previous position not part of event
-            AVG(CASE WHEN
-                             event_start = timestamp THEN NULL
-                     ELSE implied_speed_knots END) AS avg_implied_speed_knots,
-            -- remove first meters_to_prev value in each event summary as value comes from previous position not part of event
-            AVG(CASE WHEN
-                             event_start = timestamp THEN NULL
-                     ELSE meters_to_prev END) AS avg_meters_to_prev,
-            SUM(CASE WHEN
-                             event_start = timestamp THEN NULL
-                     ELSE meters_to_prev END) AS event_distance_m,
-            -- remove first hours value in each event summary as value comes from previous position not part of event
-            AVG(CASE WHEN
-                             event_start = timestamp THEN NULL
-                     ELSE hours END) AS avg_hours,
-            STRING_AGG(CONCAT(CAST(lon AS string), ' ', CAST(lat AS string)), ', ' ORDER BY timestamp) AS points_wkt
-        FROM
-            fishing_event_point
-        GROUP BY
-            ssvid,
-            seg_id,
-            vessel_id,
-            main_vessel_shipname,
-            main_vessel_flag,
-            best_best_vessel_class,
-            event_start
-        -- exclude events too short or with too high an avg vessel speed
-        HAVING
-            -- fishing events must be longer than 20 minutes
-            (TIMESTAMP_DIFF(event_end, event_start, SECOND) > 1200
-                -- fishing events must include more than 5 ais positions in event
-                AND message_count > 5
-                -- event average speed must be less than 10 knots
-                AND avg_speed_knots < 10)
+                OR on_fishing_list_nn = TRUE
+                OR on_fishing_list_sr = TRUE)
+                AND shipname_indicates_likely_gear = FALSE)
     ),
 
     --
-    -- Correct lon_min and lon_max for crossing the dateline (anti-meridian)
-    -- And extract lat and lon from the centriod
+    -- Filter aggregated events to only those from good segments
     --
-    fishing_event_dateline AS (
-        SELECT
-            * EXCEPT (centroid,
-            lon_min,
-            lon_max,
-            anti_lon_min,
-            anti_lon_max),
-            -- Get the lat and lon from the computed centroid
-            geopoint_to_struct(centroid).lat AS lat_mean,
-            geopoint_to_struct(centroid).lon AS lon_mean,
-            -- determine which direction around the globe is shorter - across the equator (eg -1.0 to 1.0), across the
-            -- dateline (eg -179.0 to 179.0) or neither (eg 10.0 to 12.0).  Use this to select which values to use for
-            -- min and max longitude
-            IF ( (lon_max - lon_min) <= (anti_lon_max - anti_lon_min),
-                 lon_min,
-                 anti_lon(anti_lon_max) ) AS lon_min,
-            IF ( (lon_max - lon_min) <= (anti_lon_max - anti_lon_min),
-                 lon_max,
-                 anti_lon(anti_lon_min) ) AS lon_max
-        FROM
-            fishing_event ),
+    aggregated_good_segments AS (
+        SELECT * FROM `{{ aggregated_table }}`
+        WHERE seg_id IN (
+            SELECT seg_id
+            FROM source_segs
+            WHERE
+                good_seg
+                AND positions > 10
+                AND NOT overlapping_and_short
+        )
+    ),
 
     --
-    -- remove events that are too short
+    -- Get a vessel_id for each segment
+    --
+    best_segment_vessel AS (
+        SELECT DISTINCT
+            seg_id,
+            FIRST_VALUE(vessel_id) OVER (
+                PARTITION BY seg_id ORDER BY last_date DESC, vessel_id
+            ) AS vessel_id
+        FROM source_segment_vessel
+    ),
+
+    --
+    -- Join vessel_id to events
+    --
+    events_with_vessel_id AS (
+        SELECT fe.*, bsv.vessel_id
+        FROM aggregated_good_segments fe
+        INNER JOIN best_segment_vessel bsv USING(seg_id)
+    ),
+
+    --
+    -- Join vessel identity information.
+    -- LEFT JOIN: if vessel is not in the fishing-vessel candidate set,
+    -- identity fields are NULL and vessel_class ends up NULL, which the
+    -- vessel-class filter below drops (both branches require a specific
+    -- best_best_vessel_class value).
+    --
+    -- The PVIS field-prefix (`ais_` on AIS PVIS, empty on VMS PVIS) is
+    -- resolved via the wrapper's --product-vessel-info-summary-field-prefix
+    -- CLI arg, matching current main's step-3 shape.
+    --
+    events_with_identity AS (
+        SELECT
+            e.* EXCEPT(vessel_id),
+            vesselinfo.vessel_id,
+            vesselinfo.prod_geartype AS best_best_vessel_class,
+            vesselinfo.ssvid AS main_vessel_ssvid,
+            vesselinfo.{{ product_vessel_info_summary_field_prefix }}mmsi_flag AS main_vessel_flag,
+            vesselinfo.{{ product_vessel_info_summary_field_prefix }}shipname AS main_vessel_shipname
+        FROM
+            events_with_vessel_id e
+            LEFT JOIN source_fishing_vessels AS vesselinfo
+                ON e.vessel_id = vesselinfo.vessel_id
+                AND EXTRACT(YEAR FROM e.event_start) = vesselinfo.year
+    ),
+
+    --
+    -- Apply vessel-class filter and generate event_id.
+    --   nnet_score:      exclude squid jiggers, require >500m distance
+    --   night_loitering: only squid jiggers,    require >50m distance
     --
     complete_fishing_event AS (
         SELECT
             *,
-            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'fishing', vessel_id, event_start, event_end))) AS event_id
-        FROM
-            fishing_event_dateline
+            TO_HEX(MD5(FORMAT(
+                "%s|%s|%t|%t", 'fishing', vessel_id, event_start, event_end
+            ))) AS event_id
+        FROM events_with_identity
         WHERE
-        -- if nnet_score_night_loitering is 'nnet_score' then we're excluding squid_jiggers
-        -- this is parameterised to "nnet_score" or "night_loitering" so only one or the other condition can be true
-        ('{{ nnet_score_night_loitering }}' = 'nnet_score' 
-        AND NOT best_best_vessel_class = 'squid_jigger' 
-        -- all other fishing events must be longer than 500 meters
-        AND event_distance_m > 500)
-        OR 
-        -- otherwise we're excluding all other fishing vessels
-        ('{{ nnet_score_night_loitering }}' != 'nnet_score' 
-        -- squid jigger fishing events must be longer than 50 meters
-        AND best_best_vessel_class = 'squid_jigger' 
-        AND event_distance_m > 50
-        )
+            ('{{ nnet_score_night_loitering }}' = 'nnet_score'
+                AND NOT best_best_vessel_class = 'squid_jigger'
+                AND event_distance_m > 500)
+            OR
+            ('{{ nnet_score_night_loitering }}' != 'nnet_score'
+                AND best_best_vessel_class = 'squid_jigger'
+                AND event_distance_m > 50)
     )
 
-select *, DATE(event_end) AS event_end_date from complete_fishing_event
+SELECT * FROM complete_fishing_event

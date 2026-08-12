@@ -209,6 +209,44 @@ class BigqueryHelper:
         else:
             job.result()
 
+    def delete_from_date(
+        self,
+        full_table_name,
+        partition_field,
+        from_date,
+        labels={},
+    ):
+        """
+        Delete rows where ``partition_field >= from_date``.
+
+        Used for step-3a's incremental mode: delete affected partitions
+        before re-inserting fresh data via ``WRITE_APPEND``. ``clear_table_partition``
+        above works on a single partition boundary; this helper takes a
+        one-sided boundary because the incremental step processes every
+        partition from ``start_date - 1 day`` onwards.
+
+        :param full_table_name: fully qualified ``project.dataset.table``.
+        :param partition_field: DATE column the table is partitioned on.
+        :param from_date: date string (YYYY-MM-DD) or datetime/date object.
+        """
+        from_date = as_date_str(from_date)
+        d_q = (f"DELETE FROM `{full_table_name}` "
+               f"WHERE {partition_field} >= '{from_date}'")
+
+        config = bigquery.QueryJobConfig(labels=labels)
+        self.log.info(
+            f"Deleting from {full_table_name} "
+            f"where {partition_field} >= {from_date}"
+        )
+        job = self.client.query(d_q, job_config=config)
+
+        if job.error_result:
+            err = job.error_result["reason"]
+            msg = job.error_result["message"]
+            raise RuntimeError(f"{err}: {msg}")
+        else:
+            job.result()
+
     def update_table_schema(self, table, schema_file):
         table = self.client.get_table(self.table_ref(table))  # API request
         table.schema = load_schema(schema_file)
