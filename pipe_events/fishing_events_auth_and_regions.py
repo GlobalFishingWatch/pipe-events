@@ -37,11 +37,20 @@ def add_arguments(parser):
         type=valid_table,
         required=True,
     )
-    # Note: --bq-in-spatial-measures and --bq-in-regions are NOT accepted
-    # on this subcommand any more. Regions (as regions_mean_position) and
-    # the four distance_from_{shore,port}_km fields are computed in step
-    # 3a and carried through step 3b into the _filtered tables that
-    # --bq-in-fishing-events and --bq-in-night-loitering-events point at.
+    parser.add_argument(
+        "--bq-in-spatial-measures",
+        dest="spatial_measures_table",
+        help="The spatial measures table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "--bq-in-regions",
+        dest="regions_table",
+        help="The event regions table.",
+        type=valid_table,
+        required=True,
+    )
     parser.add_argument(
         "--bq-in-product-vessel-info-summary",
         dest="product_vessel_info_summary_table",
