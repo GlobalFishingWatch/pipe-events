@@ -152,9 +152,12 @@ def run(bq, params):
 
     start_date = params.get("start_date")
     if start_date is not None:
-        # v6.0.0's valid_date validator returns a datetime; the SQL template
-        # renders it via `'{{ start_date }}'`, so normalize to YYYY-MM-DD
-        # for both the template render and the delete-boundary math.
+        # ``valid_date`` (pipe_events.utils.validators) returns a
+        # ``datetime.date`` -- see its ``-> datetime.date`` annotation. The
+        # SQL template renders it via ``'{{ start_date }}'``, so normalize
+        # to YYYY-MM-DD for both the template render and the delete-boundary
+        # math. The ``hasattr(strftime)`` fallback tolerates a plain-string
+        # value (a hand-composed programmatic caller) without crashing.
         if hasattr(start_date, "strftime"):
             start_date_str = start_date.strftime("%Y-%m-%d")
         else:

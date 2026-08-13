@@ -220,7 +220,7 @@ WITH
         FROM
             complete_fishing_event AS fe
                 CROSS JOIN UNNEST(fe.regions_mean_position.rfmo) AS rfmo
-                ## NEW add eez informaiton
+                ## NEW add eez information
                 LEFT JOIN UNNEST(fe.regions_mean_position.eez) AS eez
                 LEFT JOIN authorizations AS vessel_authorization ON (
                     fe.vessel_id = vessel_authorization.vessel_id

@@ -227,17 +227,44 @@ class BigqueryHelper:
 
         :param full_table_name: fully qualified ``project.dataset.table``.
         :param partition_field: DATE column the table is partitioned on.
+            Coerced to DATE in the WHERE via ``DATE(...)`` so a TIMESTAMP
+            column also works (matches ``clear_table_partition``'s
+            convention).
         :param from_date: date string (YYYY-MM-DD) or datetime/date object.
+            Caller is responsible for supplying a valid date value --
+            ``as_date_str`` is a permissive pass-through and a garbage
+            value here will render an invalid DATE literal that BigQuery
+            rejects at planning time (not silently match everything).
+
+        NOTE: ``priority="BATCH"`` is deliberately NOT used here (unlike
+        ``clear_table_partition``). The orchestrator (step 3a's incremental
+        path in ``fishing_events_incremental_filter.run``) chains this
+        DELETE immediately followed by ``WRITE_APPEND``; the append MUST
+        NOT run against a partition set the delete hasn't finished
+        clearing. Interactive priority forces the DELETE to complete
+        before the next call issues the append. If a future caller is
+        happy to background this, it should thread a ``priority`` kwarg
+        rather than flip the default.
+
+        NOTE: Respects ``self.dry_run`` -- if set, logs the SQL and
+        returns without issuing the DELETE. This matches
+        ``clear_table_partition`` above; a destructive helper defaulting
+        to the opposite policy would be a footgun for orchestrator dry
+        runs.
         """
         from_date = as_date_str(from_date)
         d_q = (f"DELETE FROM `{full_table_name}` "
-               f"WHERE {partition_field} >= '{from_date}'")
+               f"WHERE DATE({partition_field}) >= '{from_date}'")
 
-        config = bigquery.QueryJobConfig(labels=labels)
         self.log.info(
             f"Deleting from {full_table_name} "
-            f"where {partition_field} >= {from_date}"
+            f"where DATE({partition_field}) >= {from_date}"
         )
+        if self.dry_run:
+            self.log.info("dry_run=True; skipping DELETE issue.")
+            return
+
+        config = bigquery.QueryJobConfig(labels=labels)
         job = self.client.query(d_q, job_config=config)
 
         if job.error_result:

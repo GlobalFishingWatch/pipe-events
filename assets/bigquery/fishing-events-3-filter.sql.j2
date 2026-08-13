@@ -89,6 +89,32 @@ WITH
     -- resolved via the wrapper's --product-vessel-info-summary-field-prefix
     -- CLI arg, matching current main's step-3 shape.
     --
+    -- INTENTIONAL SEMANTIC CHANGE vs pre-refactor main:
+    --
+    -- Pre-refactor step 3 joined PVIS BEFORE message-level aggregation
+    -- on the per-message ``year`` column, and carried the identity
+    -- fields into the GROUP BY. For an event whose messages spanned a
+    -- calendar-year boundary and whose PVIS row differed between the two
+    -- years (vessel re-registered, geartype reclassification, etc.), that
+    -- produced TWO event rows -- one per year fragment. HAVING clauses
+    -- like ``message_count > 5`` were then applied to each fragment
+    -- independently, so a fragment with <=5 messages was dropped. In the
+    -- pathological case where PVIS has a row for the SECOND year only,
+    -- ``EXTRACT(YEAR FROM event_start)`` on the FIRST year would resolve
+    -- to NULL identity and the event would be dropped entirely, where
+    -- pre-refactor kept the (matching) second-year fragment.
+    --
+    -- The refactor's aggregation is by (ssvid, seg_id, event_start) only
+    -- and PVIS identity is resolved ONCE per event via
+    -- ``EXTRACT(YEAR FROM event_start)``. Events crossing a year boundary
+    -- are no longer shredded; per-message-year identity differences are
+    -- collapsed to the event-start year. This is the RIGHT semantics --
+    -- an event shouldn't be split because a dimension table is keyed by
+    -- calendar year -- but it IS a behavioural change: the E5
+    -- cross-version smoke will report a diff on the specific subset of
+    -- year-spanning events with year-dependent PVIS rows. Documented
+    -- explicitly in the PR description with a characterisation query.
+    --
     events_with_identity AS (
         SELECT
             e.* EXCEPT(vessel_id),

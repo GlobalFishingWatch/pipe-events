@@ -29,9 +29,23 @@ WITH
     ),
 
     --
-    -- Aggregate all messages in the same event into a single event record
-    -- Filter out short events or events where vessel is moving too fast
-    -- GROUP BY (ssvid, seg_id, event_start) -- no vessel_id, no dimension joins
+    -- Aggregate all messages in the same event into a single event record.
+    -- Filter out short events or events where vessel is moving too fast.
+    --
+    -- GROUP BY (ssvid, seg_id, event_start) -- 3 keys, no dimension columns.
+    -- Pre-refactor step 3 grouped by 7 keys: these three PLUS vessel_id,
+    -- main_vessel_shipname, main_vessel_flag, best_best_vessel_class. Four
+    -- of those dropping out is not a semantic change (they were
+    -- functionally determined by seg_id via best_segment_vessel + the
+    -- PVIS join). BUT the identity triple was resolved per-MESSAGE year
+    -- (via `LEFT JOIN source_fishing_vessels USING (vessel_id, year)`),
+    -- which for events spanning a year boundary produced two rows -- one
+    -- per calendar-year fragment. This step aggregates all messages of
+    -- an event together regardless of year, and step 3b resolves identity
+    -- once via ``EXTRACT(YEAR FROM event_start)``. See the code comment
+    -- at the equivalent GROUP BY / identity join in
+    -- fishing-events-3-filter.sql.j2 for the full failure analysis and
+    -- affected-event count on the sample cohort.
     --
     fishing_event AS (
         SELECT
@@ -124,9 +138,20 @@ WITH
         CROSS JOIN UNNEST(s2_cells) AS s2_cell
     ),
 
-    -- S2 spatial join: match event message positions to geographic regions
+    -- S2 spatial join: match event message positions to geographic regions.
+    --
+    -- Region CTEs are keyed on the FULL aggregation key
+    -- ``(ssvid, seg_id, event_start)`` -- matching the ``fishing_event``
+    -- GROUP BY above. In practice ``seg_id`` functionally determines
+    -- ``ssvid`` for segmenter output (each segment belongs to exactly one
+    -- ssvid), so ``(seg_id, event_start)`` would suffice most of the time,
+    -- but making the join key match the group key removes a silent-collapse
+    -- failure mode: if two grouped rows ever shared ``(seg_id, event_start)``
+    -- with different ``ssvid``, the region result would otherwise be
+    -- computed from the union of both events' points and applied to both.
     create_event_region_matches AS (
         SELECT
+            event.ssvid,
             event.seg_id,
             event.event_start,
             id,
@@ -140,9 +165,10 @@ WITH
 
     event_by_layer_by_id AS (
         SELECT
-            seg_id, event_start, layer, id
+            ssvid, seg_id, event_start, layer, id
         FROM create_event_region_matches
         GROUP BY
+            ssvid,
             seg_id,
             event_start,
             layer,
@@ -151,11 +177,13 @@ WITH
 
     events_by_layer AS (
         SELECT
+            ssvid,
             seg_id,
             event_start,
             CONCAT('"', layer, '":', TO_JSON_STRING(ARRAY_AGG(id))) AS json_frament
         FROM event_by_layer_by_id
         GROUP BY
+            ssvid,
             seg_id,
             event_start,
             layer
@@ -163,16 +191,18 @@ WITH
 
     event_with_region AS (
         SELECT
+            ssvid,
             seg_id,
             event_start,
             parse_regions_to_struct(CONCAT("{", STRING_AGG(json_frament, ","), "}")) AS regions
         FROM events_by_layer
         GROUP BY
+            ssvid,
             seg_id,
             event_start
     ),
 
-    -- Join regions back to events
+    -- Join regions back to events on the full aggregation key.
     events_with_regions AS (
         SELECT
             fe.*,
@@ -180,7 +210,8 @@ WITH
         FROM
             events_with_date AS fe
             LEFT JOIN event_with_region AS region_data
-                ON region_data.seg_id = fe.seg_id
+                ON region_data.ssvid = fe.ssvid
+                AND region_data.seg_id = fe.seg_id
                 AND region_data.event_start = fe.event_start
     ),
 
