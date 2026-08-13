@@ -4,13 +4,17 @@
 {% include 'util.sql.j2' %}
 
 
-
 --
 -- Fishing Events
 --
--- Aggregate position messages that have been annotated with a fishing score into fishing events
--- A fishing event is a sequence of consecutive messages that all have a fishing score of 1.0
--- messages with score=null are ignored
+-- Add authorization status from vessel identity registries.
+-- Regions and spatial measures are already computed in step 3a and carried
+-- through step 3b into the _filtered tables. This step therefore does NOT
+-- read from regions or spatial_measures directly -- the S2 spatial join,
+-- gridded-regions unnest, and gridcode-based distance joins that used to
+-- dominate step 4's slot-time (~50% + all of the ~1 TB spill) live in
+-- step 3a now, where they run incrementally on the day's delta.
+--
 WITH
     -- Source tables
     #
@@ -33,33 +37,18 @@ WITH
         FROM `{{vessel_identity_authorization}}`
     ),
 
-    #
-    # Spatial measures data
-    #
-    source_spatial_measures as (
-        SELECT
-            *,
-        FROM `{{ spatial_measures_table }}`
-    ),
-
-    #
-    # Regions data
-    #
-    regions_source as (
-      SELECT
-        *,
-      FROM `{{ regions_table }}`
-    ),
-
     --
-    -- remove events that are too short
+    -- Union nnet_score and night_loitering filtered events.
+    -- These already carry regions_mean_position (STRUCT) and the four
+    -- start/end distance_from_{shore,port}_km fields from step 3a --
+    -- see the _filtered schema in fishing-events-3-filter-schema.json.
     --
     complete_fishing_event AS (
         SELECT
             *
         FROM `{{source_fishing_events}}`
         UNION ALL
-        SELECT 
+        SELECT
             *
         FROM `{{source_night_loitering_events}}`
     ),
@@ -81,13 +70,6 @@ WITH
     ##############
     ############### ADD AUTHORIZATION DATA TO FISHING EVENTS
     ##############
-
-    gridded_regions as(
-        SELECT
-            * EXCEPT(s2_cells),
-        FROM regions_source
-            CROSS JOIN UNNEST (s2_cells) AS s2_cell
-    ),
 
     #
     # core vessel identity
@@ -158,7 +140,7 @@ WITH
         WHERE
             is_whitelisted_rfmo(source_code)
         GROUP BY
-            1
+            registry_rfmo
     ),
 
     #
@@ -214,67 +196,14 @@ WITH
     ),
 
     #
-    # Add spatial measures region information
-    #
-    create_event_region_matches AS (
-        SELECT
-            event.event_id,
-            id,
-            layer
-        FROM
-            complete_fishing_event AS event,
-            UNNEST(event.geo_info) geo_info
-            JOIN gridded_regions r ON  r.s2_cell = geo_info.s2_cell
-        WHERE ST_WITHIN(geo_info.point, r.geo)
-    ),
-
-    event_by_layer_by_id AS (
-        SELECT
-            event_id, layer, id
-        FROM create_event_region_matches
-        GROUP BY
-            1,
-            2,
-            3
-    ),
-
-    events_by_layer AS (
-        SELECT
-            event_id, CONCAT('"', layer, '":' ,TO_JSON_STRING(array_agg(id))) AS json_frament
-        FROM
-            event_by_layer_by_id
-        GROUP BY
-            event_id,
-            layer
-    ),
-
-    event_with_region AS (
-        SELECT
-            event_id,
-            parse_regions_to_struct(CONCAT( "{", STRING_AGG(json_frament, ","), "}")) as regions
-        FROM events_by_layer
-        GROUP BY
-            1
-    ),
-
-    fe_regions AS (
-        SELECT
-            fe.*,
-            spatial_measures_mean.regions AS regions_mean_position
-        FROM
-            complete_fishing_event AS fe
-                LEFT JOIN event_with_region AS spatial_measures_mean ON (
-                    spatial_measures_mean.event_id = fe.event_id
-                )
-    ),
-
-
-    #
     ## Flatten and filter the regions where the fishing events happen, so that we end
     ## up with a table with multiple records per each fishing event, one per rfmo
     ## region where the fishing event happened when the region is one of the
     ## interesting rfmos, including authorization status for each of those regions
     ## add attribute for if event date is before or after last vessel registry scrape
+    ##
+    ## regions_mean_position is now carried on complete_fishing_event (from
+    ## _filtered / _aggregated, computed in step 3a).
     #
     fe_regions_with_authorizations AS (
         SELECT
@@ -289,9 +218,9 @@ WITH
             AS vessel_is_authorized,
             fe.event_start >= last_scrape.last_scrape AS event_after_last_scrape
         FROM
-            fe_regions AS fe
+            complete_fishing_event AS fe
                 CROSS JOIN UNNEST(fe.regions_mean_position.rfmo) AS rfmo
-                ## NEW add eez informaiton
+                ## NEW add eez information
                 LEFT JOIN UNNEST(fe.regions_mean_position.eez) AS eez
                 LEFT JOIN authorizations AS vessel_authorization ON (
                     fe.vessel_id = vessel_authorization.vessel_id
@@ -305,7 +234,6 @@ WITH
         GROUP BY
             fe.event_id,
             rfmo,
-            ## NEW add field for if event occurs in eez
             eez_event,
             vessel_is_authorized,
             event_after_last_scrape
@@ -383,20 +311,18 @@ WITH
 
     #
     # Join the original fishing events with authorization status.
-    # Add region information
+    # regions_mean_position and start/end distance columns already
+    # live on complete_fishing_event, so no fe_regions join is needed.
     #
     complete_fe_with_authorizations AS (
         SELECT
             fe.*,
             authorization.potential_risk,
             authorization.vessel_public_authorization_status,
-            authorization.vessel_region_authorizations,
-            regions.regions_mean_position
+            authorization.vessel_region_authorizations
         FROM
             complete_fishing_event AS fe
             INNER JOIN fe_authorizations AS authorization USING (event_id)
-            -- join regions information
-            INNER JOIN fe_regions AS regions USING (event_id)
     ),
 
     #
@@ -404,7 +330,10 @@ WITH
     #
 
     --
-    -- Finally, generate a unique event id and write out in the normalized event schema
+    -- Finally, generate the output in the normalized event schema.
+    -- All spatial columns (regions_mean_position, four distance_from_*_km
+    -- fields) come directly from complete_fishing_event -- computed in
+    -- step 3a and passed through step 3b unchanged.
     --
     final_fishing_event AS (
         SELECT
@@ -421,10 +350,10 @@ WITH
             lon_min,
             lon_max,
             cfe.regions_mean_position AS regions_mean_position,
-            convert_m_to_km( spatial_measures_start.distance_from_shore_m ) AS start_distance_from_shore_km,
-            convert_m_to_km( spatial_measures_end.distance_from_shore_m ) AS end_distance_from_shore_km,
-            convert_m_to_km( spatial_measures_start.distance_from_port_m ) AS start_distance_from_port_km,
-            convert_m_to_km( spatial_measures_end.distance_from_port_m ) AS end_distance_from_port_km,
+            cfe.start_distance_from_shore_km,
+            cfe.end_distance_from_shore_km,
+            cfe.start_distance_from_port_km,
+            cfe.end_distance_from_port_km,
             TO_JSON_STRING(
                 STRUCT(
                     message_count,
@@ -451,8 +380,6 @@ WITH
         FROM
             -- link fishing events with authorizaiton
             complete_fe_with_authorizations AS cfe
-            JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(lon_min,lat_min) = spatial_measures_start.gridcode
-            JOIN source_spatial_measures AS spatial_measures_end ON format_gridcode(lon_max, lat_max) = spatial_measures_end.gridcode
             JOIN source_fishing_vessels vessel ON (vessel.vessel_id = cfe.vessel_id and vessel.year = EXTRACT(year FROM event_start))
     )
 
