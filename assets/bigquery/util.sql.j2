@@ -89,6 +89,21 @@ CREATE TEMPORARY FUNCTION
      );
 
 CREATE TEMP FUNCTION s2_level() AS (10);
+
+# Normalise decimal hours into the [0, 24) range after applying a longitude offset.
+CREATE TEMP FUNCTION wrap_hours(hours FLOAT64) AS (
+  CASE
+    WHEN hours < 0 THEN hours + 24
+    WHEN hours >= 24 THEN hours - 24
+    ELSE hours
+  END
+);
+
+# Extract the time component of a UTC timestamp as decimal hours.
+CREATE TEMP FUNCTION utc_decimal_hours(t TIMESTAMP) AS (
+  EXTRACT(HOUR FROM t) + EXTRACT(MINUTE FROM t) / 60.0 + EXTRACT(SECOND FROM t) / 3600.0
+);
+
 CREATE TEMP FUNCTION parse_regions_to_struct(regions_str STRING)
   RETURNS STRUCT<eez ARRAY<STRING>, mpa ARRAY<STRING>, rfmo ARRAY<STRING>, fao ARRAY<STRING>,major_fao ARRAY<STRING>, eez12nm ARRAY<STRING>, high_seas ARRAY<STRING>, mpa_no_take_partial ARRAY<STRING>, mpa_no_take ARRAY<STRING>, duke_paa ARRAY<STRING>, protectedseas ARRAY<STRING>, hsp ARRAY<STRING>, fra_gfcm_fao ARRAY<STRING>>
   LANGUAGE js AS

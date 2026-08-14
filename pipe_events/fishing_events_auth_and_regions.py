@@ -8,6 +8,8 @@ from pipe_events.utils.validators import valid_date, valid_dataset, valid_table
 COMMAND = "fishing_events_auth_and_regions"
 HELP = "Combine the fishing and night_loitering with authorization and regions."
 
+DEFAULT_DAY_NIGHT_OVERLAP_THRESHOLD_HOURS = 2.0
+
 
 def add_arguments(parser):
     parser.add_argument(
@@ -79,6 +81,24 @@ def add_arguments(parser):
             "PVIS field to read the vessel flag from. Defaults to "
             "'<field-prefix>mmsi_flag'; VMS pipelines pass 'gfw_best_flag'."
         ),
+    )
+    parser.add_argument(
+        "--bq-in-nautical-time-raster",
+        dest="nautical_time_raster_table",
+        help="Nautical dawn/dusk times by latitude and day of year.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "--day-night-overlap-threshold-hours",
+        dest="overlap_threshold_hours",
+        help=(
+            "How long an event's minority day/night phase must last before the "
+            "event is summarised as day_and_night rather than leaning to its "
+            "majority phase."
+        ),
+        type=float,
+        default=DEFAULT_DAY_NIGHT_OVERLAP_THRESHOLD_HOURS,
     )
     parser.add_argument(
         "--bq-in-udfs-dataset",
