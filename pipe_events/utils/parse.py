@@ -58,6 +58,9 @@ DEFAULT = dict(
     regions_table=f"{PROJ}.pipe_regions_layers.event_regions",
     all_vessels_byyear=(f"{PROJ}.{DATASET_IN}_published."
                         "product_vessel_info_summary"),
+    nautical_time_raster_table=(f"{PROJ}.paper_global_longline_sets."
+                                "nautical_time_raster_v20211117"),
+    overlap_threshold_hours=2.0,
     destination=f"{PROJ}.{DATASET_OUT}.fishing_events_v",
     dest_view=f"{PROJ}.{DATASET_OUT}.fishing_events",
     # fishing_restrictive
@@ -392,6 +395,18 @@ def parse(arguments):
         help="The destination view pointing to latest table having fishing events.",
         type=valid_table,
         default=DEFAULT["dest_view"],
+    )
+    auth_and_regions.add_argument(
+        "--nautical_time_raster_table",
+        help="Table with nautical dawn/dusk times by latitude and day of year.",
+        type=valid_table,
+        default=DEFAULT["nautical_time_raster_table"],
+    )
+    auth_and_regions.add_argument(
+        "--overlap_threshold_hours",
+        help="Hour threshold to classify over_dawn/over_dusk events as short or long overlap.",
+        type=float,
+        default=DEFAULT["overlap_threshold_hours"],
     )
     auth_and_regions.add_argument(
         "-rdate",
