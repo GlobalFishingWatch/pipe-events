@@ -8,6 +8,9 @@ COMMAND = "fishing_events_incremental"
 HELP = "Generates the incremental fishing or night loitering events."
 
 DEFAULT_MAX_FISHING_EVENT_GAP_HOURS = 2
+DEFAULT_MAX_FISHING_EVENT_GAP_METERS = 10000
+DEFAULT_MAX_FISHING_EVENT_MERGE_GAP_SECONDS = 3600
+DEFAULT_MAX_FISHING_EVENT_MERGE_GAP_METERS = 2000
 
 
 def add_arguments(parser):
@@ -45,6 +48,27 @@ def add_arguments(parser):
         help="The max gap hours of yesterday to get potentially open events.",
         type=int,
         default=DEFAULT_MAX_FISHING_EVENT_GAP_HOURS,
+    )
+    parser.add_argument(
+        "--max-fishing-event-gap-meters",
+        dest="max_fishing_event_gap_m",
+        help="Max distance between consecutive positions before an event is split.",
+        type=int,
+        default=DEFAULT_MAX_FISHING_EVENT_GAP_METERS,
+    )
+    parser.add_argument(
+        "--max-fishing-event-merge-gap-seconds",
+        dest="max_fishing_event_merge_gap_seconds",
+        help="Max time gap between two fishing bursts that can be merged.",
+        type=int,
+        default=DEFAULT_MAX_FISHING_EVENT_MERGE_GAP_SECONDS,
+    )
+    parser.add_argument(
+        "--max-fishing-event-merge-gap-meters",
+        dest="max_fishing_event_merge_gap_m",
+        help="Max distance between two fishing bursts that can be merged.",
+        type=int,
+        default=DEFAULT_MAX_FISHING_EVENT_MERGE_GAP_METERS,
     )
     parser.add_argument(
         "--bq-out-merged-events",

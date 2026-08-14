@@ -8,6 +8,12 @@ from pipe_events.utils.validators import valid_dataset, valid_table
 COMMAND = "fishing_events_incremental_filter"
 HELP = "Takes the incremental fishing or night loitering events and apply filters."
 
+DEFAULT_MIN_EVENT_DURATION_SECONDS = 1200
+DEFAULT_MIN_EVENT_POSITIONS = 5
+DEFAULT_MAX_AVERAGE_SPEED_KNOTS = 10
+DEFAULT_MIN_EVENT_DISTANCE_METERS = 500
+DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS = 50
+
 
 def add_arguments(parser):
     parser.add_argument(
@@ -58,6 +64,41 @@ def add_arguments(parser):
         help="The field name that has the score to eval.",
         choices=["nnet_score", "night_loitering"],
         required=True,
+    )
+    parser.add_argument(
+        "--min-event-duration-seconds",
+        dest="min_event_duration_seconds",
+        help="Minimum fishing event duration.",
+        type=int,
+        default=DEFAULT_MIN_EVENT_DURATION_SECONDS,
+    )
+    parser.add_argument(
+        "--min-event-positions",
+        dest="min_event_positions",
+        help="Minimum number of AIS positions in a fishing event.",
+        type=int,
+        default=DEFAULT_MIN_EVENT_POSITIONS,
+    )
+    parser.add_argument(
+        "--max-average-speed-knots",
+        dest="max_avg_speed_knots",
+        help="Maximum average speed for a fishing event.",
+        type=float,
+        default=DEFAULT_MAX_AVERAGE_SPEED_KNOTS,
+    )
+    parser.add_argument(
+        "--min-event-distance-meters",
+        dest="min_event_distance_m",
+        help="Minimum event distance for non-squid-jigger fishing events.",
+        type=int,
+        default=DEFAULT_MIN_EVENT_DISTANCE_METERS,
+    )
+    parser.add_argument(
+        "--min-squid-jigger-event-distance-meters",
+        dest="min_squid_jigger_event_distance_m",
+        help="Minimum event distance for squid jigger fishing events.",
+        type=int,
+        default=DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS,
     )
     parser.add_argument(
         "--bq-in-udfs-dataset",
