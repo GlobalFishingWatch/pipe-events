@@ -29,6 +29,9 @@ DEFAULT = dict(
     messages_table=f"{PROJ}.{DATASET_IN}_internal.research_messages",
     nnet_score_night_loitering="nnet_score",
     max_fishing_event_gap_hours=2,
+    max_fishing_event_gap_m=10000,
+    max_fishing_event_merge_gap_seconds=3600,
+    max_fishing_event_merge_gap_m=2000,
     destination_dataset=f"{PROJ}.{DATASET_OUT}",
     destination_table_prefix="incremental_fishing_events",
     use_merged_table=None,
@@ -39,6 +42,11 @@ DEFAULT = dict(
                                        ".product_vessel_info_summary"),
     merged_table=(f"{PROJ}.{DATASET_OUT}."
                   "incremental_fishing_events_merged"),
+    min_event_duration_seconds=1200,
+    min_event_positions=5,
+    max_avg_speed_knots=10,
+    min_event_distance_m=500,
+    min_squid_jigger_event_distance_m=50,
     # auth and regions
     source_fishing_events=(f"{PROJ}.{DATASET_OUT}."
                            "incremental_fishing_events_filtered"),
@@ -156,6 +164,24 @@ def parse(arguments):
         default=DEFAULT["max_fishing_event_gap_hours"],
     )
     incremental.add_argument(
+        "--max_fishing_event_gap_m",
+        help="Maximum distance in metres between consecutive positions before an event is split.",
+        type=int,
+        default=DEFAULT["max_fishing_event_gap_m"],
+    )
+    incremental.add_argument(
+        "--max_fishing_event_merge_gap_seconds",
+        help="Maximum time gap in seconds between two fishing bursts that can be merged.",
+        type=int,
+        default=DEFAULT["max_fishing_event_merge_gap_seconds"],
+    )
+    incremental.add_argument(
+        "--max_fishing_event_merge_gap_m",
+        help="Maximum distance in metres between two fishing bursts that can be merged.",
+        type=int,
+        default=DEFAULT["max_fishing_event_merge_gap_m"],
+    )
+    incremental.add_argument(
         "-dest",
         "--destination_dataset",
         help="The destination dataset having fishing events.",
@@ -257,6 +283,36 @@ def parse(arguments):
         type=valid_table,
         required=False,
         default=DEFAULT["merged_table"],
+    )
+    incremental_filter.add_argument(
+        "--min_event_duration_seconds",
+        help="Minimum fishing event duration in seconds.",
+        type=int,
+        default=DEFAULT["min_event_duration_seconds"],
+    )
+    incremental_filter.add_argument(
+        "--min_event_positions",
+        help="Minimum number of AIS positions in a fishing event.",
+        type=int,
+        default=DEFAULT["min_event_positions"],
+    )
+    incremental_filter.add_argument(
+        "--max_avg_speed_knots",
+        help="Maximum average speed in knots for a fishing event.",
+        type=float,
+        default=DEFAULT["max_avg_speed_knots"],
+    )
+    incremental_filter.add_argument(
+        "--min_event_distance_m",
+        help="Minimum event distance in metres for non-squid-jigger fishing events.",
+        type=int,
+        default=DEFAULT["min_event_distance_m"],
+    )
+    incremental_filter.add_argument(
+        "--min_squid_jigger_event_distance_m",
+        help="Minimum event distance in metres for squid jigger fishing events.",
+        type=int,
+        default=DEFAULT["min_squid_jigger_event_distance_m"],
     )
 
     ################################################################################

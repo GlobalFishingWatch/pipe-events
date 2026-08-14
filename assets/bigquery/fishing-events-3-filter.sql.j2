@@ -132,12 +132,12 @@ fishing_event_point AS (
             event_start
         -- exclude events too short or with too high an avg vessel speed
         HAVING
-            -- fishing events must be longer than 20 minutes
-            (TIMESTAMP_DIFF(event_end, event_start, SECOND) > 1200
-                -- fishing events must include more than 5 ais positions in event
-                AND message_count > 5
-                -- event average speed must be less than 10 knots
-                AND avg_speed_knots < 10)
+            -- fishing events must be longer than min_event_duration_seconds seconds
+            (TIMESTAMP_DIFF(event_end, event_start, SECOND) > {{ min_event_duration_seconds }}
+                -- fishing events must include more than min_event_positions ais positions in event
+                AND message_count > {{ min_event_positions }}
+                -- event average speed must be less than max_avg_speed_knots knots
+                AND avg_speed_knots < {{ max_avg_speed_knots }})
     ),
 
     --
@@ -178,16 +178,16 @@ fishing_event_point AS (
         WHERE
         -- if nnet_score_night_loitering is 'nnet_score' then we're excluding squid_jiggers
         -- this is parameterised to "nnet_score" or "night_loitering" so only one or the other condition can be true
-        ('{{ nnet_score_night_loitering }}' = 'nnet_score' 
-        AND NOT best_best_vessel_class = 'squid_jigger' 
-        -- all other fishing events must be longer than 500 meters
-        AND event_distance_m > 500)
-        OR 
+        ('{{ nnet_score_night_loitering }}' = 'nnet_score'
+        AND NOT best_best_vessel_class = 'squid_jigger'
+        -- all other fishing events must be longer than min_event_distance_m meters
+        AND event_distance_m > {{ min_event_distance_m }})
+        OR
         -- otherwise we're excluding all other fishing vessels
-        ('{{ nnet_score_night_loitering }}' != 'nnet_score' 
-        -- squid jigger fishing events must be longer than 50 meters
-        AND best_best_vessel_class = 'squid_jigger' 
-        AND event_distance_m > 50
+        ('{{ nnet_score_night_loitering }}' != 'nnet_score'
+        -- squid jigger fishing events must be longer than min_squid_jigger_event_distance_m meters
+        AND best_best_vessel_class = 'squid_jigger'
+        AND event_distance_m > {{ min_squid_jigger_event_distance_m }}
         )
     )
 
