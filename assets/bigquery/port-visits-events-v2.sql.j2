@@ -44,9 +44,14 @@ WITH
         FROM `{{ product_vessel_info_summary_table }}`
     ),
 
+    # TODO: temporary. The dock field is named `at_dock` in the `named_anchorages` view but
+    # `dock` in the versioned `named_anchorages_v*` tables, so it is normalized to `at_dock`
+    # here and referenced under that name below. Remove the aliasing once the anchorages
+    # schema settles on a single name.
     source_named_anchorages AS (
         SELECT
-            *
+            * EXCEPT({{ named_anchorages_dock_field }}),
+            {{ named_anchorages_dock_field }} AS at_dock,
         FROM `{{ named_anchorages_table }}`
     ),
 
