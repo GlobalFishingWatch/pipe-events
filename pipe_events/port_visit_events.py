@@ -75,6 +75,21 @@ def add_arguments(parser):
         required=True,
         help="Named anchorages table.",
     )
+    # TODO: temporary. The dock field has two names upstream: the `named_anchorages`
+    # view aliases `dock AS at_dock` (from anchorages_dock_label_v20191006), while the
+    # versioned `named_anchorages_v*` tables carry a native `dock`. Drop this parameter
+    # once the anchorages schema is normalized on a single name.
+    parser.add_argument(
+        "--named-anchorages-dock-field",
+        dest="named_anchorages_dock_field",
+        type=str,
+        default="at_dock",
+        help=(
+            "TEMPORARY: name of the dock boolean field in the named anchorages table. "
+            "Defaults to 'at_dock' (the 'named_anchorages' view spelling); pass 'dock' "
+            "for a versioned 'named_anchorages_v*' table."
+        ),
+    )
     parser.add_argument(
         "--bq-out-events",
         dest="dest_table",
@@ -101,6 +116,7 @@ def run(bq, params):
         "spatial_measures_table": params["spatial_measures_table"],
         "regions_table": params["regions_table"],
         "named_anchorages_table": params["named_anchorages_table"],
+        "named_anchorages_dock_field": params["named_anchorages_dock_field"],
     }
     return publish_versioned_events(
         bq,

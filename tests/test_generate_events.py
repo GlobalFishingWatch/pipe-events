@@ -117,4 +117,24 @@ class TestPortVisitEvents:
         assert kwargs["sql_template"] == "port-visits-events-v2.sql.j2"
         assert kwargs["template_params"]["end_date"] == "2024-01-02"
         assert kwargs["template_params"]["named_anchorages_table"] == "p.d.anch"
+        assert kwargs["template_params"]["named_anchorages_dock_field"] == "at_dock"
         assert "start_date" not in kwargs["template_params"]
+
+    def test_dock_field_is_overridable(self):
+        params = _parse(
+            port_visit_events,
+            [
+                "--start-date", "2024-01-01",
+                "--end-date", "2024-01-02",
+                "--bq-in-port-visits", "p.d.pv",
+                "--bq-in-product-vessel-info-summary", "p.d.pvis",
+                "--product-vessel-info-summary-field-prefix", "ais_",
+                "--bq-in-spatial-measures", "p.d.sm",
+                "--bq-in-regions", "p.d.reg",
+                "--bq-in-named-anchorages", "p.d.anch",
+                "--named-anchorages-dock-field", "dock",
+                "--bq-out-events", "p.d.dest",
+                "--labels", LABELS_ARG,
+            ],
+        )
+        assert params["named_anchorages_dock_field"] == "dock"
