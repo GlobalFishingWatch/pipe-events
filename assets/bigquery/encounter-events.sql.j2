@@ -114,6 +114,10 @@ WITH
         WHERE
                 TIMESTAMP_DIFF(end_time, start_time, SECOND) > (3600 * 2)
           AND median_speed_knots < 2
+          -- Null Island: positions at exactly 0,0 are AIS noise (zeroed high position
+          -- bits), not real activity. Implicitly filtered in pipe4 because the old
+          -- spatial measures raster reported distance_from_port = 0 there.
+          AND NOT (mean_latitude = 0 AND mean_longitude = 0)
     ),
 
     #
