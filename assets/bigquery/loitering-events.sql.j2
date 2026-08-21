@@ -169,7 +169,7 @@ WITH
                     vessel.{{ product_vessel_info_summary_field_prefix }}shipname AS `name`,
                     si.seg_id,
                     vessel.prod_shiptype AS `type`,
-                    vessel.{{ product_vessel_info_summary_field_prefix }}mmsi_flag AS `flag`
+                    vessel.{{ product_vessel_info_summary_flag_field }} AS `flag`
                 )
             ]) AS event_vessels
         FROM denoised_loitering AS lo

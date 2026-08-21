@@ -2,6 +2,7 @@ import json
 import logging
 
 from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.pvis import resolve_flag_field
 from pipe_events.utils.validators import valid_dataset, valid_table
 
 COMMAND = "fishing_events_incremental_filter"
@@ -40,6 +41,16 @@ def add_arguments(parser):
             example, on ais this is `ais_`, but VMS PVIS has no prefix
             """,
         required=True,
+    )
+    parser.add_argument(
+        "--product-vessel-info-summary-flag-field",
+        dest="product_vessel_info_summary_flag_field",
+        type=str,
+        default=None,
+        help=(
+            "PVIS field to read the vessel flag from. Defaults to "
+            "'<field-prefix>mmsi_flag'; VMS pipelines pass 'gfw_best_flag'."
+        ),
     )
     parser.add_argument(
         "--score-field",
@@ -84,6 +95,7 @@ def run(bq, params):
 
     log.info("*** 1. Ensures filter table exists.")
     params_copy["filtered_table"] = params["filtered_events"]
+    params_copy["product_vessel_info_summary_flag_field"] = resolve_flag_field(params)
     bq.create_table(
         params_copy["filtered_table"],
         schema_file=schema_file,

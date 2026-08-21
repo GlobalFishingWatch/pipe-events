@@ -1,6 +1,7 @@
 import json
 
 from pipe_events.utils.events import build_description, publish_versioned_events
+from pipe_events.utils.pvis import resolve_flag_field
 from pipe_events.utils.validators import valid_date, valid_table
 
 COMMAND = "loitering_events"
@@ -82,6 +83,16 @@ def add_arguments(parser):
         help="Prefix to access vessel info fields in the PVIS table (e.g. 'ais_').",
     )
     parser.add_argument(
+        "--product-vessel-info-summary-flag-field",
+        dest="product_vessel_info_summary_flag_field",
+        type=str,
+        default=None,
+        help=(
+            "PVIS field to read the vessel flag from. Defaults to "
+            "'<field-prefix>mmsi_flag'; VMS pipelines pass 'gfw_best_flag'."
+        ),
+    )
+    parser.add_argument(
         "--minimum-distance-from-shore-nm",
         dest="minimum_distance_from_shore_nm",
         type=float,
@@ -129,6 +140,7 @@ def run(bq, params):
         "product_vessel_info_summary_field_prefix": params[
             "product_vessel_info_summary_field_prefix"
         ],
+        "product_vessel_info_summary_flag_field": resolve_flag_field(params),
         "minimum_distance_from_shore_nm": params["minimum_distance_from_shore_nm"],
         "voyages_table": params["voyages_table"],
         "port_visits_table": params["port_visits_table"],

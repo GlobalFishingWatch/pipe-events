@@ -1,6 +1,7 @@
 import json
 
 from pipe_events.utils.events import build_description, publish_versioned_events
+from pipe_events.utils.pvis import resolve_flag_field
 from pipe_events.utils.validators import valid_date, valid_table
 
 COMMAND = "encounter_events"
@@ -68,6 +69,16 @@ def add_arguments(parser):
         help="Prefix to access vessel info fields in the PVIS table (e.g. 'ais_').",
     )
     parser.add_argument(
+        "--product-vessel-info-summary-flag-field",
+        dest="product_vessel_info_summary_flag_field",
+        type=str,
+        default=None,
+        help=(
+            "PVIS field to read the vessel flag from. Defaults to "
+            "'<field-prefix>mmsi_flag'; VMS pipelines pass 'gfw_best_flag'."
+        ),
+    )
+    parser.add_argument(
         "--bq-in-vessel-identity-core",
         dest="vessel_identity_core",
         type=valid_table,
@@ -119,6 +130,7 @@ def run(bq, params):
         "product_vessel_info_summary_field_prefix": params[
             "product_vessel_info_summary_field_prefix"
         ],
+        "product_vessel_info_summary_flag_field": resolve_flag_field(params),
         "vessel_identity_core": params["vessel_identity_core"],
         "vessel_identity_authorization": params["vessel_identity_authorization"],
         "voyages_table": params["voyages_table"],
