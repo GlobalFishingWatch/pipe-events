@@ -69,7 +69,7 @@ fishing_events_identity AS (
       vesselinfo.vessel_id,
       vesselinfo.prod_geartype AS best_best_vessel_class,
       vesselinfo.ssvid AS main_vessel_ssvid,
-      vesselinfo.{{ product_vessel_info_summary_field_prefix }}mmsi_flag as main_vessel_flag,
+      vesselinfo.{{ product_vessel_info_summary_flag_field }} as main_vessel_flag,
       vesselinfo.{{ product_vessel_info_summary_field_prefix }}shipname AS main_vessel_shipname
   FROM
       fishing_events_vessel_id

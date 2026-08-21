@@ -2,6 +2,7 @@ import json
 import logging
 
 from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.pvis import resolve_flag_field
 from pipe_events.utils.validators import valid_date, valid_dataset, valid_table
 
 COMMAND = "fishing_events_auth_and_regions"
@@ -70,6 +71,16 @@ def add_arguments(parser):
         required=True,
     )
     parser.add_argument(
+        "--product-vessel-info-summary-flag-field",
+        dest="product_vessel_info_summary_flag_field",
+        type=str,
+        default=None,
+        help=(
+            "PVIS field to read the vessel flag from. Defaults to "
+            "'<field-prefix>mmsi_flag'; VMS pipelines pass 'gfw_best_flag'."
+        ),
+    )
+    parser.add_argument(
         "--bq-in-udfs-dataset",
         dest="udfs_dataset",
         help="Fully-qualified dataset (project.dataset) where the shared UDFs live.",
@@ -108,6 +119,7 @@ def add_arguments(parser):
 def run(bq, params):
     log = logging.getLogger()
     params['reference_date'] = params['reference_date'].strftime("%Y%m%d")
+    params["product_vessel_info_summary_flag_field"] = resolve_flag_field(params)
     dest = params["destination"] + params['reference_date']
     schema_path = "./assets/bigquery/fishing-events-4-authorization-schema.json"
 

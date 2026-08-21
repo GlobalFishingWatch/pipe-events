@@ -8,6 +8,20 @@ Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to
 
 ## [Unreleased]
 
+## v6.2.0 - 2026-08-21
+
+### Added
+
+* [PIPELINE-4424](https://globalfishingwatch.atlassian.net/browse/PIPELINE-4424): Adds
+  `--product-vessel-info-summary-flag-field` to the commands that read the vessel flag
+  from the PVIS: `encounter_events`, `loitering_events`, `port_visit_events`,
+  `fishing_events_incremental_filter` and `fishing_events_auth_and_regions`.
+  It defaults to `<field-prefix>mmsi_flag`, the field those queries already read, so
+  omitting it emits identical SQL. VMS pipelines pass `gfw_best_flag` — COALESCE of the
+  reported flag, the registry flag and the source tenant — which is the flag VMS v5
+  publishes on its other datasets. AIS stays on the default, because its `gfw_best_flag`
+  is derived from the registry and the vessel classification model instead.
+
 ## v3.1.0 - 2021-04-22
 
 ### Added
