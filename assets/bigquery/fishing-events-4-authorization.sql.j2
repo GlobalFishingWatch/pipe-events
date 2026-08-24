@@ -183,7 +183,7 @@ WITH
     #
     all_vessels AS (
         SELECT
-            vessel_id,
+            entity_id,
             registry_rfmo,
             registry_authorized_from,
             registry_authorized_to,
@@ -197,7 +197,7 @@ WITH
     #
     authorizations AS (
         SELECT
-            vessel_id,
+            entity_id,
             registry_rfmo,
             registry_authorized_from,
             registry_authorized_to
@@ -207,7 +207,7 @@ WITH
             registry_authorized_from IS NOT NULL
             AND registry_authorized_to IS NOT NULL
         GROUP BY
-            vessel_id,
+            entity_id,
             registry_rfmo,
             registry_authorized_from,
             registry_authorized_to
@@ -294,7 +294,7 @@ WITH
                 ## NEW add eez informaiton
                 LEFT JOIN UNNEST(fe.regions_mean_position.eez) AS eez
                 LEFT JOIN authorizations AS vessel_authorization ON (
-                    fe.vessel_id = vessel_authorization.vessel_id
+                    fe.entity_id = vessel_authorization.entity_id
                     AND rfmo = vessel_authorization.registry_rfmo
                     AND fe.event_start < vessel_authorization.registry_authorized_to
                     AND fe.event_end > vessel_authorization.registry_authorized_from
@@ -410,7 +410,7 @@ WITH
         SELECT
             event_id,
             'fishing' AS event_type,
-            cfe.vessel_id,
+            cfe.entity_id,
             seg_id,
             event_start,
             event_end,
@@ -438,7 +438,7 @@ WITH
             ) AS event_info,
             TO_JSON_STRING([
                 STRUCT(
-                    cfe.vessel_id AS `id`,
+                    cfe.entity_id AS `id`,
                     filter_invalid_ssvid(cfe.ssvid) AS `ssvid`,
                     vessel.{{ product_vessel_info_summary_field_prefix }}shipname AS `name`,
                     vessel.{{ product_vessel_info_summary_flag_field }} as `flag`,
@@ -453,7 +453,7 @@ WITH
             complete_fe_with_authorizations AS cfe
             JOIN source_spatial_measures AS spatial_measures_start ON format_gridcode(lon_min,lat_min) = spatial_measures_start.gridcode
             JOIN source_spatial_measures AS spatial_measures_end ON format_gridcode(lon_max, lat_max) = spatial_measures_end.gridcode
-            JOIN source_fishing_vessels vessel ON (vessel.vessel_id = cfe.vessel_id and vessel.year = EXTRACT(year FROM event_start))
+            JOIN source_fishing_vessels vessel ON (vessel.entity_id = cfe.entity_id and vessel.year = EXTRACT(year FROM event_start))
     )
 
     --

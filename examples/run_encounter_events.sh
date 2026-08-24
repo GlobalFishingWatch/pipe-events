@@ -32,6 +32,7 @@ Usage: run_encounter_events.sh \
   --bq-in-voyages PROJECT.DATASET.TABLE \
   --bq-in-port-visits PROJECT.DATASET.TABLE \
   --bq-in-identity-published-dataset PROJECT.DATASET \
+  --bq-in-pvis-table PROJECT.DATASET.TABLE \
   --bq-out-dataset PROJECT.DATASET \
   --bq-out-table-prefix PREFIX \
   [--bq-in-spatial-measures PROJECT.DATASET.TABLE] \
@@ -52,6 +53,7 @@ while [[ $# -gt 0 ]]; do
     --bq-in-voyages) bq_in_voyages="$2"; shift 2 ;;
     --bq-in-port-visits) bq_in_port_visits="$2"; shift 2 ;;
     --bq-in-identity-published-dataset) bq_in_identity_published_dataset="$2"; shift 2 ;;
+    --bq-in-pvis-table) bq_in_pvis_table="$2"; shift 2 ;;
     --bq-out-dataset) bq_out_dataset="$2"; shift 2 ;;
     --bq-out-table-prefix) bq_out_table_prefix="$2"; shift 2 ;;
     --bq-in-spatial-measures) bq_in_spatial_measures="$2"; shift 2 ;;
@@ -70,6 +72,7 @@ missing=()
 [[ -z "$bq_in_voyages" ]] && missing+=(--bq-in-voyages)
 [[ -z "$bq_in_port_visits" ]] && missing+=(--bq-in-port-visits)
 [[ -z "$bq_in_identity_published_dataset" ]] && missing+=(--bq-in-identity-published-dataset)
+[[ -z "$bq_in_pvis_table" ]] && missing+=(--bq-in-pvis-table)
 [[ -z "$bq_out_dataset" ]] && missing+=(--bq-out-dataset)
 [[ -z "$bq_out_table_prefix" ]] && missing+=(--bq-out-table-prefix)
 if [[ ${#missing[@]} -gt 0 ]]; then
@@ -81,7 +84,7 @@ fi
 # Derived tables.
 identity_core="${bq_in_identity_published_dataset}.identity_core"
 identity_authorization="${bq_in_identity_published_dataset}.identity_authorization"
-product_vessel_info_summary="${bq_in_identity_published_dataset}.product_vessel_info_summary"
+product_vessel_info_summary="${bq_in_pvis_table}"
 bq_out_events="${bq_out_dataset}.${bq_out_table_prefix}_encounter_events"
 
 echo "----------------------------------------"

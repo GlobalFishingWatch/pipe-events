@@ -93,7 +93,7 @@ WITH
             source_port_visits
         LEFT JOIN
             UNNEST (events) events
-        WHERE vessel_id IN (SELECT vessel_id FROM source_product_vessel_info_summary)
+        WHERE entity_id IN (SELECT entity_id FROM source_product_vessel_info_summary)
     ),
 
     -- we pick the event with the lowest ranking and in case of ties we pick the first one
@@ -127,9 +127,9 @@ WITH
     #
     total_events as (
         SELECT
-            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', source_port_visits.vessel_id, start_timestamp, end_timestamp))) AS event_id,
+            TO_HEX(MD5(FORMAT("%s|%s|%t|%t",'port_visit', source_port_visits.entity_id, start_timestamp, end_timestamp))) AS event_id,
             'port_visit' AS event_type,
-            source_port_visits.vessel_id as vessel_id,
+            source_port_visits.entity_id as entity_id,
             cast(NULL AS string) AS seg_id,
             start_timestamp AS event_start,
             end_timestamp AS event_end,
@@ -188,7 +188,7 @@ WITH
             ) as event_info,
             TO_JSON_STRING([
                 STRUCT(
-                    vessel.vessel_id AS `id`,
+                    vessel.entity_id AS `id`,
                     filter_invalid_ssvid(vessel.ssvid) AS `ssvid`,
                     vessel.{{ product_vessel_info_summary_field_prefix }}shipname AS `name`,
                     vessel.prod_shiptype as `type`,
@@ -197,7 +197,7 @@ WITH
                 ]) as event_vessels
         FROM
             source_port_visits
-                JOIN source_product_vessel_info_summary vessel on vessel.vessel_id = source_port_visits.vessel_id and vessel.year= EXTRACT(year from start_timestamp)
+                JOIN source_product_vessel_info_summary vessel on vessel.entity_id = source_port_visits.entity_id and vessel.year= EXTRACT(year from start_timestamp)
                 JOIN source_named_anchorages AS start_anchorage ON (start_anchorage_id = start_anchorage.s2id)
                 JOIN source_named_anchorages AS end_anchorage ON (end_anchorage_id = end_anchorage.s2id)
                 JOIN mean_positions USING (visit_id)

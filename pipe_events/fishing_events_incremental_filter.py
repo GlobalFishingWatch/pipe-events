@@ -107,6 +107,7 @@ def run(bq, params):
 
     log.info("*** 2. Runs the filter over the merged table with truncated data.")
     filter_query = bq.format_query("fishing-events-3-filter.sql.j2", **params_copy)
+    print("query: ", filter_query)
     bq.run_query(
         filter_query,
         dest_table=params_copy["filtered_table"],
