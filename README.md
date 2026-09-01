@@ -51,12 +51,24 @@ incremental; the rest are transformations that refine its output. The first two 
 run twice each — once for `nnet_score` and once for `night_loitering` — because at that
 point the vessel's shiptype is not yet known.
 
-| Subcommand | Output | What it does |
-|---|---|---|
-| `fishing_events_incremental` | `*_merged` table | Opens a BigQuery session, computes fishing events for the input date range (loading the day before `--start-date` as padding), and merges them into the historical merged-events table, stitching overlapping events together. Runs once per score field. |
-| `fishing_events_incremental_filter` | `*_filtered` table | Applies segment noise filters, keeps potential fishing vessels, and drops events that don't meet the fishing-event criteria (e.g. minimum duration). Runs once per score field. |
-| `fishing_events_auth_and_regions` | versioned table + view | Combines the `nnet_score` and `night_loitering` filtered events into a single table and adds authorization and region information. |
-| `fishing_events_restrictive` | versioned table + view | Applies the more restrictive `prod_shiptype='fishing'` filter required by the API. |
+| Subcommand | Output | What it does | Orchestration |
+|---|---|---|---|
+| `fishing_events_incremental` | `*_merged` table | Opens a BigQuery session, computes fishing events for the input date range (loading the day before `--start-date` as padding), and merges them into the historical merged-events table, stitching overlapping events together. Runs once per score field. | Incremental — strictly sequential: one window at a time, in chronological order, always extending forward to the present. Never run windows in parallel or re-run a historical window. |
+| `fishing_events_incremental_filter` | `*_filtered` table | Applies segment noise filters, keeps potential fishing vessels, and drops events that don't meet the fishing-event criteria (e.g. minimum duration). Runs once per score field. | Full rebuild — when backfilling, skip per window and run once after the last merge. |
+| `fishing_events_auth_and_regions` | versioned table + view | Combines the `nnet_score` and `night_loitering` filtered events into a single table and adds authorization and region information. | Full rebuild — run once, after both filters. |
+| `fishing_events_restrictive` | versioned table + view | Applies the more restrictive `prod_shiptype='fishing'` filter required by the API. | Full rebuild — run once, after `fishing_events_auth_and_regions`. |
+
+**Orchestration constraints.** The `*_merged` tables are stateful: each
+`fishing_events_incremental` run zips new messages onto the open events of the previous
+run, so windows must be processed strictly sequentially, in chronological order, always
+ending at the present. Its pre-merge cleanup
+(`fishing-events-2a-truncate-before-merge.sql.j2`) deletes everything from
+`--start-date` onward with **no upper bound**, so re-running a historical window —
+alone or in parallel — destroys all data after that date and re-appends only the window
+itself. To reprocess history, re-run from the earliest affected date forward to the
+present. The three downstream steps carry no state and fully rebuild their outputs from
+the merged tables on every run, so when backfilling, skip them per window and run them
+once at the end, in order (filter → auth → restrictive).
 
 **Standalone event publishers** each read their sources and publish one versioned events
 table plus a view pointing at the latest version:
