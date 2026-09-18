@@ -26,6 +26,7 @@ class TestEncounterEvents:
                 "--bq-in-encounters", "p.d.enc",
                 "--bq-in-spatial-measures", "p.d.sm",
                 "--bq-in-regions", "p.d.reg",
+                "--bq-in-regions-registry", "p.d.registry",
                 "--bq-in-product-vessel-info-summary", "p.d.pvis",
                 "--product-vessel-info-summary-field-prefix", "ais_",
                 "--bq-in-vessel-identity-core", "p.d.idcore",
@@ -37,6 +38,7 @@ class TestEncounterEvents:
             ],
         )
         bq = utm.MagicMock()
+        bq.fetch_rows.return_value = [{"name": "eez", "description": "Exclusive Economic Zones."}]
         with utm.patch.object(encounter_events, "publish_versioned_events") as pub:
             pub.return_value = True
             assert encounter_events.run(bq, params) is True
@@ -46,6 +48,7 @@ class TestEncounterEvents:
         assert kwargs["end_date"] == date(2024, 1, 2)
         assert kwargs["sql_template"] == "encounter-events.sql.j2"
         assert kwargs["labels"] == {"step": "generate_events"}
+        assert kwargs["regions"] == [{"name": "eez", "description": "Exclusive Economic Zones."}]
         assert kwargs["template_params"] == {
             "encounters_table": "p.d.enc",
             "spatial_measures_table": "p.d.sm",
@@ -57,6 +60,7 @@ class TestEncounterEvents:
             "vessel_identity_authorization": "p.d.idauth",
             "voyages_table": "p.d.voy",
             "port_visits_table": "p.d.pv",
+            "regions": ["eez"],
         }
 
 
@@ -71,6 +75,7 @@ class TestLoiteringEvents:
                 "--bq-in-segment-info", "p.d.seg",
                 "--bq-in-spatial-measures", "p.d.sm",
                 "--bq-in-regions", "p.d.reg",
+                "--bq-in-regions-registry", "p.d.registry",
                 "--bq-in-research-segments", "p.d.rsegs",
                 "--bq-in-product-vessel-info-summary", "p.d.pvis",
                 "--product-vessel-info-summary-field-prefix", "ais_",
@@ -109,6 +114,7 @@ class TestPortVisitEvents:
                 "--product-vessel-info-summary-field-prefix", "ais_",
                 "--bq-in-spatial-measures", "p.d.sm",
                 "--bq-in-regions", "p.d.reg",
+                "--bq-in-regions-registry", "p.d.registry",
                 "--bq-in-named-anchorages", "p.d.anch",
                 "--bq-out-events", "p.d.dest",
                 "--labels", LABELS_ARG,
@@ -137,6 +143,7 @@ class TestPortVisitEvents:
                 "--product-vessel-info-summary-field-prefix", "ais_",
                 "--bq-in-spatial-measures", "p.d.sm",
                 "--bq-in-regions", "p.d.reg",
+                "--bq-in-regions-registry", "p.d.registry",
                 "--bq-in-named-anchorages", "p.d.anch",
                 "--named-anchorages-dock-field", "dock",
                 "--bq-out-events", "p.d.dest",
@@ -159,6 +166,7 @@ class TestFlagField:
         "--bq-in-encounters", "p.d.enc",
         "--bq-in-spatial-measures", "p.d.sm",
         "--bq-in-regions", "p.d.reg",
+        "--bq-in-regions-registry", "p.d.registry",
         "--bq-in-product-vessel-info-summary", "p.d.pvis",
         "--product-vessel-info-summary-field-prefix", "self_reported_",
         "--bq-in-vessel-identity-core", "p.d.idcore",
@@ -177,6 +185,7 @@ class TestFlagField:
         "--product-vessel-info-summary-field-prefix", "self_reported_",
         "--bq-in-spatial-measures", "p.d.sm",
         "--bq-in-regions", "p.d.reg",
+        "--bq-in-regions-registry", "p.d.registry",
         "--bq-in-named-anchorages", "p.d.anch",
         "--bq-out-events", "p.d.dest",
         "--labels", LABELS_ARG,
@@ -240,6 +249,7 @@ class TestFishingFlagField:
         "--bq-in-vessel-identity-authorization", "p.d.idauth",
         "--bq-in-spatial-measures", "p.d.sm",
         "--bq-in-regions", "p.d.reg",
+        "--bq-in-regions-registry", "p.d.registry",
         "--bq-in-product-vessel-info-summary", "p.d.pvis",
         "--product-vessel-info-summary-field-prefix", "self_reported_",
         "--bq-in-nautical-time-raster", "p.d.nautical",

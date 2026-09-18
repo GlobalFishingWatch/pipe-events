@@ -1,8 +1,9 @@
 import json
 import logging
 
-from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.bigquery import dest_table_description, load_schema
 from pipe_events.utils.pvis import resolve_flag_field
+from pipe_events.utils.regions import fetch_regions_registry, with_dynamic_regions_schema
 from pipe_events.utils.validators import valid_date, valid_dataset, valid_table
 
 COMMAND = "fishing_events_auth_and_regions"
@@ -56,6 +57,17 @@ def add_arguments(parser):
         "--bq-in-regions",
         dest="regions_table",
         help="The event regions table.",
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
+        "--bq-in-regions-registry",
+        dest="regions_registry_table",
+        help=(
+            "Region name -> description registry (published by pipe-regions' "
+            "publish-registry command), used to build the region struct/schema dynamically "
+            "instead of hardcoding the region list."
+        ),
         type=valid_table,
         required=True,
     )
@@ -148,9 +160,13 @@ def run(bq, params):
     dest = params["destination"] + params['reference_date']
     schema_path = "./assets/bigquery/fishing-events-4-authorization-schema.json"
 
+    regions = fetch_regions_registry(bq, params["regions_registry_table"])
+    params["regions"] = [region["name"] for region in regions]
+    schema = with_dynamic_regions_schema(load_schema(schema_path), regions)
+
     bq.create_table(
         dest,
-        schema_file=schema_path,
+        schema_file=schema,
         table_description=dest_table_description(**params),
         partition_field="event_start",
         clustering_fields=["seg_id", "event_start"],
@@ -169,7 +185,7 @@ def run(bq, params):
     )
     bq.update_table_schema(
         dest,
-        schema_path
+        schema
     )  # schema should be kept after trucate
     log.info("*** 2. Creates/Updates the view over the authorized with regions table.")
     bq.create_view(
@@ -180,6 +196,6 @@ def run(bq, params):
     )
     bq.update_table_schema(
         params["destination_view"],
-        schema_path
+        schema
     )
     return True

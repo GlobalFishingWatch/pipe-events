@@ -3,6 +3,8 @@ from datetime import date
 
 from pipe_events.constants import EVENTS_SCHEMA
 from pipe_events.utils import events
+from pipe_events.utils.bigquery import load_schema
+from pipe_events.utils.regions import with_dynamic_regions_schema
 
 
 class TestVersionedTableNames:
@@ -30,6 +32,8 @@ class TestPublishVersionedEvents:
     def test_runs_full_swap_in_order(self):
         bq = utm.MagicMock()
         bq.format_query.side_effect = lambda template, **kw: f"SQL:{template}"
+        regions = [{"name": "eez", "description": "Exclusive Economic Zones."}]
+        expected_schema = with_dynamic_regions_schema(load_schema(EVENTS_SCHEMA), regions)
 
         result = events.publish_versioned_events(
             bq,
@@ -39,6 +43,7 @@ class TestPublishVersionedEvents:
             template_params={"encounters_table": "p.d.enc"},
             description="the description",
             labels={"step": "generate_events"},
+            regions=regions,
         )
 
         assert result is True
@@ -47,7 +52,7 @@ class TestPublishVersionedEvents:
 
         bq.create_table.assert_called_once_with(
             current,
-            schema_file=EVENTS_SCHEMA,
+            schema_file=expected_schema,
             table_description="the description",
             partition_field="event_start",
             labels={"step": "generate_events"},
@@ -71,5 +76,41 @@ class TestPublishVersionedEvents:
             "the description",
             {"step": "generate_events"},
         )
-        bq.update_table_schema.assert_called_once_with("p.d.events", EVENTS_SCHEMA)
+        bq.update_table_schema.assert_called_once_with("p.d.events", expected_schema)
         bq.remove_table.assert_called_once_with(previous)
+
+    def test_regions_mean_position_fields_come_from_registry_not_hardcoded(self):
+        """A newly registered region shows up here without a pipe-events code change."""
+        bq = utm.MagicMock()
+        regions = [
+            {"name": "eez", "description": "Exclusive Economic Zones."},
+            {"name": "imma", "description": "International Marine Mammal Areas."},
+        ]
+
+        events.publish_versioned_events(
+            bq,
+            dest_table="p.d.events",
+            end_date=date(2024, 3, 10),
+            sql_template="encounter-events.sql.j2",
+            template_params={},
+            description="the description",
+            labels={},
+            regions=regions,
+        )
+
+        schema = bq.create_table.call_args.kwargs["schema_file"]
+        regions_field = next(f for f in schema if f["name"] == "regions_mean_position")
+        assert regions_field["fields"] == [
+            {
+                "name": "eez",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "Exclusive Economic Zones.",
+            },
+            {
+                "name": "imma",
+                "type": "STRING",
+                "mode": "REPEATED",
+                "description": "International Marine Mammal Areas.",
+            },
+        ]
