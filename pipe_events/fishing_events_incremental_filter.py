@@ -66,6 +66,17 @@ def add_arguments(parser):
         required=True,
     )
     parser.add_argument(
+        "--bq-in-vessel-filter",
+        dest="vessel_filter_table",
+        help=(
+            "Table of ssvids to restrict events to, applied on top of the usual "
+            "vessel filters rather than instead of them. Omit to generate events "
+            "for every vessel."
+        ),
+        type=valid_table,
+        default=None,
+    )
+    parser.add_argument(
         "--min-event-duration-seconds",
         dest="min_event_duration_seconds",
         help="Minimum fishing event duration.",

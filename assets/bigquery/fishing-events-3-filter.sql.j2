@@ -43,6 +43,14 @@ fishing_events_merged_good_segments AS (
       AND positions > 10
       AND NOT overlapping_and_short
   )
+{% if vessel_filter_table %}
+  -- Restrict to an explicit vessel set, on top of the vessel filters further down
+  -- rather than instead of them. The prototype achieved this by prefiltering the
+  -- messages that fed the incremental step; applying it here instead keeps the
+  -- restriction inside a full-load step, so changing the list and re-running
+  -- reapplies it across all history rather than only to newly ingested days.
+  AND ssvid IN (SELECT ssvid FROM `{{ vessel_filter_table }}`)
+{% endif %}
 ),
 
 
