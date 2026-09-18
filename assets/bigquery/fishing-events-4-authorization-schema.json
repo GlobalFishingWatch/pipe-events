@@ -184,7 +184,7 @@
         "name": "event_info",
         "type": "STRING",
         "mode": "NULLABLE",
-        "description": "JSON: message_count, avg_duration_hrs, full_event_duration_hrs (wall-clock event length), distance_km, avg_speed_knots, potential_risk, vessel_public_authorization_status, local_start_hours, local_end_hours (local solar time as decimal hours, e.g. 14.5=14:30), nautical_dawn_utc, nautical_dusk_utc (nautical dawn/dusk as UTC time, HH:MM), day_night_summary (rolled-up grouping: entirely_day/mostly_day/day_and_night/mostly_night/entirely_night/unclassified). day_night_summary is 'unclassified' when dawn/dusk are null (no raster coverage), equal (polar day/night), or the event is 24h or longer."
+        "description": "JSON: message_count, avg_duration_hrs, full_event_duration_hrs (wall-clock event length), distance_km, avg_speed_knots, potential_risk, vessel_public_authorization_status, local_start_hours, local_end_hours (local solar time as decimal hours, e.g. 14.5=14:30), nautical_dawn_utc, nautical_dusk_utc (nautical dawn/dusk as UTC time, HH:MM), day_night_summary (rolled-up grouping: entirely_day/mostly_day/day_and_night/mostly_night/entirely_night/unclassified). day_night_summary is 'unclassified' when the raster has no row for the event's latitude and day (nautical_dawn_utc/nautical_dusk_utc null), when the raster puts dawn and dusk at the same instant, or when the event lasts 24h or more. Equal published times do not by themselves mean unclassified: under polar day, dawn and dusk sit ~24h apart and round to the same HH:MM once converted to UTC, while the event is still correctly classified entirely_day."
     },
     {
         "name": "event_vessels",
