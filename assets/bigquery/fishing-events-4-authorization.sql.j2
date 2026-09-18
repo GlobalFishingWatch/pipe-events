@@ -52,11 +52,21 @@ WITH
     ),
 
     #
-    # Nautical dawn/dusk times by latitude and day of year
+    # Nautical dawn/dusk times by latitude and day of year.
+    #
+    # The raster is expected to hold exactly one row per (lat, day_of_year), but
+    # nothing downstream would collapse duplicates: the day/night CTEs are plain
+    # SELECTs, so a duplicated raster row would multiply events through the join
+    # in fishing_event_nautical_time and out into the final table. Deduplicating
+    # here keeps that structurally impossible regardless of how the snapshot is
+    # built. It is cheap -- the raster is ~64k rows.
     #
     source_nautical_times AS (
         SELECT *
         FROM `{{ nautical_time_raster_table }}`
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY lat, day_of_year ORDER BY nauticalDawn, nauticalDusk
+        ) = 1
     ),
 
     --
@@ -662,7 +672,8 @@ WITH
                 STRUCT(
                     message_count,
                     avg_hours AS avg_duration_hrs,
-                    TIMESTAMP_DIFF(event_end, event_start, SECOND) / 3600.0 AS event_duration_hrs,
+                    -- wall-clock event length, distinct from avg_duration_hrs above
+                    TIMESTAMP_DIFF(event_end, event_start, SECOND) / 3600.0 AS full_event_duration_hrs,
                     convert_m_to_km(event_distance_m) AS distance_km,
                     avg_speed_knots,
                     -- add authorization information
