@@ -76,10 +76,12 @@ WITH
         SELECT
             *
         FROM `{{source_fishing_events}}`
+{% if source_night_loitering_events %}
         UNION ALL
-        SELECT 
+        SELECT
             *
         FROM `{{source_night_loitering_events}}`
+{% endif %}
     ),
 
     source_fishing_vessels AS (

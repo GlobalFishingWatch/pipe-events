@@ -22,9 +22,14 @@ def add_arguments(parser):
     parser.add_argument(
         "--bq-in-night-loitering-events",
         dest="source_night_loitering_events",
-        help="The night loitering events table.",
+        help=(
+            "The night loitering events table, unioned with the fishing events. "
+            "Omit on a run whose vessels cannot produce night loitering events: "
+            "that step keeps only squid jiggers, so on a branch restricted to "
+            "another gear type it is empty by construction."
+        ),
         type=valid_table,
-        required=True,
+        default=None,
     )
     parser.add_argument(
         "--bq-in-vessel-identity-core",
