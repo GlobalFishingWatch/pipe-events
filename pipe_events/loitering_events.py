@@ -2,6 +2,7 @@ import json
 
 from pipe_events.utils.events import build_description, publish_versioned_events
 from pipe_events.utils.pvis import resolve_flag_field
+from pipe_events.utils.regions import fetch_regions_registry
 from pipe_events.utils.validators import valid_date, valid_table
 
 COMMAND = "loitering_events"
@@ -60,6 +61,17 @@ def add_arguments(parser):
         type=valid_table,
         required=True,
         help="Source event regions table.",
+    )
+    parser.add_argument(
+        "--bq-in-regions-registry",
+        dest="regions_registry_table",
+        type=valid_table,
+        required=True,
+        help=(
+            "Region name -> description registry (published by pipe-regions' "
+            "publish-registry command), used to build the region struct/schema dynamically "
+            "instead of hardcoding the region list."
+        ),
     )
     parser.add_argument(
         "--bq-in-research-segments",
@@ -129,6 +141,7 @@ def add_arguments(parser):
 
 
 def run(bq, params):
+    regions = fetch_regions_registry(bq, params["regions_registry_table"])
     template_params = {
         "start_date": params["start_date"].strftime("%Y-%m-%d"),
         "source_loitering": params["source_loitering"],
@@ -144,6 +157,7 @@ def run(bq, params):
         "minimum_distance_from_shore_nm": params["minimum_distance_from_shore_nm"],
         "voyages_table": params["voyages_table"],
         "port_visits_table": params["port_visits_table"],
+        "regions": [region["name"] for region in regions],
     }
     return publish_versioned_events(
         bq,
@@ -153,4 +167,5 @@ def run(bq, params):
         template_params=template_params,
         description=build_description(params, SQL_URL, MAINTAINERS),
         labels=params["labels"],
+        regions=regions,
     )

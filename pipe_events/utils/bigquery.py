@@ -44,6 +44,16 @@ def format_query(template_file: str, **params) -> str:
 
 
 def load_schema(schema_file):
+    """Loads a BigQuery schema from `schema_file`.
+
+    Accepts either a path to a JSON schema file (the usual case), or an already-loaded schema
+    (a list of field dicts), passed straight through -- lets a caller build a schema dynamically
+    (see `pipe_events.utils.regions.with_dynamic_regions_schema`) and hand it to
+    `BigqueryHelper.create_table`/`update_table_schema` the same way as a static file.
+    """
+    if isinstance(schema_file, list):
+        return schema_file
+
     with open(schema_file) as file:
         return json.load(file)
 
@@ -75,6 +85,22 @@ class BigqueryHelper:
         job = self.client.query(
             f"CALL BQ.ABORT_SESSION('{session_id}')", job_config=config
         )
+        return job.result()
+
+    def fetch_rows(self, query):
+        """Runs a read-only query and returns its rows.
+
+        Lighter than `run_query`: no destination table/write disposition, and none of its
+        progress-polling or job-stats logging (meant for the actual event-generating queries) --
+        for small metadata lookups, e.g. pipe-regions' own name/description registry.
+
+        Always runs for real, ignoring `self.dry_run`: it's a cheap metadata read needed to
+        build a syntactically valid query (e.g. `pipe_events.utils.regions`), not the
+        expensive/destructive operation `--dry-run` is meant to skip. Under `--dry-run`, a
+        dry-run job never returns rows, which would silently starve the caller.
+        """
+        config = bigquery.QueryJobConfig(dry_run=False)
+        job = self.client.query(query, job_config=config)
         return job.result()
 
     def table_ref(self, table):

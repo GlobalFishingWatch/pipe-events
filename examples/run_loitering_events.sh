@@ -16,6 +16,7 @@ bq_in_segment_info=""
 bq_in_research_segments=""
 bq_in_voyages=""
 bq_in_port_visits=""
+bq_in_regions_registry=""
 minimum_distance_from_shore_nm=""
 bq_in_identity_published_dataset=""   # product_vessel_info_summary
 bq_out_dataset=""
@@ -37,6 +38,7 @@ Usage: run_loitering_events.sh \
   --bq-in-research-segments PROJECT.DATASET.TABLE \
   --bq-in-voyages PROJECT.DATASET.TABLE \
   --bq-in-port-visits PROJECT.DATASET.TABLE \
+  --bq-in-regions-registry PROJECT.DATASET.TABLE \
   --bq-in-identity-published-dataset PROJECT.DATASET \
   --bq-out-dataset PROJECT.DATASET \
   --bq-out-table-prefix PREFIX \
@@ -61,6 +63,7 @@ while [[ $# -gt 0 ]]; do
     --bq-in-research-segments) bq_in_research_segments="$2"; shift 2 ;;
     --bq-in-voyages) bq_in_voyages="$2"; shift 2 ;;
     --bq-in-port-visits) bq_in_port_visits="$2"; shift 2 ;;
+    --bq-in-regions-registry) bq_in_regions_registry="$2"; shift 2 ;;
     --minimum-distance-from-shore-nm) minimum_distance_from_shore_nm="$2"; shift 2 ;;
     --bq-in-identity-published-dataset) bq_in_identity_published_dataset="$2"; shift 2 ;;
     --bq-out-dataset) bq_out_dataset="$2"; shift 2 ;;
@@ -82,6 +85,7 @@ missing=()
 [[ -z "$bq_in_research_segments" ]] && missing+=(--bq-in-research-segments)
 [[ -z "$bq_in_voyages" ]] && missing+=(--bq-in-voyages)
 [[ -z "$bq_in_port_visits" ]] && missing+=(--bq-in-port-visits)
+[[ -z "$bq_in_regions_registry" ]] && missing+=(--bq-in-regions-registry)
 [[ -z "$bq_in_identity_published_dataset" ]] && missing+=(--bq-in-identity-published-dataset)
 [[ -z "$bq_out_dataset" ]] && missing+=(--bq-out-dataset)
 [[ -z "$bq_out_table_prefix" ]] && missing+=(--bq-out-table-prefix)
@@ -104,6 +108,7 @@ echo "Segment info:       $bq_in_segment_info"
 echo "Research segments:  $bq_in_research_segments"
 echo "Voyages:            $bq_in_voyages"
 echo "Port visits:        $bq_in_port_visits"
+echo "Regions registry:   $bq_in_regions_registry"
 echo "Min dist. (nm):     $minimum_distance_from_shore_nm"
 echo "Identity dataset:   $bq_in_identity_published_dataset"
 echo "PVIS field prefix:  $pvis_field_prefix"
@@ -126,6 +131,7 @@ docker compose run \
   --bq-in-segment-info "$bq_in_segment_info" \
   --bq-in-spatial-measures "$bq_in_spatial_measures" \
   --bq-in-regions "$bq_in_regions" \
+  --bq-in-regions-registry "$bq_in_regions_registry" \
   --bq-in-research-segments "$bq_in_research_segments" \
   --bq-in-product-vessel-info-summary "$product_vessel_info_summary" \
   --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \

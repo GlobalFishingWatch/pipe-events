@@ -2,6 +2,7 @@ import json
 
 from pipe_events.utils.events import build_description, publish_versioned_events
 from pipe_events.utils.pvis import resolve_flag_field
+from pipe_events.utils.regions import fetch_regions_registry
 from pipe_events.utils.validators import valid_date, valid_table
 
 COMMAND = "encounter_events"
@@ -53,6 +54,17 @@ def add_arguments(parser):
         type=valid_table,
         required=True,
         help="Event regions table.",
+    )
+    parser.add_argument(
+        "--bq-in-regions-registry",
+        dest="regions_registry_table",
+        type=valid_table,
+        required=True,
+        help=(
+            "Region name -> description registry (published by pipe-regions' "
+            "publish-registry command), used to build the region struct/schema dynamically "
+            "instead of hardcoding the region list."
+        ),
     )
     parser.add_argument(
         "--bq-in-product-vessel-info-summary",
@@ -122,6 +134,7 @@ def add_arguments(parser):
 
 
 def run(bq, params):
+    regions = fetch_regions_registry(bq, params["regions_registry_table"])
     template_params = {
         "encounters_table": params["encounters_table"],
         "spatial_measures_table": params["spatial_measures_table"],
@@ -135,6 +148,7 @@ def run(bq, params):
         "vessel_identity_authorization": params["vessel_identity_authorization"],
         "voyages_table": params["voyages_table"],
         "port_visits_table": params["port_visits_table"],
+        "regions": [region["name"] for region in regions],
     }
     return publish_versioned_events(
         bq,
@@ -144,4 +158,5 @@ def run(bq, params):
         template_params=template_params,
         description=build_description(params, SQL_URL, MAINTAINERS),
         labels=params["labels"],
+        regions=regions,
     )

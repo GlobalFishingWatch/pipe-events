@@ -26,6 +26,7 @@ bq_in_merged_night_loitering=""
 bq_in_identity_published_dataset=""   # identity_core, identity_authorization, product_vessel_info_summary
 bq_in_ais_published_dataset=""        # segs_activity
 bq_in_ais_internal_dataset=""         # segment_vessel
+bq_in_regions_registry=""
 bq_out_dataset=""
 bq_out_table_prefix=""
 
@@ -44,6 +45,7 @@ Usage: run_fishing_consolidated_stages.sh \
   --bq-in-identity-published-dataset PROJECT.DATASET \
   --bq-in-ais-published-dataset PROJECT.DATASET \
   --bq-in-ais-internal-dataset PROJECT.DATASET \
+  --bq-in-regions-registry PROJECT.DATASET.TABLE \
   --bq-out-dataset PROJECT.DATASET \
   --bq-out-table-prefix PREFIX \
   [--pvis-field-prefix PREFIX] \
@@ -70,6 +72,7 @@ while [[ $# -gt 0 ]]; do
     --bq-in-identity-published-dataset) bq_in_identity_published_dataset="$2"; shift 2 ;;
     --bq-in-ais-published-dataset) bq_in_ais_published_dataset="$2"; shift 2 ;;
     --bq-in-ais-internal-dataset) bq_in_ais_internal_dataset="$2"; shift 2 ;;
+    --bq-in-regions-registry) bq_in_regions_registry="$2"; shift 2 ;;
     --bq-out-dataset) bq_out_dataset="$2"; shift 2 ;;
     --bq-out-table-prefix) bq_out_table_prefix="$2"; shift 2 ;;
     --pvis-field-prefix) pvis_field_prefix="$2"; shift 2 ;;
@@ -89,6 +92,7 @@ missing=()
 [[ -z "$bq_in_identity_published_dataset" ]] && missing+=(--bq-in-identity-published-dataset)
 [[ -z "$bq_in_ais_published_dataset" ]] && missing+=(--bq-in-ais-published-dataset)
 [[ -z "$bq_in_ais_internal_dataset" ]] && missing+=(--bq-in-ais-internal-dataset)
+[[ -z "$bq_in_regions_registry" ]] && missing+=(--bq-in-regions-registry)
 [[ -z "$bq_out_dataset" ]] && missing+=(--bq-out-dataset)
 [[ -z "$bq_out_table_prefix" ]] && missing+=(--bq-out-table-prefix)
 if [[ ${#missing[@]} -gt 0 ]]; then
@@ -123,6 +127,7 @@ echo "Merged (nl):       $bq_in_merged_night_loitering"
 echo "Identity dataset:  $bq_in_identity_published_dataset"
 echo "AIS published:     $bq_in_ais_published_dataset"
 echo "AIS internal:      $bq_in_ais_internal_dataset"
+echo "Regions registry:  $bq_in_regions_registry"
 echo "PVIS field prefix: $pvis_field_prefix"
 echo "UDFs dataset:      $bq_in_udfs_dataset"
 echo "Spatial measures:  $bq_in_spatial_measures"
@@ -169,6 +174,7 @@ docker compose run \
   --bq-in-vessel-identity-authorization "$identity_authorization" \
   --bq-in-spatial-measures "$bq_in_spatial_measures" \
   --bq-in-regions "$bq_in_regions" \
+  --bq-in-regions-registry "$bq_in_regions_registry" \
   --bq-in-product-vessel-info-summary "$product_vessel_info_summary" \
   --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \
   --bq-out-events "$fishing_events_v" \

@@ -38,3 +38,46 @@ class TestUtilsBigQuery:
         bq.client.delete_table.assert_called_once()
         _, kwargs = bq.client.delete_table.call_args
         assert kwargs["not_found_ok"] is True
+
+    def test_load_schema_reads_a_json_file(self):
+        from pipe_events.utils.bigquery import load_schema
+        schema = load_schema("./assets/bigquery/events.schema.json")
+        assert isinstance(schema, list)
+        assert all("name" in field for field in schema)
+
+    def test_load_schema_passes_through_an_already_loaded_schema(self):
+        """A caller building a schema dynamically (see pipe_events.utils.regions) hands it
+        straight to BigqueryHelper.create_table/update_table_schema the same way as a file.
+        """
+        from pipe_events.utils.bigquery import load_schema
+        schema = [{"name": "event_id", "type": "STRING", "mode": "NULLABLE"}]
+        assert load_schema(schema) is schema
+
+    def test_fetch_rows_runs_a_plain_read_only_query(self):
+        from pipe_events.utils.bigquery import BigqueryHelper
+        with utm.patch("pipe_events.utils.bigquery.bigquery.Client"):
+            bq = BigqueryHelper(project="p")
+
+        result = bq.fetch_rows("SELECT 1")
+
+        bq.client.query.assert_called_once()
+        args, kwargs = bq.client.query.call_args
+        assert args[0] == "SELECT 1"
+        assert kwargs["job_config"].dry_run is False
+        assert result is bq.client.query.return_value.result.return_value
+
+    def test_fetch_rows_always_runs_for_real_under_dry_run(self):
+        """Even with `--dry-run`, this metadata read must actually execute.
+
+        Otherwise it returns no rows (BigQuery dry runs never return data), starving callers
+        like `pipe_events.utils.regions.fetch_regions_registry` that need real data to render
+        a valid query -- breaking dry-run validation of a query that would otherwise succeed.
+        """
+        from pipe_events.utils.bigquery import BigqueryHelper
+        with utm.patch("pipe_events.utils.bigquery.bigquery.Client"):
+            bq = BigqueryHelper(project="p", dry_run=True)
+
+        bq.fetch_rows("SELECT 1")
+
+        _, kwargs = bq.client.query.call_args
+        assert kwargs["job_config"].dry_run is False

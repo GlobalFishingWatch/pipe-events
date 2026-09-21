@@ -10,7 +10,8 @@ import datetime as dt
 import logging
 
 from pipe_events.constants import EVENTS_SCHEMA
-from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.bigquery import dest_table_description, load_schema
+from pipe_events.utils.regions import with_dynamic_regions_schema
 
 PARTITION_FIELD = "event_start"
 
@@ -37,15 +38,16 @@ def versioned_table_names(dest_table, end_date):
 
 
 def publish_versioned_events(
-    bq, *, dest_table, end_date, sql_template, template_params, description, labels
+    bq, *, dest_table, end_date, sql_template, template_params, description, labels, regions
 ):
     log = logging.getLogger()
     current, previous = versioned_table_names(dest_table, end_date)
+    schema = with_dynamic_regions_schema(load_schema(EVENTS_SCHEMA), regions)
 
     log.info(f"Ensuring events table {current} exists")
     bq.create_table(
         current,
-        schema_file=EVENTS_SCHEMA,
+        schema_file=schema,
         table_description=description,
         partition_field=PARTITION_FIELD,
         labels=labels,
@@ -66,7 +68,7 @@ def publish_versioned_events(
 
     log.info(f"Pointing view {dest_table} at {current}")
     bq.create_view(dest_table, f"SELECT * FROM `{current}`", description, labels)
-    bq.update_table_schema(dest_table, EVENTS_SCHEMA)
+    bq.update_table_schema(dest_table, schema)
 
     log.info(f"Removing previous table {previous}")
     bq.remove_table(previous)
