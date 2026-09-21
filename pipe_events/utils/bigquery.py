@@ -93,8 +93,13 @@ class BigqueryHelper:
         Lighter than `run_query`: no destination table/write disposition, and none of its
         progress-polling or job-stats logging (meant for the actual event-generating queries) --
         for small metadata lookups, e.g. pipe-regions' own name/description registry.
+
+        Always runs for real, ignoring `self.dry_run`: it's a cheap metadata read needed to
+        build a syntactically valid query (e.g. `pipe_events.utils.regions`), not the
+        expensive/destructive operation `--dry-run` is meant to skip. Under `--dry-run`, a
+        dry-run job never returns rows, which would silently starve the caller.
         """
-        config = bigquery.QueryJobConfig(dry_run=self.dry_run)
+        config = bigquery.QueryJobConfig(dry_run=False)
         job = self.client.query(query, job_config=config)
         return job.result()
 

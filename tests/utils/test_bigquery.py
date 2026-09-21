@@ -65,3 +65,19 @@ class TestUtilsBigQuery:
         assert args[0] == "SELECT 1"
         assert kwargs["job_config"].dry_run is False
         assert result is bq.client.query.return_value.result.return_value
+
+    def test_fetch_rows_always_runs_for_real_under_dry_run(self):
+        """Even with `--dry-run`, this metadata read must actually execute.
+
+        Otherwise it returns no rows (BigQuery dry runs never return data), starving callers
+        like `pipe_events.utils.regions.fetch_regions_registry` that need real data to render
+        a valid query -- breaking dry-run validation of a query that would otherwise succeed.
+        """
+        from pipe_events.utils.bigquery import BigqueryHelper
+        with utm.patch("pipe_events.utils.bigquery.bigquery.Client"):
+            bq = BigqueryHelper(project="p", dry_run=True)
+
+        bq.fetch_rows("SELECT 1")
+
+        _, kwargs = bq.client.query.call_args
+        assert kwargs["job_config"].dry_run is False
