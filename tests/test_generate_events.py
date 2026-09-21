@@ -242,6 +242,7 @@ class TestFishingFlagField:
         "--bq-in-regions", "p.d.reg",
         "--bq-in-product-vessel-info-summary", "p.d.pvis",
         "--product-vessel-info-summary-field-prefix", "self_reported_",
+        "--bq-in-nautical-time-raster", "p.d.nautical",
         "--bq-in-udfs-dataset", "p.udfs",
         "--bq-out-events", "p.d.dest",
         "--bq-out-events-view", "p.d.dest_view",

@@ -51,6 +51,24 @@ WITH
       FROM `{{ regions_table }}`
     ),
 
+    #
+    # Nautical dawn/dusk times by latitude and day of year.
+    #
+    # The raster is expected to hold exactly one row per (lat, day_of_year), but
+    # nothing downstream would collapse duplicates: the day/night CTEs are plain
+    # SELECTs, so a duplicated raster row would multiply events through the join
+    # in fishing_event_nautical_time and out into the final table. Deduplicating
+    # here keeps that structurally impossible regardless of how the snapshot is
+    # built. It is cheap -- the raster is ~64k rows.
+    #
+    source_nautical_times AS (
+        SELECT *
+        FROM `{{ nautical_time_raster_table }}`
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY lat, day_of_year ORDER BY nauticalDawn, nauticalDusk
+        ) = 1
+    ),
+
     --
     -- remove events that are too short
     --
@@ -58,10 +76,12 @@ WITH
         SELECT
             *
         FROM `{{source_fishing_events}}`
+{% if source_night_loitering_events %}
         UNION ALL
-        SELECT 
+        SELECT
             *
         FROM `{{source_night_loitering_events}}`
+{% endif %}
     ),
 
     source_fishing_vessels AS (
@@ -377,6 +397,225 @@ WITH
 
 
     ##############
+    ############### ADD NAUTICAL TIME CATEGORY TO FISHING EVENTS
+    ##############
+
+    #
+    # Nautical dawn/dusk times are joined by rounded latitude and day of year from
+    # the event start. The nautical time raster stores one row per integer latitude
+    # degree, so lat_mean is rounded to the nearest integer to find the matching row.
+    # The same dawn/dusk values are used for both start and end comparisons, which
+    # is a small approximation for events crossing midnight but acceptable given the
+    # 1-degree lat resolution of the table.
+    #
+    # Local solar time is computed by adding the longitude-based solar offset
+    # (lon / 360 * 24 hours, converted to whole seconds) to the UTC timestamp,
+    # then extracting the time-of-day. The * 240.0 factor is that conversion to
+    # seconds: lon / 360 * 24 * 3600 = lon * (86400 / 360) = lon * 240. So
+    # lon_mean * 240.0 is the solar offset in seconds (e.g. 60 deg E = 60 * 240
+    # = 14400 s = 4 h ahead of UTC). Using whole seconds keeps local_start_hours,
+    # local_end_hours, and same_day consistent: all three derive from the same
+    # TIMESTAMP_ADD expression, so an event ending at exactly local midnight cannot
+    # show same_day=False while local_end_hours reads as 23.999 instead of 0.0.
+    #
+    # The same_day flag indicates whether the event start and end fall on the same
+    # local solar calendar day. This is required because an event that crosses
+    # midnight has local_end_hours < local_start_hours, and without this flag the
+    # night/dawn/dusk category logic would misclassify it.
+    #
+    # The within_single_day flag is true when the event lasts less than 24 hours.
+    # It guards the NOT same_day branches, which classify from the time-of-day of
+    # start vs end. That only works if the event is under 24h; longer events wrap
+    # past the same time-of-day and fall through to NULL.
+    #
+    fishing_event_nautical_time AS (
+        SELECT
+            fe.event_id,
+            fe.lon_mean,
+            utc_decimal_hours(TIMESTAMP_ADD(fe.event_start, INTERVAL CAST(fe.lon_mean * 240.0 AS INT64) SECOND)) AS local_start_hours,
+            utc_decimal_hours(TIMESTAMP_ADD(fe.event_end,   INTERVAL CAST(fe.lon_mean * 240.0 AS INT64) SECOND)) AS local_end_hours,
+            EXTRACT(DAYOFYEAR FROM TIMESTAMP_ADD(fe.event_start, INTERVAL CAST(fe.lon_mean * 240.0 AS INT64) SECOND))
+                = EXTRACT(DAYOFYEAR FROM TIMESTAMP_ADD(fe.event_end,   INTERVAL CAST(fe.lon_mean * 240.0 AS INT64) SECOND))
+                AS same_day,
+            TIMESTAMP_DIFF(fe.event_end, fe.event_start, SECOND) / 3600.0 AS event_duration_hrs,
+            TIMESTAMP_DIFF(fe.event_end, fe.event_start, SECOND) / 3600.0 < 24.0 AS within_single_day,
+            nt.nauticalDawn,
+            nt.nauticalDusk,
+        FROM complete_fishing_event AS fe
+        LEFT JOIN source_nautical_times AS nt
+            ON ROUND(fe.lat_mean) = nt.lat
+            AND EXTRACT(DAYOFYEAR FROM fe.event_start) = nt.day_of_year
+    ),
+
+    #
+    # Classify each event by its relationship to nautical dawn and dusk, producing
+    # twilight_boundary_class. fraction_at_night is derived from this classification
+    # in the next CTE (fishing_event_fraction), not here.
+    #
+    # Nautical twilight is used as the day/night boundary: nautical dawn is when
+    # the horizon first becomes visible; nautical dusk is when it becomes
+    # indistinguishable. This is the standard maritime reference for light conditions.
+    #
+    # Categories:
+    --   day               entirely between nautical dawn and dusk
+    --   night             entirely outside nautical dawn to dusk
+    --   over_dusk         starts in day, ends in night
+    --   over_dawn         starts in night, ends in day
+    --   over_dusk_and_dawn starts in day, spans full night, ends in day
+    --   over_dawn_and_dusk starts in night, spans full day, ends in night
+    --   polar             nauticalDawn = nauticalDusk (polar night or midnight sun)
+    --                     fraction_at_night is NULL for polar events
+    #
+    fishing_event_time_category AS (
+        SELECT
+            event_id,
+            lon_mean,
+            same_day,
+            event_duration_hrs,
+            local_start_hours,
+            local_end_hours,
+            nauticalDawn,
+            nauticalDusk,
+            CASE
+                WHEN nauticalDawn = nauticalDusk THEN 'polar'
+                WHEN same_day AND local_start_hours > nauticalDawn AND local_end_hours < nauticalDusk THEN 'day'
+                WHEN same_day AND (local_start_hours > nauticalDusk OR local_end_hours < nauticalDawn) THEN 'night'
+                WHEN NOT same_day AND within_single_day AND local_start_hours > nauticalDusk AND local_end_hours < nauticalDawn THEN 'night'
+                WHEN same_day AND local_start_hours <= nauticalDawn AND local_end_hours >= nauticalDusk THEN 'over_dawn_and_dusk'
+                WHEN NOT same_day AND within_single_day AND (
+                    (local_start_hours <= nauticalDawn AND local_end_hours < nauticalDawn)
+                    OR (local_start_hours > nauticalDusk AND local_end_hours >= nauticalDusk)
+                ) THEN 'over_dawn_and_dusk'
+                WHEN NOT same_day AND within_single_day
+                    AND local_start_hours <= nauticalDusk
+                    AND local_end_hours >= nauticalDawn THEN 'over_dusk_and_dawn'
+                WHEN same_day AND local_start_hours > nauticalDawn AND local_start_hours <= nauticalDusk
+                    AND local_end_hours >= nauticalDusk THEN 'over_dusk'
+                WHEN NOT same_day AND within_single_day AND local_start_hours > nauticalDawn AND local_start_hours <= nauticalDusk
+                    AND local_end_hours < nauticalDawn THEN 'over_dusk'
+                WHEN same_day AND local_start_hours <= nauticalDawn
+                    AND local_end_hours >= nauticalDawn AND local_end_hours < nauticalDusk THEN 'over_dawn'
+                WHEN NOT same_day AND within_single_day AND local_start_hours > nauticalDusk
+                    AND local_end_hours >= nauticalDawn AND local_end_hours < nauticalDusk THEN 'over_dawn'
+                ELSE NULL
+            END AS twilight_boundary_class,
+        FROM fishing_event_nautical_time
+    ),
+
+    #
+    # Compute fraction_at_night from the category and raw local solar hours.
+    #
+    # For over_dusk and over_dawn the formula differs by same_day since the
+    # night portion either stays within the day or wraps through midnight.
+    #
+    # For over_dusk_and_dawn and the NOT same_day over_dawn_and_dusk, the
+    # unified formula covers all start/end positions using GREATEST/LEAST:
+    #   GREATEST(0, dawn - start)              pre-dawn night on day 1
+    #   GREATEST(0, 24 - GREATEST(start,dusk)) post-dusk night on day 1
+    #   LEAST(end, dawn)                       pre-dawn night on day 2
+    #   GREATEST(0, end - dusk)                post-dusk night on day 2
+    #
+    fishing_event_fraction AS (
+        SELECT
+            event_id,
+            lon_mean,
+            twilight_boundary_class,
+            local_start_hours,
+            local_end_hours,
+            -- Nautical dawn/dusk for the event's latitude and day of year, in local
+            -- solar decimal hours. Intermediate only: converted to UTC in the next CTE.
+            nauticalDawn AS nautical_dawn_local_hours,
+            nauticalDusk AS nautical_dusk_local_hours,
+            CASE twilight_boundary_class
+                WHEN 'polar' THEN NULL
+                WHEN 'day'   THEN 0.0
+                WHEN 'night' THEN 1.0
+                WHEN 'over_dusk' THEN
+                    CASE WHEN same_day
+                        THEN (local_end_hours - nauticalDusk)
+                             / event_duration_hrs
+                        ELSE ((24.0 - nauticalDusk) + local_end_hours)
+                             / event_duration_hrs
+                    END
+                WHEN 'over_dawn' THEN
+                    CASE WHEN same_day
+                        THEN (nauticalDawn - local_start_hours)
+                             / event_duration_hrs
+                        ELSE ((24.0 - local_start_hours) + nauticalDawn)
+                             / event_duration_hrs
+                    END
+                WHEN 'over_dawn_and_dusk' THEN
+                    CASE WHEN same_day
+                        THEN ((nauticalDawn - local_start_hours) + (local_end_hours - nauticalDusk))
+                             / event_duration_hrs
+                        ELSE (GREATEST(0.0, nauticalDawn - local_start_hours)
+                              + GREATEST(0.0, 24.0 - GREATEST(local_start_hours, nauticalDusk))
+                              + LEAST(local_end_hours, nauticalDawn)
+                              + GREATEST(0.0, local_end_hours - nauticalDusk))
+                             / event_duration_hrs
+                    END
+                WHEN 'over_dusk_and_dawn' THEN
+                    (GREATEST(0.0, nauticalDawn - local_start_hours)
+                     + GREATEST(0.0, 24.0 - GREATEST(local_start_hours, nauticalDusk))
+                     + LEAST(local_end_hours, nauticalDawn)
+                     + GREATEST(0.0, local_end_hours - nauticalDusk))
+                    / event_duration_hrs
+                ELSE NULL
+            END AS fraction_at_night,
+            -- passed through so day_night_summary can compute the absolute time spent
+            -- in the minority (whichever of day/night is smaller) phase.
+            event_duration_hrs,
+        FROM fishing_event_time_category
+    ),
+
+    #
+    # Final day/night fields for each event, derived from fishing_event_fraction: the
+    # UTC dawn/dusk times (HH:MM) and the rolled-up day_night_summary. Kept as its own
+    # CTE (rather than inlined into complete_fe_with_authorizations) so the whole
+    # day/night derivation -- fishing_event_nautical_time -> fishing_event_time_category
+    # -> fishing_event_fraction -> here -- is a self-contained block that can be
+    # relocated as a unit. Everything it needs (including lon_mean, threaded through the
+    # earlier CTEs) comes from fishing_event_fraction.
+    #
+    fishing_event_day_night AS (
+        SELECT
+            event_id,
+            -- fraction_at_night is used below to derive day_night_summary, not surfaced.
+            local_start_hours,
+            local_end_hours,
+            -- Convert nautical dawn/dusk from local solar to UTC, formatted as HH:MM.
+            -- UTC decimal hours = local_solar - lon/15 (15 deg of longitude = 1 hour),
+            -- wrapped to [0,24); then rounded to the minute and formatted. The MOD 1440
+            -- wraps a value that rounds up to 24:00 back to 00:00.
+            FORMAT_TIME('%H:%M', TIME_ADD(TIME '00:00:00',
+                INTERVAL MOD(CAST(ROUND(wrap_hours(nautical_dawn_local_hours - lon_mean / 15.0) * 60) AS INT64), 1440) MINUTE)
+            ) AS nautical_dawn_utc,
+            FORMAT_TIME('%H:%M', TIME_ADD(TIME '00:00:00',
+                INTERVAL MOD(CAST(ROUND(wrap_hours(nautical_dusk_local_hours - lon_mean / 15.0) * 60) AS INT64), 1440) MINUTE)
+            ) AS nautical_dusk_utc,
+            -- Rolled-up, client-facing grouping derived from twilight_boundary_class
+            -- and fraction_at_night. day/night map straight to entirely_*. For a
+            -- crossing event, day_and_night if the minority phase (whichever of day or
+            -- night is smaller) lasts at least overlap_threshold_hours in absolute
+            -- terms -- minority hours = LEAST(fraction_at_night, 1 - fraction_at_night)
+            -- * event_duration_hrs; otherwise the event leans to its majority phase by
+            -- fraction_at_night. polar and unclassified events fall through to 'unclassified'.
+            CASE
+                WHEN twilight_boundary_class = 'day'   THEN 'entirely_day'
+                WHEN twilight_boundary_class = 'night' THEN 'entirely_night'
+                WHEN twilight_boundary_class IN ('over_dawn', 'over_dusk', 'over_dusk_and_dawn', 'over_dawn_and_dusk')
+                    THEN CASE
+                        WHEN LEAST(fraction_at_night, 1.0 - fraction_at_night)
+                             * event_duration_hrs >= {{ overlap_threshold_hours }} THEN 'day_and_night'
+                        WHEN fraction_at_night < 0.5 THEN 'mostly_day'
+                        ELSE 'mostly_night'
+                    END
+                ELSE 'unclassified'
+            END AS day_night_summary
+        FROM fishing_event_fraction
+    ),
+
+    ##############
     ############### JOIN AUTHORIZATION DATA WITH FISHING EVENTS
     ##############
 
@@ -391,12 +630,18 @@ WITH
             authorization.potential_risk,
             authorization.vessel_public_authorization_status,
             authorization.vessel_region_authorizations,
-            regions.regions_mean_position
+            regions.regions_mean_position,
+            day_night.local_start_hours,
+            day_night.local_end_hours,
+            day_night.nautical_dawn_utc,
+            day_night.nautical_dusk_utc,
+            day_night.day_night_summary
         FROM
             complete_fishing_event AS fe
             INNER JOIN fe_authorizations AS authorization USING (event_id)
             -- join regions information
             INNER JOIN fe_regions AS regions USING (event_id)
+            LEFT JOIN fishing_event_day_night AS day_night USING (event_id)
     ),
 
     #
@@ -429,11 +674,18 @@ WITH
                 STRUCT(
                     message_count,
                     avg_hours AS avg_duration_hrs,
+                    -- wall-clock event length, distinct from avg_duration_hrs above
+                    TIMESTAMP_DIFF(event_end, event_start, SECOND) / 3600.0 AS full_event_duration_hrs,
                     convert_m_to_km(event_distance_m) AS distance_km,
                     avg_speed_knots,
                     -- add authorization information
                     potential_risk,
-                    vessel_public_authorization_status
+                    vessel_public_authorization_status,
+                    local_start_hours,
+                    local_end_hours,
+                    nautical_dawn_utc,
+                    nautical_dusk_utc,
+                    day_night_summary
                 )
             ) AS event_info,
             TO_JSON_STRING([
