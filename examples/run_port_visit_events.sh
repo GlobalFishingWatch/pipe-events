@@ -13,6 +13,7 @@ start_date=""
 end_date=""
 bq_in_port_visits=""
 bq_in_named_anchorages=""
+bq_in_regions_registry=""
 bq_in_identity_published_dataset=""   # product_vessel_info_summary
 bq_out_dataset=""
 bq_out_table_prefix=""
@@ -29,6 +30,7 @@ Usage: run_port_visit_events.sh \
   --end-date YYYY-MM-DD \
   --bq-in-port-visits PROJECT.DATASET.TABLE \
   --bq-in-named-anchorages PROJECT.DATASET.TABLE \
+  --bq-in-regions-registry PROJECT.DATASET.TABLE \
   --bq-in-identity-published-dataset PROJECT.DATASET \
   --bq-out-dataset PROJECT.DATASET \
   --bq-out-table-prefix PREFIX \
@@ -48,6 +50,7 @@ while [[ $# -gt 0 ]]; do
     --end-date) end_date="$2"; shift 2 ;;
     --bq-in-port-visits) bq_in_port_visits="$2"; shift 2 ;;
     --bq-in-named-anchorages) bq_in_named_anchorages="$2"; shift 2 ;;
+    --bq-in-regions-registry) bq_in_regions_registry="$2"; shift 2 ;;
     --bq-in-identity-published-dataset) bq_in_identity_published_dataset="$2"; shift 2 ;;
     --bq-out-dataset) bq_out_dataset="$2"; shift 2 ;;
     --bq-out-table-prefix) bq_out_table_prefix="$2"; shift 2 ;;
@@ -65,6 +68,7 @@ missing=()
 [[ -z "$end_date" ]] && missing+=(--end-date)
 [[ -z "$bq_in_port_visits" ]] && missing+=(--bq-in-port-visits)
 [[ -z "$bq_in_named_anchorages" ]] && missing+=(--bq-in-named-anchorages)
+[[ -z "$bq_in_regions_registry" ]] && missing+=(--bq-in-regions-registry)
 [[ -z "$bq_in_identity_published_dataset" ]] && missing+=(--bq-in-identity-published-dataset)
 [[ -z "$bq_out_dataset" ]] && missing+=(--bq-out-dataset)
 [[ -z "$bq_out_table_prefix" ]] && missing+=(--bq-out-table-prefix)
@@ -84,6 +88,7 @@ echo "Start date:        $start_date"
 echo "End date:          $end_date"
 echo "Port visits:       $bq_in_port_visits"
 echo "Named anchorages:  $bq_in_named_anchorages"
+echo "Regions registry:  $bq_in_regions_registry"
 echo "Identity dataset:  $bq_in_identity_published_dataset"
 echo "PVIS field prefix: $pvis_field_prefix"
 echo "Spatial measures:  $bq_in_spatial_measures"
@@ -106,6 +111,7 @@ docker compose run \
   --product-vessel-info-summary-field-prefix "$pvis_field_prefix" \
   --bq-in-spatial-measures "$bq_in_spatial_measures" \
   --bq-in-regions "$bq_in_regions" \
+  --bq-in-regions-registry "$bq_in_regions_registry" \
   --bq-in-named-anchorages "$bq_in_named_anchorages" \
   --bq-out-events "$bq_out_events" \
   --labels "$LABELS"

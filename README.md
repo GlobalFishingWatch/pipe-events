@@ -199,6 +199,7 @@ and region information, publishing a versioned table and a view.
 | `--bq-in-vessel-identity-authorization` | yes | Vessel identity authorization table. |
 | `--bq-in-spatial-measures` | yes | Spatial measures table. |
 | `--bq-in-regions` | yes | Event regions table. |
+| `--bq-in-regions-registry` | yes | Region name → description registry (published by pipe-regions' `publish-registry` command); builds the region struct/schema dynamically instead of hardcoding the region list. |
 | `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
 | `--product-vessel-info-summary-field-prefix` | no | Prefix for vessel info fields in the PVIS table (e.g. `ais_`). |
 | `--bq-in-udfs-dataset` | yes | Dataset (`project.dataset`) where the shared UDFs live. |
@@ -231,6 +232,7 @@ Publishes encounter events for a date range as a versioned table and a view.
 | `--bq-in-encounters` | yes | Source encounters table. |
 | `--bq-in-spatial-measures` | yes | Spatial measures table. |
 | `--bq-in-regions` | yes | Event regions table. |
+| `--bq-in-regions-registry` | yes | Region name → description registry (published by pipe-regions' `publish-registry` command); builds the region struct/schema dynamically instead of hardcoding the region list. |
 | `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
 | `--product-vessel-info-summary-field-prefix` | yes | Prefix for vessel info fields in the PVIS table (e.g. `ais_`). |
 | `--bq-in-vessel-identity-core` | yes | Vessel identity core table. |
@@ -252,6 +254,7 @@ Publishes loitering events for a date range as a versioned table and a view.
 | `--bq-in-segment-info` | yes | Segment info table. |
 | `--bq-in-spatial-measures` | yes | Spatial measures table. |
 | `--bq-in-regions` | yes | Event regions table. |
+| `--bq-in-regions-registry` | yes | Region name → description registry (published by pipe-regions' `publish-registry` command); builds the region struct/schema dynamically instead of hardcoding the region list. |
 | `--bq-in-research-segments` | yes | Research segments table. |
 | `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
 | `--product-vessel-info-summary-field-prefix` | yes | Prefix for vessel info fields in the PVIS table (e.g. `ais_`). |
@@ -274,6 +277,7 @@ Publishes port visit events for a date range as a versioned table and a view.
 | `--product-vessel-info-summary-field-prefix` | yes | Prefix for vessel info fields in the PVIS table (e.g. `ais_`). |
 | `--bq-in-spatial-measures` | yes | Spatial measures table. |
 | `--bq-in-regions` | yes | Event regions table. |
+| `--bq-in-regions-registry` | yes | Region name → description registry (published by pipe-regions' `publish-registry` command); builds the region struct/schema dynamically instead of hardcoding the region list. |
 | `--bq-in-named-anchorages` | yes | Named anchorages table. |
 | `--bq-out-events` | yes | Destination table; the versioned table and view derive from this. |
 | `--labels` | yes | JSON object string applied to the output tables. |
