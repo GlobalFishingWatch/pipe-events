@@ -193,5 +193,6 @@ docker compose run \
   --bq-in-events "$fishing_events_v" \
   --bq-out-events "$product_events_v" \
   --bq-out-events-view "$product_events_view" \
+  --bq-in-regions-registry "$bq_in_regions_registry" \
   --reference-date "$reference_date" \
   --labels "$LABELS"
