@@ -1,7 +1,8 @@
 import json
 import logging
 
-from pipe_events.utils.bigquery import dest_table_description
+from pipe_events.utils.bigquery import dest_table_description, load_schema
+from pipe_events.utils.regions import fetch_regions_registry, with_dynamic_regions_schema
 from pipe_events.utils.validators import valid_date, valid_table
 
 COMMAND = "fishing_events_restrictive"
@@ -31,6 +32,17 @@ def add_arguments(parser):
         required=True,
     )
     parser.add_argument(
+        "--bq-in-regions-registry",
+        dest="regions_registry_table",
+        help=(
+            "Region name -> description registry (published by pipe-regions' "
+            "publish-registry command), used to build the region struct/schema dynamically "
+            "instead of hardcoding the region list."
+        ),
+        type=valid_table,
+        required=True,
+    )
+    parser.add_argument(
         "--reference-date",
         dest="reference_date",
         help="The reference date that has the restrictive fishing events.",
@@ -50,11 +62,13 @@ def run(bq, params):
     ref_date = params['reference_date'].strftime("%Y%m%d")
     params["source_restrictive_events"] += ref_date
     dest = params["dest_restrictive_events"] + ref_date
-    # schama is the same just with fishing strict list
+    # schema is the same just with fishing strict list
     schema_path = "./assets/bigquery/fishing-events-4-authorization-schema.json"
+    regions = fetch_regions_registry(bq, params["regions_registry_table"])
+    schema = with_dynamic_regions_schema(load_schema(schema_path), regions)
     bq.create_table(
         dest,
-        schema_file=schema_path,
+        schema_file=schema,
         table_description=dest_table_description(**params),
         partition_field="event_start",
         clustering_fields=["seg_id", "event_start"],
@@ -71,7 +85,7 @@ def run(bq, params):
         clustering_fields=["seg_id", "event_start"],
         labels=params["labels"],
     )
-    bq.update_table_schema(dest, schema_path)  # schema should be kept after trucate
+    bq.update_table_schema(dest, schema)  # schema should be kept after trucate
     log.info(f"The table {dest} is ready.")
 
     log.info("*** 2. Creates/Updates the view over the restricted table.")
@@ -83,6 +97,6 @@ def run(bq, params):
     )
     bq.update_table_schema(
         params["dest_rest_view"],
-        schema_path
+        schema
     )
     return True

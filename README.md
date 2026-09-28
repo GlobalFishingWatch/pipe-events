@@ -218,6 +218,7 @@ versioned table and a view.
 | `--bq-in-events` | yes | Source (less restrictive) events table; `--reference-date` is appended to resolve the versioned name. |
 | `--bq-out-events` | yes | Destination restrictive events table (versioned by `--reference-date`). |
 | `--bq-out-events-view` | yes | Destination view pointing at the restrictive events table. |
+| `--bq-in-regions-registry` | yes | Region name → description registry (published by pipe-regions' `publish-registry` command); builds the region struct/schema dynamically instead of hardcoding the region list. |
 | `--reference-date` | yes | Reference date (`YYYY-MM-DD`) for the restrictive events; drives the versioned table name. |
 | `--labels` | yes | JSON object string applied to the output tables. |
 
