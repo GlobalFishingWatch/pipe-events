@@ -3,5 +3,7 @@ SELECT
   *
   FROM
     `{{ source_restrictive_events }}`
+{% if not skip_fishing_vessel_filter %}
     WHERE
       json_extract((json_extract_array(event_vessels, '$')[0]), '$.type') = '"fishing"'
+{% endif %}

@@ -50,6 +50,16 @@ def add_arguments(parser):
         required=True,
     )
     parser.add_argument(
+        "--skip-fishing-vessel-filter",
+        dest="skip_fishing_vessel_filter",
+        action="store_true",
+        default=False,
+        help=(
+            "Copy every event instead of only those whose vessel has "
+            "prod_shiptype 'fishing' in the event year."
+        ),
+    )
+    parser.add_argument(
         "--labels",
         help="The labels assigned to each table.",
         type=json.loads,

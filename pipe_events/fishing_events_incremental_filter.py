@@ -77,6 +77,17 @@ def add_arguments(parser):
         default=None,
     )
     parser.add_argument(
+        "--skip-fishing-vessel-filter",
+        dest="skip_fishing_vessel_filter",
+        action="store_true",
+        default=False,
+        help=(
+            "Keep every vessel-year in the PVIS table instead of only the potential "
+            "fishing ones (prod_shiptype, registry geartype, fishing lists). Use it "
+            "when --bq-in-vessel-filter already defines the vessel population."
+        ),
+    )
+    parser.add_argument(
         "--min-event-duration-seconds",
         dest="min_event_duration_seconds",
         help="Minimum fishing event duration.",

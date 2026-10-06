@@ -100,6 +100,18 @@ def add_arguments(parser):
         ),
     )
     parser.add_argument(
+        "--skip-fishing-vessel-filter",
+        dest="skip_fishing_vessel_filter",
+        action="store_true",
+        default=False,
+        help=(
+            "Join events to every vessel-year in the PVIS table instead of only "
+            "the potential fishing ones. Must match the flag passed to "
+            "fishing_events_incremental_filter, or vessel-years kept there are "
+            "dropped here."
+        ),
+    )
+    parser.add_argument(
         "--bq-in-nautical-time-raster",
         dest="nautical_time_raster_table",
         help="Nautical dawn/dusk times by latitude and day of year.",
