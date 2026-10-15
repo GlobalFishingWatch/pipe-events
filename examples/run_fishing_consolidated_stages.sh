@@ -137,8 +137,8 @@ echo "----------------------------------------"
 echo "1. Filtered"
 for score_field in nnet_score night_loitering; do
   case $score_field in
-    nnet_score) merged_in="$bq_in_merged_nnet_score"; filtered_out="$filtered_nnet_score" ;;
-    night_loitering) merged_in="$bq_in_merged_night_loitering"; filtered_out="$filtered_night_loitering" ;;
+    nnet_score) merged_in="$bq_in_merged_nnet_score"; filtered_out="$filtered_nnet_score"; squid_jiggers=() ;;
+    night_loitering) merged_in="$bq_in_merged_night_loitering"; filtered_out="$filtered_night_loitering"; squid_jiggers=(--squid-jiggers) ;;
   esac
   echo "==> fishing_events_incremental_filter ($score_field)"
   docker compose run \
@@ -148,7 +148,7 @@ for score_field in nnet_score night_loitering; do
     --project "$EXECUTION_PROJECT" \
     --table-description "Filtered fishing events based on $score_field" \
     fishing_events_incremental_filter \
-    --score-field "$score_field" \
+    "${squid_jiggers[@]}" \
     --bq-in-udfs-dataset "$bq_in_udfs_dataset" \
     --bq-in-segments-activity "$segs_activity" \
     --bq-in-segment-vessel "$segment_vessel" \

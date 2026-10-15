@@ -39,6 +39,6 @@ Previously, fishing events was split into two steps:
     3. Generate final fishing events which are based on all messages within an event. Apply filters, add `vessel_id` and identity fields, and remove `overlapping_and_short` segments.
 
 
-All 3 steps need to be run twice, once for `nnet_score` and once for `night_loitering`.
+All 3 steps need to be run twice, once for `nnet_score` and once for `night_loitering`. The filter step is told which vessels to keep with `--squid-jiggers`: without it, it drops squid jiggers (the `nnet_score` run); with it, it keeps only squid jiggers (the `night_loitering` run).
 
 2. The former second step of adding authorization and regions information is largely unchanged. However, it now combines `fishing events` and `night loitering events`. Also, a hard coded filter for less retrictive fishing vessels is applied and in the end 

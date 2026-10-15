@@ -12,6 +12,7 @@ def valid_date(s: str) -> datetime.date:
 
 TABLE_REGEX = r"[\w\-_]+\.[\w\-_]+\.[\w\-_]+"
 DATASET_REGEX = r"[\w\-_]+\.[\w\-_]+"
+COLUMN_REGEX = r"[A-Za-z_][A-Za-z0-9_]*"
 
 
 def valid_table(s: str) -> str:
@@ -28,5 +29,15 @@ def valid_dataset(s: str) -> str:
     if matched is None:
         raise argparse.ArgumentTypeError(
             f"not a valid dataset pattern (Format allowed <{DATASET_REGEX}>): {s!r}"
+        )
+    return s
+
+
+def valid_column(s: str) -> str:
+    # Column names are interpolated into the SQL, so only plain identifiers are allowed.
+    matched = re.fullmatch(COLUMN_REGEX, s)
+    if matched is None:
+        raise argparse.ArgumentTypeError(
+            f"not a valid column name (Format allowed <{COLUMN_REGEX}>): {s!r}"
         )
     return s

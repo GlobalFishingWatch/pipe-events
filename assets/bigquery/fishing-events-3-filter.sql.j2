@@ -188,19 +188,12 @@ fishing_event_point AS (
         FROM
             fishing_event_dateline
         WHERE
-        -- if nnet_score_night_loitering is 'nnet_score' then we're excluding squid_jiggers
-        -- this is parameterised to "nnet_score" or "night_loitering" so only one or the other condition can be true
-        ('{{ nnet_score_night_loitering }}' = 'nnet_score'
-        AND NOT best_best_vessel_class = 'squid_jigger'
-        -- all other fishing events must be longer than min_event_distance_m meters
-        AND event_distance_m > {{ min_event_distance_m }})
-        OR
-        -- otherwise we're excluding all other fishing vessels
-        ('{{ nnet_score_night_loitering }}' != 'nnet_score'
-        -- squid jigger fishing events must be longer than min_squid_jigger_event_distance_m meters
-        AND best_best_vessel_class = 'squid_jigger'
-        AND event_distance_m > {{ min_squid_jigger_event_distance_m }}
-        )
+        {% if squid_jiggers %}
+        best_best_vessel_class = 'squid_jigger'
+        {% else %}
+        NOT best_best_vessel_class = 'squid_jigger'
+        {% endif %}
+        AND event_distance_m > {{ min_event_distance_m }}
     )
 
 select *, DATE(event_end) AS event_end_date from complete_fishing_event

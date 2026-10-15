@@ -2,7 +2,7 @@ import json
 import logging
 
 from pipe_events.utils.bigquery import dest_table_description
-from pipe_events.utils.validators import valid_date, valid_table
+from pipe_events.utils.validators import valid_column, valid_date, valid_table
 
 COMMAND = "fishing_events_incremental"
 HELP = "Generates the incremental fishing or night loitering events."
@@ -37,9 +37,13 @@ def add_arguments(parser):
     )
     parser.add_argument(
         "--score-field",
-        dest="nnet_score_night_loitering",
-        help="The field name that has the score to eval.",
-        choices=["nnet_score", "night_loitering"],
+        dest="score_field",
+        help=(
+            "Column of --bq-in-messages holding the score to build events from, e.g. "
+            "nnet_score, night_loitering or longline_setting_score. Events are the "
+            "runs of positions where it equals 1."
+        ),
+        type=valid_column,
         required=True,
     )
     parser.add_argument(
