@@ -1,7 +1,7 @@
 import argparse
 import pytest
 from datetime import date
-from pipe_events.utils.validators import valid_date, valid_dataset, valid_table
+from pipe_events.utils.validators import valid_column, valid_date, valid_dataset, valid_table
 
 
 class TestValidators:
@@ -50,3 +50,12 @@ class TestValidators:
     def test_dataset_valid_rejects_invalid(self, dataset):
         with pytest.raises(argparse.ArgumentTypeError):
             valid_dataset(dataset)
+
+    @pytest.mark.parametrize("column", ["nnet_score", "longline_setting_score", "_x1"])
+    def test_column_valid(self, column):
+        assert column == valid_column(column)
+
+    @pytest.mark.parametrize("column", ["1score", "a.b", "a-b", "a b", "a;", ""])
+    def test_column_valid_rejects_invalid(self, column):
+        with pytest.raises(argparse.ArgumentTypeError):
+            valid_column(column)

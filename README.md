@@ -49,7 +49,9 @@ The CLI exposes seven subcommands that fall into two groups.
 **Incremental fishing events** is a four-step chain. Only the first step is genuinely
 incremental; the rest are transformations that refine its output. The first two steps
 run twice each — once for `nnet_score` and once for `night_loitering` — because at that
-point the vessel's shiptype is not yet known.
+point the vessel's shiptype is not yet known. The filter step keeps the non-squid-jigger
+events of the `nnet_score` run and, with `--squid-jiggers`, only the squid jigger events
+of the `night_loitering` run.
 
 | Subcommand | Output | What it does |
 |---|---|---|
@@ -135,7 +137,7 @@ These options are parsed **before** the subcommand token and apply to every subc
 |---|---|---|
 | `--project` | yes | GCP project id billed for executing the BigQuery work. |
 | `--table-description` | no | Extra text appended to the output table description. Default: empty. |
-| `--dry-run` | no | Print the queries and exit without running them. |
+| `--dry-run` | no | Print the queries and validate them with BigQuery dry runs, without creating, changing or deleting anything. Only read-only metadata lookups run for real. A query that reads a table the run would have created (e.g. on a first run, or the incremental step's session temp table) can't be validated, and is logged as a warning. |
 | `-v`, `--verbose` | no | Verbose output; repeat (`-vv`) for more. |
 | `-q`, `--quiet` | no | Quiet output (errors only). |
 
@@ -164,7 +166,7 @@ field.
 | `--start-date` | yes | Start date of the source messages (`YYYY-MM-DD`). |
 | `--end-date` | yes | End date of the source messages (`YYYY-MM-DD`). |
 | `--bq-in-messages` | yes | Source messages table with fishing / night loitering scores. |
-| `--score-field` | yes | Score field to evaluate: `nnet_score` or `night_loitering`. |
+| `--score-field` | yes | Column of `--bq-in-messages` to build events from, e.g. `nnet_score`, `night_loitering` or `longline_setting_score`. Events are runs of positions where it equals 1. |
 | `--max-fishing-event-gap-hours` | no | Max gap (hours) from the prior day used to reopen potentially open events. Default: `2`. |
 | `--bq-out-merged-events` | yes | Destination merged fishing events table. |
 | `--labels` | yes | JSON object string applied to the output tables. |
@@ -172,7 +174,7 @@ field.
 ### `fishing_events_incremental_filter`
 
 Applies the fishing-event filters to a merged table and writes the `*_filtered` table.
-Run once per score field.
+Run once per score field, with `--squid-jiggers` for the `night_loitering` run.
 
 | Option | Required | Description |
 |---|---|---|
@@ -181,7 +183,8 @@ Run once per score field.
 | `--bq-in-segment-vessel` | yes | Segment vessel table. |
 | `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
 | `--product-vessel-info-summary-field-prefix` | no | Prefix for vessel info fields in the PVIS table (e.g. `ais_`; empty for VMS PVIS). |
-| `--score-field` | yes | Score field to evaluate: `nnet_score` or `night_loitering`. |
+| `--squid-jiggers` | no | Keep only squid jigger events (pass it for `night_loitering`). Without it, squid jigger events are dropped. |
+| `--min-event-distance-meters` | no | Minimum event distance. Default: `500`, or `50` with `--squid-jiggers`. |
 | `--bq-in-udfs-dataset` | yes | Dataset (`project.dataset`) where the shared UDFs live. |
 | `--bq-out-filtered-events` | yes | Destination filtered fishing events table. |
 | `--labels` | yes | JSON object string applied to the output tables. |

@@ -42,7 +42,10 @@ def add_global_arguments(parser):
         "--dry-run",
         dest="test",
         action="store_true",
-        help="Print query and exit; do not run queries.",
+        help=(
+            "Print and validate the queries with BigQuery dry runs; nothing in "
+            "BigQuery is created, changed or deleted."
+        ),
         default=False,
     )
     parser.add_argument(

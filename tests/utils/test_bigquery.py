@@ -81,3 +81,42 @@ class TestUtilsBigQuery:
 
         _, kwargs = bq.client.query.call_args
         assert kwargs["job_config"].dry_run is False
+
+    def _dry_run_helper(self):
+        from pipe_events.utils.bigquery import BigqueryHelper
+        with utm.patch("pipe_events.utils.bigquery.bigquery.Client"):
+            return BigqueryHelper(project="p", dry_run=True)
+
+    def test_dry_run_changes_nothing(self):
+        bq = self._dry_run_helper()
+        schema = [{"name": "event_id", "type": "STRING", "mode": "NULLABLE"}]
+
+        assert bq.begin_session() is None
+        bq.end_session(None)
+        bq.create_table("p.d.t", schema_file=schema, table_description="")
+        bq.create_view("p.d.v", "SELECT 1", "")
+        bq.remove_table("p.d.t")
+        bq.clear_table_partition("p.d.t", "timestamp", "2024-01-01", "2024-01-02")
+        bq.update_table_schema("p.d.t", schema)
+        bq.update_table_description("p.d.t", "")
+        bq.update_labels("p.d.t", {})
+        bq.update_require_partition_filter("p.d.t")
+
+        assert bq.client.mock_calls == []
+
+    def test_dry_run_query_is_only_validated(self):
+        bq = self._dry_run_helper()
+
+        assert bq.run_query("SELECT 1", dest_table="p.d.t") is None
+
+        bq.client.query.assert_called_once()
+        _, kwargs = bq.client.query.call_args
+        assert kwargs["job_config"].dry_run is True
+        bq.client.query.return_value.result.assert_not_called()
+
+    def test_dry_run_query_rejection_does_not_raise(self):
+        from google.api_core.exceptions import NotFound
+        bq = self._dry_run_helper()
+        bq.client.query.side_effect = NotFound("Table p.d.t was not found")
+
+        assert bq.run_query("SELECT * FROM `p.d.t`") is None

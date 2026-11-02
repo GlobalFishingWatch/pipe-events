@@ -59,11 +59,13 @@ def add_arguments(parser):
         ),
     )
     parser.add_argument(
-        "--score-field",
-        dest="nnet_score_night_loitering",
-        help="The field name that has the score to eval.",
-        choices=["nnet_score", "night_loitering"],
-        required=True,
+        "--squid-jiggers",
+        dest="squid_jiggers",
+        help=(
+            "Keep only squid jigger events (night loitering). Without it, squid "
+            "jigger events are dropped and every other vessel class is kept."
+        ),
+        action="store_true",
     )
     parser.add_argument(
         "--bq-in-vessel-filter",
@@ -100,16 +102,13 @@ def add_arguments(parser):
     parser.add_argument(
         "--min-event-distance-meters",
         dest="min_event_distance_m",
-        help="Minimum event distance for non-squid-jigger fishing events.",
+        help=(
+            "Minimum event distance. Defaults to "
+            f"{DEFAULT_MIN_EVENT_DISTANCE_METERS}, or "
+            f"{DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS} with --squid-jiggers."
+        ),
         type=int,
-        default=DEFAULT_MIN_EVENT_DISTANCE_METERS,
-    )
-    parser.add_argument(
-        "--min-squid-jigger-event-distance-meters",
-        dest="min_squid_jigger_event_distance_m",
-        help="Minimum event distance for squid jigger fishing events.",
-        type=int,
-        default=DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS,
+        default=None,
     )
     parser.add_argument(
         "--bq-in-udfs-dataset",
@@ -140,6 +139,14 @@ def add_arguments(parser):
     )
 
 
+def resolve_min_event_distance(params):
+    if params["min_event_distance_m"] is not None:
+        return params["min_event_distance_m"]
+    if params["squid_jiggers"]:
+        return DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS
+    return DEFAULT_MIN_EVENT_DISTANCE_METERS
+
+
 def run(bq, params):
     log = logging.getLogger()
     params_copy = params.copy()
@@ -148,6 +155,7 @@ def run(bq, params):
     log.info("*** 1. Ensures filter table exists.")
     params_copy["filtered_table"] = params["filtered_events"]
     params_copy["product_vessel_info_summary_flag_field"] = resolve_flag_field(params)
+    params_copy["min_event_distance_m"] = resolve_min_event_distance(params)
     bq.create_table(
         params_copy["filtered_table"],
         schema_file=schema_file,

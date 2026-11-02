@@ -2,8 +2,11 @@ import argparse
 import unittest.mock as utm
 from datetime import date
 
+import pytest
+
 from pipe_events import encounter_events, loitering_events, port_visit_events
 from pipe_events import fishing_events_auth_and_regions as auth_and_regions
+from pipe_events import fishing_events_incremental as incremental
 from pipe_events import fishing_events_incremental_filter as incremental_filter
 
 
@@ -235,7 +238,6 @@ class TestFishingFlagField:
         "--bq-in-segment-vessel", "p.d.segvessel",
         "--bq-in-product-vessel-info-summary", "p.d.pvis",
         "--product-vessel-info-summary-field-prefix", "self_reported_",
-        "--score-field", "nnet_score",
         "--bq-in-udfs-dataset", "p.udfs",
         "--bq-out-filtered-events", "p.d.filtered",
         "--bq-in-merged-events", "p.d.merged",
@@ -290,3 +292,55 @@ class TestFishingFlagField:
             "--product-vessel-info-summary-flag-field", "gfw_best_flag",
         ]
         assert self._flag_field(auth_and_regions, argv) == "gfw_best_flag"
+
+
+class TestFishingIncrementalScoreField:
+    ARGS = [
+        "--start-date", "2024-01-01",
+        "--end-date", "2024-01-02",
+        "--bq-in-messages", "p.d.messages",
+        "--bq-out-merged-events", "p.d.merged",
+        "--labels", LABELS_ARG,
+    ]
+
+    def test_accepts_any_column(self):
+        params = _parse(incremental, self.ARGS + ["--score-field", "longline_setting_score"])
+        assert params["score_field"] == "longline_setting_score"
+
+    def test_rejects_non_identifier(self):
+        with pytest.raises(SystemExit):
+            _parse(incremental, self.ARGS + ["--score-field", "nnet_score; DROP"])
+
+
+class TestFishingFilterSquidJiggers:
+    """`--squid-jiggers` picks the vessels kept and the default minimum distance."""
+
+    ARGS = TestFishingFlagField.FILTER_ARGS
+
+    def _params(self, argv):
+        params = _parse(incremental_filter, argv)
+        params["table_description"] = ""
+        bq = utm.MagicMock()
+        assert incremental_filter.run(bq, params) is True
+        _, kwargs = bq.format_query.call_args
+        return kwargs
+
+    def test_defaults_to_excluding_squid_jiggers(self):
+        kwargs = self._params(self.ARGS)
+        assert kwargs["squid_jiggers"] is False
+        assert kwargs["min_event_distance_m"] == (
+            incremental_filter.DEFAULT_MIN_EVENT_DISTANCE_METERS
+        )
+
+    def test_squid_jiggers_uses_squid_jigger_distance(self):
+        kwargs = self._params(self.ARGS + ["--squid-jiggers"])
+        assert kwargs["squid_jiggers"] is True
+        assert kwargs["min_event_distance_m"] == (
+            incremental_filter.DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS
+        )
+
+    def test_explicit_distance_overrides_default(self):
+        kwargs = self._params(
+            self.ARGS + ["--squid-jiggers", "--min-event-distance-meters", "123"]
+        )
+        assert kwargs["min_event_distance_m"] == 123

@@ -33,7 +33,7 @@ WITH
             meters_to_prev, --meters to previous position in segment
             implied_speed_knots, --meters_to_prev / hours
             hours, --time since the previous position in the segment
-            {{ nnet_score_night_loitering }} score
+            {{ score_field }} score
         FROM
             source_research_messages
         WHERE

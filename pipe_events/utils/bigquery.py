@@ -10,6 +10,7 @@ from jinja2 import Environment
 from jinja2 import FileSystemLoader
 from jinja2 import StrictUndefined
 import json
+from google.api_core.exceptions import GoogleAPICallError
 from google.cloud.exceptions import Conflict
 
 
@@ -59,18 +60,32 @@ def load_schema(schema_file):
 
 
 class BigqueryHelper:
+    """Thin wrapper over the BigQuery client.
+
+    With `dry_run`, nothing in BigQuery is changed: every method that would create,
+    update or delete a table, view, partition or session only logs what it would have
+    done, and `run_query` validates each query with a BigQuery dry run instead of
+    running it. Read-only metadata lookups (`fetch_rows`) still run for real.
+    """
+
     def __init__(self, project=None, logger=None, dry_run=False):
         self.log = logger or logging.getLogger(__name__)
         self.dry_run = dry_run
         self.client = bigquery.Client(project=project)
 
+    def _skip_under_dry_run(self, action):
+        if self.dry_run:
+            self.log.info(f"DRY RUN: skipping {action}")
+        return self.dry_run
+
     def format_query(self, template_file, **params):
         return format_query(template_file, **params)
 
     def begin_session(self, labels={}):
-        config = bigquery.QueryJobConfig(
-            create_session=True, dry_run=self.dry_run, labels=labels
-        )
+        # A dry-run job can't create a session, so under dry run the queries run without one.
+        if self._skip_under_dry_run("starting a bigquery session"):
+            return None
+        config = bigquery.QueryJobConfig(create_session=True, labels=labels)
         self.log.info("Starting bigquery session")
         job = self.client.query("SELECT 1", job_config=config)
         session_id = job.session_info.session_id
@@ -78,13 +93,10 @@ class BigqueryHelper:
         return session_id
 
     def end_session(self, session_id):
-        config = bigquery.QueryJobConfig(
-            dry_run=self.dry_run,
-        )
+        if self._skip_under_dry_run(f"terminating bigquery session {session_id}"):
+            return None
         self.log.info(f"Terminating bigquery session {session_id}")
-        job = self.client.query(
-            f"CALL BQ.ABORT_SESSION('{session_id}')", job_config=config
-        )
+        job = self.client.query(f"CALL BQ.ABORT_SESSION('{session_id}')")
         return job.result()
 
     def fetch_rows(self, query):
@@ -124,6 +136,8 @@ class BigqueryHelper:
         :parma labels: labels to audit the table.
         :return: A new google.cloud.bigquery.table.Table
         """
+        if self._skip_under_dry_run(f"creating or updating view {view_id}"):
+            return None
         table_ref = self.table_ref(view_id)
 
         # Create BQ table object
@@ -167,6 +181,8 @@ class BigqueryHelper:
         :param labels: labels to audit the table.
         :return: A new google.cloud.bigquery.table.Table
         """
+        if self._skip_under_dry_run(f"creating table {full_table_name}"):
+            return None
 
         # load schema
         schema = load_schema(schema_file)
@@ -195,6 +211,8 @@ class BigqueryHelper:
 
     def remove_table(self, table):
         """Delete a table if it exists (no-op when it does not)."""
+        if self._skip_under_dry_run(f"removing table {table}"):
+            return
         self.client.delete_table(self.table_ref(table), not_found_ok=True)
         self.log.info(f"Removed table {table}")
 
@@ -215,6 +233,11 @@ class BigqueryHelper:
 
         partition_date_start = as_date_str(partition_date_start)
         partition_date_end = as_date_str(partition_date_end)
+        if self._skip_under_dry_run(
+            f"clearing partitions {partition_date_start}-{partition_date_end} "
+            f"of {full_table_name}"
+        ):
+            return
 
         # Clear data for query date before running query
         d_q = (f"DELETE FROM `{full_table_name}` "
@@ -236,21 +259,29 @@ class BigqueryHelper:
             job.result()
 
     def update_table_schema(self, table, schema_file):
+        if self._skip_under_dry_run(f"updating the schema of {table}"):
+            return
         table = self.client.get_table(self.table_ref(table))  # API request
         table.schema = load_schema(schema_file)
         table = self.client.update_table(table, ["schema"])  # API request
 
     def update_table_description(self, table, description):
+        if self._skip_under_dry_run(f"updating the description of {table}"):
+            return
         table = self.client.get_table(self.table_ref(table))  # API request
         table.description = description
         table = self.client.update_table(table, ["description"])  # API request
 
     def update_labels(self, table, labels):
+        if self._skip_under_dry_run(f"updating the labels of {table}"):
+            return
         table = self.client.get_table(self.table_ref(table))  # API request
         table.labels = labels
         table = self.client.update_table(table, ["labels"])  # API request
 
     def update_require_partition_filter(self, table):
+        if self._skip_under_dry_run(f"requiring a partition filter on {table}"):
+            return
         table = self.client.get_table(self.table_ref(table))  # API request
         table.require_partition_filter = True
         table = self.client.update_table(
@@ -335,9 +366,10 @@ class BigqueryHelper:
                 connection_properties=connection_properties,
                 labels=labels,
             )
-        job = self.client.query(query, job_config=config)
         if self.dry_run:
-            self.log.info("\n*** DRY RUN ***\n")
+            return self._dry_run_query(query, config)
+
+        job = self.client.query(query, job_config=config)
         self.log.info(f"Bigquery job created: {job.created:%Y-%m-%d %H:%M:%S}")
         self.log.info(f"job_id: {job.job_id}")
         self.log.debug("Running...")
@@ -370,12 +402,30 @@ class BigqueryHelper:
             self.dump_query(job.query)
         self.log.info("Bigquery job done.")
 
-        if job.dry_run:
-            self.dump_query(job.query)
-        elif job.error_result:
+        if job.error_result:
             err = job.error_result["reason"]
             msg = job.error_result["message"]
             raise RuntimeError(f"{err}: {msg}")
         else:
             self.log_job_stats(job)
         return job.result()
+
+    def _dry_run_query(self, query, config):
+        """Validates `query` with a BigQuery dry run and logs it; nothing is executed.
+
+        A rejection is logged instead of raised: it's expected whenever the query needs
+        something this same run would have created first, e.g. a destination table on a
+        first run, or the session and its temp tables, all skipped under dry run.
+        """
+        self.log.info("\n*** DRY RUN ***\n")
+        self.dump_query(query)
+        try:
+            job = self.client.query(query, job_config=config)
+        except GoogleAPICallError as e:
+            self.log.warning(
+                f"DRY RUN: BigQuery rejected the query (expected if it needs a table "
+                f"or session this run would have created): {e}"
+            )
+            return None
+        self.log.info(f"DRY RUN: query is valid, would process {job.total_bytes_processed} bytes")
+        return None
