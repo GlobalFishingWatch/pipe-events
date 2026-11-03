@@ -92,14 +92,15 @@ class BigqueryHelper:
         self.log.info(f"Bigquery session started {session_id}")
         return session_id
 
-    def end_session(self, session_id):
+    def end_session(self, session_id, labels={}):
         if self._skip_under_dry_run(f"terminating bigquery session {session_id}"):
             return None
+        config = bigquery.QueryJobConfig(labels=labels)
         self.log.info(f"Terminating bigquery session {session_id}")
-        job = self.client.query(f"CALL BQ.ABORT_SESSION('{session_id}')")
+        job = self.client.query(f"CALL BQ.ABORT_SESSION('{session_id}')", job_config=config)
         return job.result()
 
-    def fetch_rows(self, query):
+    def fetch_rows(self, query, labels={}):
         """Runs a read-only query and returns its rows.
 
         Lighter than `run_query`: no destination table/write disposition, and none of its
@@ -111,7 +112,7 @@ class BigqueryHelper:
         expensive/destructive operation `--dry-run` is meant to skip. Under `--dry-run`, a
         dry-run job never returns rows, which would silently starve the caller.
         """
-        config = bigquery.QueryJobConfig(dry_run=False)
+        config = bigquery.QueryJobConfig(dry_run=False, labels=labels)
         job = self.client.query(query, job_config=config)
         return job.result()
 

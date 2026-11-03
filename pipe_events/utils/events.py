@@ -54,7 +54,7 @@ def publish_versioned_events(
     )
 
     log.info(f"Truncating existing records in {current}")
-    bq.run_query(bq.format_query("truncate-table.sql.j2", table=current))
+    bq.run_query(bq.format_query("truncate-table.sql.j2", table=current), labels=labels)
 
     log.info(f"Inserting new records into {current} using {sql_template}")
     insert_query = bq.format_query(sql_template, **template_params)

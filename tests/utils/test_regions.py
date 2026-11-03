@@ -15,6 +15,13 @@ class TestFetchRegionsRegistry:
         assert "p.d.registry" in query
         assert result == [{"name": "eez", "description": "Exclusive Economic Zones."}]
 
+    def test_passes_labels_to_the_query(self):
+        bq = utm.MagicMock()
+
+        regions.fetch_regions_registry(bq, "p.d.registry", {"step": "generate_events"})
+
+        assert bq.fetch_rows.call_args.kwargs["labels"] == {"step": "generate_events"}
+
 
 class TestRegionsMeanPositionFields:
     def test_builds_one_repeated_string_field_per_region(self):

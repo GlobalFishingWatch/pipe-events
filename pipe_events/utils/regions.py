@@ -11,10 +11,10 @@ a newly registered region shows up here without a pipe-events code change.
 import copy
 
 
-def fetch_regions_registry(bq, bq_in_regions_registry):
+def fetch_regions_registry(bq, bq_in_regions_registry, labels={}):
     """Reads pipe-regions' ``(name, description)`` registry table."""
     query = f"SELECT name, description FROM `{bq_in_regions_registry}` ORDER BY name"
-    return [dict(row) for row in bq.fetch_rows(query)]
+    return [dict(row) for row in bq.fetch_rows(query, labels=labels)]
 
 
 def regions_mean_position_fields(regions):

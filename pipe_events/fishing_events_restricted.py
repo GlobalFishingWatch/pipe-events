@@ -64,7 +64,7 @@ def run(bq, params):
     dest = params["dest_restrictive_events"] + ref_date
     # schema is the same just with fishing strict list
     schema_path = "./assets/bigquery/fishing-events-4-authorization-schema.json"
-    regions = fetch_regions_registry(bq, params["regions_registry_table"])
+    regions = fetch_regions_registry(bq, params["regions_registry_table"], params["labels"])
     schema = with_dynamic_regions_schema(load_schema(schema_path), regions)
     bq.create_table(
         dest,

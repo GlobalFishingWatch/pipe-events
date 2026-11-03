@@ -82,6 +82,27 @@ class TestUtilsBigQuery:
         _, kwargs = bq.client.query.call_args
         assert kwargs["job_config"].dry_run is False
 
+    def test_fetch_rows_sets_labels(self):
+        from pipe_events.utils.bigquery import BigqueryHelper
+        with utm.patch("pipe_events.utils.bigquery.bigquery.Client"):
+            bq = BigqueryHelper(project="p")
+
+        bq.fetch_rows("SELECT 1", labels={"step": "generate_events"})
+
+        _, kwargs = bq.client.query.call_args
+        assert kwargs["job_config"].labels == {"step": "generate_events"}
+
+    def test_end_session_sets_labels(self):
+        from pipe_events.utils.bigquery import BigqueryHelper
+        with utm.patch("pipe_events.utils.bigquery.bigquery.Client"):
+            bq = BigqueryHelper(project="p")
+
+        bq.end_session("s1", labels={"step": "generate_events"})
+
+        args, kwargs = bq.client.query.call_args
+        assert args[0] == "CALL BQ.ABORT_SESSION('s1')"
+        assert kwargs["job_config"].labels == {"step": "generate_events"}
+
     def _dry_run_helper(self):
         from pipe_events.utils.bigquery import BigqueryHelper
         with utm.patch("pipe_events.utils.bigquery.bigquery.Client"):
