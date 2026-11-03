@@ -146,8 +146,8 @@ for score_field in nnet_score night_loitering; do
     --entrypoint pipe-events pipeline \
     -v \
     --project "$EXECUTION_PROJECT" \
-    --table-description "Filtered fishing events based on $score_field" \
     fishing_events_incremental_filter \
+    --table-description "Filtered fishing events based on $score_field" \
     "${vessel_args[@]}" \
     --bq-in-udfs-dataset "$bq_in_udfs_dataset" \
     --bq-in-segments-activity "$segs_activity" \
@@ -165,8 +165,8 @@ docker compose run \
   --entrypoint pipe-events pipeline \
   -v \
   --project "$EXECUTION_PROJECT" \
-  --table-description "Fishing events with authorizations" \
   fishing_events_auth_and_regions \
+  --table-description "Fishing events with authorizations" \
   --bq-in-udfs-dataset "$bq_in_udfs_dataset" \
   --bq-in-fishing-events "$filtered_nnet_score" \
   --bq-in-night-loitering-events "$filtered_night_loitering" \
@@ -188,8 +188,8 @@ docker compose run \
   --entrypoint pipe-events pipeline \
   -v \
   --project "$EXECUTION_PROJECT" \
-  --table-description "Restrictive fishing events used in products" \
   fishing_events_restrictive \
+  --table-description "Restrictive fishing events used in products" \
   --bq-in-events "$fishing_events_v" \
   --bq-out-events "$product_events_v" \
   --bq-out-events-view "$product_events_view" \

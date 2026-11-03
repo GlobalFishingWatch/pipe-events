@@ -136,24 +136,34 @@ These options are parsed **before** the subcommand token and apply to every subc
 | Option | Required | Description |
 |---|---|---|
 | `--project` | yes | GCP project id billed for executing the BigQuery work. |
-| `--table-description` | no | Extra text appended to the output table description. Default: empty. |
 | `--dry-run` | no | Print the queries and validate them with BigQuery dry runs, without creating, changing or deleting anything. Only read-only metadata lookups run for real. A query that reads a table the run would have created (e.g. on a first run, or the incremental step's session temp table) can't be validated, and is logged as a warning. |
 | `-v`, `--verbose` | no | Verbose output; repeat (`-vv`) for more. |
 | `-q`, `--quiet` | no | Quiet output (errors only). |
+
+### Common command options
+
+These options are parsed **after** the subcommand token and are accepted by every
+subcommand:
+
+| Option | Required | Description |
+|---|---|---|
+| `--table-description` | no | Extra text appended to the output table description. Default: empty. |
 
 A full invocation therefore looks like:
 
 ```shell
 docker compose run --rm --entrypoint pipe-events pipeline \
-  -v --project world-fishing-827 --table-description "Incremental fishing events" \
-  fishing_events_incremental --start-date 2020-01-01 --end-date 2020-01-10 ...
+  -v --project world-fishing-827 \
+  fishing_events_incremental --table-description "Incremental fishing events" \
+  --start-date 2020-01-01 --end-date 2020-01-10 ...
 ```
 
 ## CLI reference
 
 Every table option takes a **fully-qualified** `project.dataset.table` value, and
 `--bq-in-udfs-dataset` takes a `project.dataset`. All subcommand options below are
-required unless noted; the [global options](#global-options) above are additional.
+required unless noted; the [global options](#global-options) and
+[common command options](#common-command-options) above are additional.
 
 ### `fishing_events_incremental`
 

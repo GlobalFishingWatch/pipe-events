@@ -109,8 +109,8 @@ docker compose run \
   --entrypoint pipe-events pipeline \
   -v \
   --project "$EXECUTION_PROJECT" \
-  --table-description "Encounter events" \
   encounter_events \
+  --table-description "Encounter events" \
   --start-date "$start_date" \
   --end-date "$end_date" \
   --bq-in-encounters "$bq_in_encounters" \

@@ -75,8 +75,8 @@ for score_field in nnet_score night_loitering; do
     --entrypoint pipe-events pipeline \
     -v \
     --project "$EXECUTION_PROJECT" \
-    --table-description "Incremental fishing events based on $score_field" \
     fishing_events_incremental \
+    --table-description "Incremental fishing events based on $score_field" \
     --start-date "$start_date" \
     --end-date "$end_date" \
     --bq-in-messages "$bq_in_messages" \

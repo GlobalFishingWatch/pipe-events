@@ -50,6 +50,38 @@ class TestCli:
             assert result is not None
             assert result is False
 
+    FILTER_ARGV = [
+        "fishing_events_incremental_filter",
+        "--bq-in-segments-activity", "p.d.segsact",
+        "--bq-in-segment-vessel", "p.d.segvessel",
+        "--bq-in-product-vessel-info-summary", "p.d.pvis",
+        "--product-vessel-info-summary-field-prefix", "ais_",
+        "--bq-in-udfs-dataset", "p.udfs",
+        "--bq-out-filtered-events", "p.d.filtered",
+        "--bq-in-merged-events", "p.d.merged",
+        "--exclude-geartype", "squid_jigger",
+        "--labels", "{}",
+    ]
+
+    def test_table_description_after_subcommand(self):
+        from pipe_events.cli import build_parser
+        args = build_parser().parse_args(
+            ["--project", "p"] + self.FILTER_ARGV + ["--table-description", "Filtered"]
+        )
+        assert args.table_description == "Filtered"
+
+    def test_table_description_defaults_to_empty(self):
+        from pipe_events.cli import build_parser
+        args = build_parser().parse_args(["--project", "p"] + self.FILTER_ARGV)
+        assert args.table_description == ""
+
+    def test_table_description_rejected_before_subcommand(self):
+        from pipe_events.cli import build_parser
+        with pytest.raises(SystemExit):
+            build_parser().parse_args(
+                ["--project", "p", "--table-description", "Filtered"] + self.FILTER_ARGV
+            )
+
     def test_unknown_operation_main(self):
         import pipe_events.cli as cli
         with pytest.raises(SystemExit) as err:

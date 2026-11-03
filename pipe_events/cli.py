@@ -71,6 +71,14 @@ def add_global_arguments(parser):
         help="GCP project id",
         required=True,
     )
+
+
+def add_common_command_arguments(parser):
+    """Arguments every subcommand accepts (parsed after the subcommand token).
+
+    Unlike the global arguments, these describe one task's output, so they vary
+    between invocations that share the same global arguments.
+    """
     parser.add_argument(
         "--table-description",
         type=str,
@@ -88,6 +96,7 @@ def build_parser():
     subparsers = parser.add_subparsers(dest="operation", required=True)
     for module in COMMAND_MODULES:
         subparser = subparsers.add_parser(module.COMMAND, help=module.HELP)
+        add_common_command_arguments(subparser)
         module.add_arguments(subparser)
 
     return parser

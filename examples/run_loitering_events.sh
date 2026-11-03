@@ -123,8 +123,8 @@ docker compose run \
   --entrypoint pipe-events pipeline \
   -v \
   --project "$EXECUTION_PROJECT" \
-  --table-description "Loitering events" \
   loitering_events \
+  --table-description "Loitering events" \
   --start-date "$start_date" \
   --end-date "$end_date" \
   --bq-in-loitering "$bq_in_loitering" \
