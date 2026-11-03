@@ -13,6 +13,8 @@ def valid_date(s: str) -> datetime.date:
 TABLE_REGEX = r"[\w\-_]+\.[\w\-_]+\.[\w\-_]+"
 DATASET_REGEX = r"[\w\-_]+\.[\w\-_]+"
 COLUMN_REGEX = r"[A-Za-z_][A-Za-z0-9_]*"
+# PVIS gear types are lowercase snake_case, with `|` joining compound classes.
+GEARTYPE_REGEX = r"[a-z0-9_]+(\|[a-z0-9_]+)*"
 
 
 def valid_table(s: str) -> str:
@@ -39,5 +41,15 @@ def valid_column(s: str) -> str:
     if matched is None:
         raise argparse.ArgumentTypeError(
             f"not a valid column name (Format allowed <{COLUMN_REGEX}>): {s!r}"
+        )
+    return s
+
+
+def valid_geartype(s: str) -> str:
+    # Interpolated into the SQL as a string literal, so quotes and the like are refused.
+    matched = re.fullmatch(GEARTYPE_REGEX, s)
+    if matched is None:
+        raise argparse.ArgumentTypeError(
+            f"not a valid gear type (Format allowed <{GEARTYPE_REGEX}>): {s!r}"
         )
     return s

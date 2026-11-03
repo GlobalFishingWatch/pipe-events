@@ -50,8 +50,8 @@ The CLI exposes seven subcommands that fall into two groups.
 incremental; the rest are transformations that refine its output. The first two steps
 run twice each — once for `nnet_score` and once for `night_loitering` — because at that
 point the vessel's shiptype is not yet known. The filter step keeps the non-squid-jigger
-events of the `nnet_score` run and, with `--squid-jiggers`, only the squid jigger events
-of the `night_loitering` run.
+events of the `nnet_score` run (`--exclude-geartype squid_jigger`) and only the squid
+jigger events of the `night_loitering` run (`--include-geartype squid_jigger`).
 
 | Subcommand | Output | What it does |
 |---|---|---|
@@ -174,7 +174,9 @@ field.
 ### `fishing_events_incremental_filter`
 
 Applies the fishing-event filters to a merged table and writes the `*_filtered` table.
-Run once per score field, with `--squid-jiggers` for the `night_loitering` run.
+Run once per score field: `--exclude-geartype squid_jigger` for the `nnet_score` run,
+and `--include-geartype squid_jigger --min-event-distance-meters 50` for the
+`night_loitering` run.
 
 | Option | Required | Description |
 |---|---|---|
@@ -183,8 +185,9 @@ Run once per score field, with `--squid-jiggers` for the `night_loitering` run.
 | `--bq-in-segment-vessel` | yes | Segment vessel table. |
 | `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
 | `--product-vessel-info-summary-field-prefix` | no | Prefix for vessel info fields in the PVIS table (e.g. `ais_`; empty for VMS PVIS). |
-| `--squid-jiggers` | no | Keep only squid jigger events (pass it for `night_loitering`). Without it, squid jigger events are dropped. |
-| `--min-event-distance-meters` | no | Minimum event distance. Default: `500`, or `50` with `--squid-jiggers`. |
+| `--include-geartype` | one of the two | Keep only events of vessels whose PVIS `prod_geartype` for the event year is this value (e.g. `squid_jigger`, `drifting_longlines`). |
+| `--exclude-geartype` | one of the two | Drop events of vessels whose PVIS `prod_geartype` for the event year is this value, keeping every other gear type (e.g. `squid_jigger`). |
+| `--min-event-distance-meters` | no | Minimum event distance. Default: `500`. |
 | `--bq-in-udfs-dataset` | yes | Dataset (`project.dataset`) where the shared UDFs live. |
 | `--bq-out-filtered-events` | yes | Destination filtered fishing events table. |
 | `--labels` | yes | JSON object string applied to the output tables. |
