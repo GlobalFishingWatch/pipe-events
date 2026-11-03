@@ -160,7 +160,7 @@ def run(bq, params):
     dest = params["destination"] + params['reference_date']
     schema_path = "./assets/bigquery/fishing-events-4-authorization-schema.json"
 
-    regions = fetch_regions_registry(bq, params["regions_registry_table"])
+    regions = fetch_regions_registry(bq, params["regions_registry_table"], params["labels"])
     params["regions"] = [region["name"] for region in regions]
     schema = with_dynamic_regions_schema(load_schema(schema_path), regions)
 

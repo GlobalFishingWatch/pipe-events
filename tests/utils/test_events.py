@@ -57,12 +57,14 @@ class TestPublishVersionedEvents:
             partition_field="event_start",
             labels={"step": "generate_events"},
         )
-        # truncate query is rendered and run without a destination
+        # truncate query is rendered and run without a destination, but with labels
         bq.format_query.assert_any_call("truncate-table.sql.j2", table=current)
         bq.format_query.assert_any_call(
             "encounter-events.sql.j2", encounters_table="p.d.enc"
         )
-        bq.run_query.assert_any_call("SQL:truncate-table.sql.j2")
+        bq.run_query.assert_any_call(
+            "SQL:truncate-table.sql.j2", labels={"step": "generate_events"}
+        )
         bq.run_query.assert_any_call(
             "SQL:encounter-events.sql.j2",
             dest_table=current,

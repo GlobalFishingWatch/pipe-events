@@ -116,7 +116,7 @@ def run(bq, params):
     )
     incremental_query = bq.format_query("fishing-events-1-incremental.sql.j2", **params)
     query = run_incremental_fishing_events_query(temp_table, incremental_query)
-    bq.run_query(query, session_id=session_id)
+    bq.run_query(query, session_id=session_id, labels=params["labels"])
 
     log.info("*** 2. Ensure the merge table already exists or create it.")
     params_copy = params.copy()
@@ -140,7 +140,7 @@ def run(bq, params):
         start_date=params["start_date"],
     )
 
-    bq.run_query(truncation_query, session_id=session_id)
+    bq.run_query(truncation_query, session_id=session_id, labels=params["labels"])
 
     log.info("*** 3. Merges the temp table with the merged table.")
     params_copy["merged_table"] = params_copy["existing_merged_fishing_events"]
@@ -149,7 +149,8 @@ def run(bq, params):
         "fishing-events-2b-merge.sql.j2", **params_copy
     )
     merge_query = bq.format_query("fishing-events-2c-merge-into.sql.j2", **params_copy)
-    bq.run_query(merge_query, session_id=session_id)
-    bq.end_session(session_id)  # required to use destination in QueryJobConfig then
+    bq.run_query(merge_query, session_id=session_id, labels=params["labels"])
+    # required to use destination in QueryJobConfig then
+    bq.end_session(session_id, params["labels"])
 
     return True

@@ -141,7 +141,7 @@ def add_arguments(parser):
 
 
 def run(bq, params):
-    regions = fetch_regions_registry(bq, params["regions_registry_table"])
+    regions = fetch_regions_registry(bq, params["regions_registry_table"], params["labels"])
     template_params = {
         "start_date": params["start_date"].strftime("%Y-%m-%d"),
         "source_loitering": params["source_loitering"],
