@@ -233,7 +233,7 @@ class TestFishingFlagField:
     look at what reached `format_query`.
     """
 
-    FILTER_ARGS = [
+    FILTER_BASE_ARGS = [
         "--bq-in-segments-activity", "p.d.segsact",
         "--bq-in-segment-vessel", "p.d.segvessel",
         "--bq-in-product-vessel-info-summary", "p.d.pvis",
@@ -243,6 +243,7 @@ class TestFishingFlagField:
         "--bq-in-merged-events", "p.d.merged",
         "--labels", LABELS_ARG,
     ]
+    FILTER_ARGS = FILTER_BASE_ARGS + ["--exclude-geartype", "squid_jigger"]
 
     AUTH_ARGS = [
         "--bq-in-fishing-events", "p.d.fishing",
@@ -312,10 +313,10 @@ class TestFishingIncrementalScoreField:
             _parse(incremental, self.ARGS + ["--score-field", "nnet_score; DROP"])
 
 
-class TestFishingFilterSquidJiggers:
-    """`--squid-jiggers` picks the vessels kept and the default minimum distance."""
+class TestFishingFilterGeartype:
+    """Exactly one of `--include-geartype`/`--exclude-geartype` picks the vessels kept."""
 
-    ARGS = TestFishingFlagField.FILTER_ARGS
+    ARGS = TestFishingFlagField.FILTER_BASE_ARGS
 
     def _params(self, argv):
         params = _parse(incremental_filter, argv)
@@ -325,22 +326,45 @@ class TestFishingFilterSquidJiggers:
         _, kwargs = bq.format_query.call_args
         return kwargs
 
-    def test_defaults_to_excluding_squid_jiggers(self):
-        kwargs = self._params(self.ARGS)
-        assert kwargs["squid_jiggers"] is False
+    def test_include(self):
+        kwargs = self._params(self.ARGS + ["--include-geartype", "drifting_longlines"])
+        assert kwargs["include_geartype"] == "drifting_longlines"
+        assert kwargs["exclude_geartype"] is None
+
+    def test_exclude(self):
+        kwargs = self._params(self.ARGS + ["--exclude-geartype", "squid_jigger"])
+        assert kwargs["include_geartype"] is None
+        assert kwargs["exclude_geartype"] == "squid_jigger"
+
+    def test_requires_one(self):
+        with pytest.raises(SystemExit):
+            _parse(incremental_filter, self.ARGS)
+
+    def test_rejects_both(self):
+        with pytest.raises(SystemExit):
+            _parse(
+                incremental_filter,
+                self.ARGS + [
+                    "--include-geartype", "squid_jigger",
+                    "--exclude-geartype", "squid_jigger",
+                ],
+            )
+
+    def test_rejects_invalid_geartype(self):
+        with pytest.raises(SystemExit):
+            _parse(incremental_filter, self.ARGS + ["--include-geartype", "x' OR '1"])
+
+    def test_min_distance_default_ignores_geartype(self):
+        kwargs = self._params(self.ARGS + ["--include-geartype", "squid_jigger"])
         assert kwargs["min_event_distance_m"] == (
             incremental_filter.DEFAULT_MIN_EVENT_DISTANCE_METERS
         )
 
-    def test_squid_jiggers_uses_squid_jigger_distance(self):
-        kwargs = self._params(self.ARGS + ["--squid-jiggers"])
-        assert kwargs["squid_jiggers"] is True
-        assert kwargs["min_event_distance_m"] == (
-            incremental_filter.DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS
-        )
-
-    def test_explicit_distance_overrides_default(self):
+    def test_explicit_min_distance(self):
         kwargs = self._params(
-            self.ARGS + ["--squid-jiggers", "--min-event-distance-meters", "123"]
+            self.ARGS + [
+                "--include-geartype", "squid_jigger",
+                "--min-event-distance-meters", "50",
+            ]
         )
-        assert kwargs["min_event_distance_m"] == 123
+        assert kwargs["min_event_distance_m"] == 50

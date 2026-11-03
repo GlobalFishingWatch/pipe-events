@@ -3,7 +3,7 @@ import logging
 
 from pipe_events.utils.bigquery import dest_table_description
 from pipe_events.utils.pvis import resolve_flag_field
-from pipe_events.utils.validators import valid_dataset, valid_table
+from pipe_events.utils.validators import valid_dataset, valid_geartype, valid_table
 
 COMMAND = "fishing_events_incremental_filter"
 HELP = "Takes the incremental fishing or night loitering events and apply filters."
@@ -12,7 +12,6 @@ DEFAULT_MIN_EVENT_DURATION_SECONDS = 1200
 DEFAULT_MIN_EVENT_POSITIONS = 5
 DEFAULT_MAX_AVERAGE_SPEED_KNOTS = 10
 DEFAULT_MIN_EVENT_DISTANCE_METERS = 500
-DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS = 50
 
 
 def add_arguments(parser):
@@ -58,25 +57,24 @@ def add_arguments(parser):
             "'<field-prefix>mmsi_flag'; VMS pipelines pass 'gfw_best_flag'."
         ),
     )
-    parser.add_argument(
-        "--squid-jiggers",
-        dest="squid_jiggers",
+    geartype = parser.add_mutually_exclusive_group(required=True)
+    geartype.add_argument(
+        "--include-geartype",
+        dest="include_geartype",
         help=(
-            "Keep only squid jigger events (night loitering). Without it, squid "
-            "jigger events are dropped and every other vessel class is kept."
+            "Keep only events of vessels whose PVIS prod_geartype for the event "
+            "year is this value, e.g. squid_jigger or drifting_longlines."
         ),
-        action="store_true",
+        type=valid_geartype,
     )
-    parser.add_argument(
-        "--bq-in-vessel-filter",
-        dest="vessel_filter_table",
+    geartype.add_argument(
+        "--exclude-geartype",
+        dest="exclude_geartype",
         help=(
-            "Table of ssvids to restrict events to, applied on top of the usual "
-            "vessel filters rather than instead of them. Omit to generate events "
-            "for every vessel."
+            "Drop events of vessels whose PVIS prod_geartype for the event year "
+            "is this value, keeping every other gear type, e.g. squid_jigger."
         ),
-        type=valid_table,
-        default=None,
+        type=valid_geartype,
     )
     parser.add_argument(
         "--min-event-duration-seconds",
@@ -102,13 +100,9 @@ def add_arguments(parser):
     parser.add_argument(
         "--min-event-distance-meters",
         dest="min_event_distance_m",
-        help=(
-            "Minimum event distance. Defaults to "
-            f"{DEFAULT_MIN_EVENT_DISTANCE_METERS}, or "
-            f"{DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS} with --squid-jiggers."
-        ),
+        help="Minimum event distance.",
         type=int,
-        default=None,
+        default=DEFAULT_MIN_EVENT_DISTANCE_METERS,
     )
     parser.add_argument(
         "--bq-in-udfs-dataset",
@@ -139,14 +133,6 @@ def add_arguments(parser):
     )
 
 
-def resolve_min_event_distance(params):
-    if params["min_event_distance_m"] is not None:
-        return params["min_event_distance_m"]
-    if params["squid_jiggers"]:
-        return DEFAULT_MIN_SQUID_JIGGER_EVENT_DISTANCE_METERS
-    return DEFAULT_MIN_EVENT_DISTANCE_METERS
-
-
 def run(bq, params):
     log = logging.getLogger()
     params_copy = params.copy()
@@ -155,7 +141,6 @@ def run(bq, params):
     log.info("*** 1. Ensures filter table exists.")
     params_copy["filtered_table"] = params["filtered_events"]
     params_copy["product_vessel_info_summary_flag_field"] = resolve_flag_field(params)
-    params_copy["min_event_distance_m"] = resolve_min_event_distance(params)
     bq.create_table(
         params_copy["filtered_table"],
         schema_file=schema_file,

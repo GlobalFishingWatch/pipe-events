@@ -102,8 +102,8 @@ docker compose run \
   --entrypoint pipe-events pipeline \
   -v \
   --project "$EXECUTION_PROJECT" \
-  --table-description "Port visit events" \
   port_visit_events \
+  --table-description "Port visit events" \
   --start-date "$start_date" \
   --end-date "$end_date" \
   --bq-in-port-visits "$bq_in_port_visits" \

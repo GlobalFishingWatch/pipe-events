@@ -50,8 +50,8 @@ The CLI exposes seven subcommands that fall into two groups.
 incremental; the rest are transformations that refine its output. The first two steps
 run twice each — once for `nnet_score` and once for `night_loitering` — because at that
 point the vessel's shiptype is not yet known. The filter step keeps the non-squid-jigger
-events of the `nnet_score` run and, with `--squid-jiggers`, only the squid jigger events
-of the `night_loitering` run.
+events of the `nnet_score` run (`--exclude-geartype squid_jigger`) and only the squid
+jigger events of the `night_loitering` run (`--include-geartype squid_jigger`).
 
 | Subcommand | Output | What it does |
 |---|---|---|
@@ -136,24 +136,34 @@ These options are parsed **before** the subcommand token and apply to every subc
 | Option | Required | Description |
 |---|---|---|
 | `--project` | yes | GCP project id billed for executing the BigQuery work. |
-| `--table-description` | no | Extra text appended to the output table description. Default: empty. |
 | `--dry-run` | no | Print the queries and validate them with BigQuery dry runs, without creating, changing or deleting anything. Only read-only metadata lookups run for real. A query that reads a table the run would have created (e.g. on a first run, or the incremental step's session temp table) can't be validated, and is logged as a warning. |
 | `-v`, `--verbose` | no | Verbose output; repeat (`-vv`) for more. |
 | `-q`, `--quiet` | no | Quiet output (errors only). |
+
+### Common command options
+
+These options are parsed **after** the subcommand token and are accepted by every
+subcommand:
+
+| Option | Required | Description |
+|---|---|---|
+| `--table-description` | no | Extra text appended to the output table description. Default: empty. |
 
 A full invocation therefore looks like:
 
 ```shell
 docker compose run --rm --entrypoint pipe-events pipeline \
-  -v --project world-fishing-827 --table-description "Incremental fishing events" \
-  fishing_events_incremental --start-date 2020-01-01 --end-date 2020-01-10 ...
+  -v --project world-fishing-827 \
+  fishing_events_incremental --table-description "Incremental fishing events" \
+  --start-date 2020-01-01 --end-date 2020-01-10 ...
 ```
 
 ## CLI reference
 
 Every table option takes a **fully-qualified** `project.dataset.table` value, and
 `--bq-in-udfs-dataset` takes a `project.dataset`. All subcommand options below are
-required unless noted; the [global options](#global-options) above are additional.
+required unless noted; the [global options](#global-options) and
+[common command options](#common-command-options) above are additional.
 
 ### `fishing_events_incremental`
 
@@ -174,7 +184,9 @@ field.
 ### `fishing_events_incremental_filter`
 
 Applies the fishing-event filters to a merged table and writes the `*_filtered` table.
-Run once per score field, with `--squid-jiggers` for the `night_loitering` run.
+Run once per score field: `--exclude-geartype squid_jigger` for the `nnet_score` run,
+and `--include-geartype squid_jigger --min-event-distance-meters 50` for the
+`night_loitering` run.
 
 | Option | Required | Description |
 |---|---|---|
@@ -183,8 +195,9 @@ Run once per score field, with `--squid-jiggers` for the `night_loitering` run.
 | `--bq-in-segment-vessel` | yes | Segment vessel table. |
 | `--bq-in-product-vessel-info-summary` | yes | Product vessel info summary (PVIS) table. |
 | `--product-vessel-info-summary-field-prefix` | no | Prefix for vessel info fields in the PVIS table (e.g. `ais_`; empty for VMS PVIS). |
-| `--squid-jiggers` | no | Keep only squid jigger events (pass it for `night_loitering`). Without it, squid jigger events are dropped. |
-| `--min-event-distance-meters` | no | Minimum event distance. Default: `500`, or `50` with `--squid-jiggers`. |
+| `--include-geartype` | one of the two | Keep only events of vessels whose PVIS `prod_geartype` for the event year is this value (e.g. `squid_jigger`, `drifting_longlines`). |
+| `--exclude-geartype` | one of the two | Drop events of vessels whose PVIS `prod_geartype` for the event year is this value, keeping every other gear type (e.g. `squid_jigger`). |
+| `--min-event-distance-meters` | no | Minimum event distance. Default: `500`. |
 | `--bq-in-udfs-dataset` | yes | Dataset (`project.dataset`) where the shared UDFs live. |
 | `--bq-out-filtered-events` | yes | Destination filtered fishing events table. |
 | `--labels` | yes | JSON object string applied to the output tables. |

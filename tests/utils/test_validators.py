@@ -1,7 +1,13 @@
 import argparse
 import pytest
 from datetime import date
-from pipe_events.utils.validators import valid_column, valid_date, valid_dataset, valid_table
+from pipe_events.utils.validators import (
+    valid_column,
+    valid_dataset,
+    valid_date,
+    valid_geartype,
+    valid_table,
+)
 
 
 class TestValidators:
@@ -59,3 +65,16 @@ class TestValidators:
     def test_column_valid_rejects_invalid(self, column):
         with pytest.raises(argparse.ArgumentTypeError):
             valid_column(column)
+
+    @pytest.mark.parametrize(
+        "geartype", ["squid_jigger", "drifting_longlines", "pole_and_line|trollers"]
+    )
+    def test_geartype_valid(self, geartype):
+        assert geartype == valid_geartype(geartype)
+
+    @pytest.mark.parametrize(
+        "geartype", ["", "Squid_Jigger", "a'b", "a b", "a|", "|a", "a||b"]
+    )
+    def test_geartype_valid_rejects_invalid(self, geartype):
+        with pytest.raises(argparse.ArgumentTypeError):
+            valid_geartype(geartype)
